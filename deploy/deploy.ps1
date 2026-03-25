@@ -173,7 +173,11 @@ echo 'MQTT passwords generated.'
 Write-Host ""
 Write-Host "--- [5/6] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
 
-$sbDbUrl    = if ($config["SB_DATABASE_URL"])  { $config["SB_DATABASE_URL"] }  else { "sqlite:///./data/cloud.db" }
+$pgUser     = if ($config["POSTGRES_USER"])     { $config["POSTGRES_USER"] }     else { "sb_user" }
+$pgPass     = if ($config["POSTGRES_PASSWORD"]) { $config["POSTGRES_PASSWORD"] } else { "sb_pass" }
+$pgDb       = if ($config["POSTGRES_DB"])       { $config["POSTGRES_DB"] }       else { "sb_cloud" }
+$sbDbUrl    = if ($config["SB_DATABASE_URL"])  { $config["SB_DATABASE_URL"] }  else { "postgresql+asyncpg://${pgUser}:${pgPass}@postgres:5432/${pgDb}" }
+$sbMqttHost = if ($config["SB_MQTT_HOST"])     { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
 $sbMqttUser = if ($config["SB_MQTT_USERNAME"]) { $config["SB_MQTT_USERNAME"] } else { "client" }
 $sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } else { "client123" }
 $sbTenant   = if ($config["SB_TENANT_ID"])     { $config["SB_TENANT_ID"] }     else { "hust" }
@@ -183,7 +187,7 @@ $sbGw       = if ($config["SB_GATEWAY_ID"])    { $config["SB_GATEWAY_ID"] }    e
 Invoke-EC2 @"
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$sbDbUrl
-SB_MQTT_HOST=mosquitto
+SB_MQTT_HOST=$sbMqttHost
 SB_MQTT_PORT=1883
 SB_MQTT_USERNAME=$sbMqttUser
 SB_MQTT_PASSWORD=$sbMqttPass
@@ -213,6 +217,11 @@ cp    ../cloud/requirements.txt cloud/
 cp    ../cloud/Dockerfile  cloud/
 cp    ../cloud/__init__.py cloud/
 cp    ../cloud/__main__.py cloud/
+
+# Export PostgreSQL credentials for docker-compose interpolation
+export POSTGRES_USER='$pgUser'
+export POSTGRES_PASSWORD='$pgPass'
+export POSTGRES_DB='$pgDb'
 
 # Build and start
 docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
