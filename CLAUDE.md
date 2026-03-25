@@ -43,7 +43,7 @@ The gateway bridge implements a **contract-aware MQTT <-> IPC translator**:
 
 FastAPI REST API + MQTT subscriber/publisher for cloud-side device management.
 
-- **Stack**: FastAPI + SQLAlchemy 2.0 async + aiosqlite (SQLite) + Paho MQTT
+- **Stack**: FastAPI + SQLAlchemy 2.0 async + asyncpg (PostgreSQL) + Paho MQTT
 - **DB**: 7 tables — `homes`, `rooms`, `users`, `devices`, `device_states`, `events`, `commands`
 - **Entry point**: `python -m cloud` (uvicorn) or Docker container
 
@@ -228,7 +228,7 @@ Default development namespace:
 - `SB_COMMAND_TIMEOUT_MS` (default: `5000`)
 
 ### Cloud env vars (set in `cloud/.env`):
-- `SB_DATABASE_URL` (default: `sqlite:///./cloud.db`)
+- `SB_DATABASE_URL` (default: `postgresql+asyncpg://sb_user:sb_pass@localhost:5432/sb_cloud`)
 - `SB_MQTT_HOST`, `SB_MQTT_PORT`, `SB_MQTT_USERNAME`, `SB_MQTT_PASSWORD`
 - `SB_TENANT_ID`, `SB_SITE_ID`, `SB_GATEWAY_ID`
 - `SB_API_HOST` (default: `0.0.0.0`), `SB_API_PORT` (default: `8000`)

@@ -18,6 +18,25 @@ services:
       retries: 3
       start_period: 10s
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: sb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sb_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sb_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-sb_cloud}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sb_user} -d ${POSTGRES_DB:-sb_cloud}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   cloud-api:
     build:
       context: ./cloud
@@ -28,10 +47,10 @@ services:
       - "8000:8000"
     env_file:
       - ./cloud/.env
-    volumes:
-      - cloud-data:/app/data
     depends_on:
       mosquitto:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -42,4 +61,4 @@ services:
 
 volumes:
   mosquitto-data:
-  cloud-data:
+  postgres-data:
