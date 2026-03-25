@@ -10,7 +10,7 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy.dialects.postgresql import JSONB as JSON
 from sqlalchemy.orm import relationship
 
 from cloud.app.database import Base

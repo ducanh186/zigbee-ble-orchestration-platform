@@ -12,14 +12,8 @@ from sqlalchemy.orm import DeclarativeBase
 from cloud.app.config import settings
 
 # SQLAlchemy 2.0 async engine ------------------------------------------------
-# aiosqlite requires the "sqlite+aiosqlite:///" scheme.
-_raw_url = settings.database_url
-if _raw_url.startswith("sqlite:///"):
-    _async_url = _raw_url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
-else:
-    _async_url = _raw_url
-
-engine = create_async_engine(_async_url, echo=False)
+# Expects a postgresql+asyncpg:// URL from settings.
+engine = create_async_engine(settings.database_url, echo=False)
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

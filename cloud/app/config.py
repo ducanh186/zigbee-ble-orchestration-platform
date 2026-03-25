@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Cloud backend configuration loaded from environment variables."""
 
-    database_url: str = "sqlite:///./cloud.db"
+    database_url: str = "postgresql+asyncpg://sb_user:sb_pass@localhost:5432/sb_cloud"
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
     mqtt_username: str = "client"
