@@ -1,0 +1,17 @@
+# Simplicity Studio / Silicon Labs SDK
+gecko_sdk_*/
+
+# Build output
+GNU ARM*/
+
+# Binary artifacts
+*.s37
+*.hex
+*.bin
+*.map
+*.axf
+*.out
+*.elf
+
+# Generated docs
+readme.html
