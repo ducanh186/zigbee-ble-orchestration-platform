@@ -4,7 +4,7 @@ FastAPI REST API + MQTT subscriber/publisher cho cloud-side device management.
 
 ## Stack
 
-- **FastAPI** + **SQLAlchemy 2.0** async + **aiosqlite** (SQLite)
+- **FastAPI** + **SQLAlchemy 2.0** async + **asyncpg** (PostgreSQL)
 - **Paho MQTT** subscriber + publisher
 - **Pydantic v2** settings + schemas
 
@@ -72,7 +72,7 @@ Swagger UI: http://localhost:8000/docs
 
 | Biến | Default | Mô tả |
 |---|---|---|
-| `SB_DATABASE_URL` | `sqlite:///./cloud.db` | Database URL |
+| `SB_DATABASE_URL` | `postgresql+asyncpg://sb_user:sb_pass@localhost:5432/sb_cloud` | Database URL |
 | `SB_MQTT_HOST` | `localhost` | MQTT broker host |
 | `SB_MQTT_PORT` | `1883` | MQTT broker port |
 | `SB_MQTT_USERNAME` | `client` | MQTT username |
