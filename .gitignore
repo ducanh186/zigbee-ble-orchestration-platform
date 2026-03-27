@@ -1,0 +1,25 @@
+z3.pem
+/*.md
+!CLAUDE.md
+!README.md
+.claude/
+!.github/
+# Deploy secrets
+deploy/.env.deploy
+*.pem
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.githooks
+.sunlint-cache
+# Database
+*.db
+
+# Environment
+.env
+!.env.example
+!.env.deploy.example
+
+# OTA artifacts
+ota-files/
