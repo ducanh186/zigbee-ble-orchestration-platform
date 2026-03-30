@@ -1,7 +1,7 @@
 z3.pem
 /*.md
-!CLAUDE.md
 !README.md
+CLAUDE.md
 .claude/
 !.github/
 # Deploy secrets
