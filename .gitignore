@@ -11,6 +11,7 @@ deploy/.env.deploy
 __pycache__/
 *.pyc
 *.pyo
+.vscode/
 .githooks
 .sunlint-cache
 # Database
@@ -23,3 +24,14 @@ __pycache__/
 
 # OTA artifacts
 ota-files/
+
+# Simplicity Studio / EFR32 end device projects
+end_devices/**/GNU ARM*/
+end_devices/**/gecko_sdk_*/
+end_devices/**/.project
+end_devices/**/.cproject
+end_devices/**/.pdm/
+end_devices/**/.settings/
+end_devices/**/.slcw
+end_devices/**/*.zap~
+end_devices/**/.projectlinkstore
