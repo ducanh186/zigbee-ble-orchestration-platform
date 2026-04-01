@@ -1,0 +1,6597 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>CLI Command Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,500;1,300;1,500&display=swap" rel="stylesheet"> 
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,500;1,300;1,500&display=swap" rel="stylesheet">
+<style>
+html, body, div, span, h1, h2, h3, h4, h5, h6, p, a, code, em, strong,
+ol, ul, li, article, aside, footer, header, menu, nav, section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+body {
+  line-height: 1;
+  background: #f8f8f8;
+  font-family: Roboto, sans-serif;
+  font-weight: 300;
+  font-size: 14px;
+  padding-bottom: 36px;
+}
+ol, ul {
+  list-style: none;
+}
+strong {
+  font-weight: 500;
+}
+em {
+  font-style: italic;
+}
+
+.command {
+  background: #ffffff;
+  margin: 18px;
+  position: relative;
+  padding: 21px 24px 24px 24px;
+  min-width: 300px;
+  box-shadow: 0 2px 2px 0 rgba(0,0,0,0.27);
+  border-radius: 2px;
+}
+.command-header-bar {
+  position: absolute;
+  height: 32px;
+  width: 4px;
+  top: 24px;
+  left: 0;
+  background-color: #0086d9;
+}
+
+h1 {
+  font-size: 42px;
+  margin: 18px;
+  line-height: 54px;
+}
+h2 {
+  font-size: 36px;
+  margin: 18px;
+  padding-top: 18px;
+  line-height: 42px;
+}
+h3 {
+  font-size: 30px;
+  margin: 18px;
+  line-height: 36px;
+}
+h4 {
+  font-size: 24px;
+  margin: 18px;
+  line-height: 30px;
+}
+
+.command-header {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 18px;
+  color: #333333;
+  line-height: 38px;
+  padding-bottom: 8px;
+}
+.group-header {
+  font-family: 'Roboto Mono', monospace;
+  color: #444447;
+}
+
+.command-name {
+  font-weight: 500;
+}
+.command-argument {
+  padding-left: 12px;
+}
+.command-handler {
+  display:inline-block;
+  float: right;
+  font-size: 12px;
+  line-height: 38px;
+}
+.group-info > .help, .group-info > .alias-list {
+  margin: 0 18px;
+}
+
+.arguments-title {
+  font-weight: 500;
+  margin-top: 8px;
+  line-height: 20px;
+}
+.argument-list li {
+  margin-left: 12px;
+  line-height: 20px;
+}
+.argument-list .argument-name {
+  font-family: 'Roboto Mono', monospace;
+  display: inline-block;
+  width: 50px;
+}
+
+.aliases-title {
+  font-weight: 500;
+  margin-top: 8px;
+  line-height: 20px;
+  display: inline-block;
+}
+.alias-list .alias {
+  margin-left: 12px;
+  line-height: 20px;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.search {
+  padding: 0 18px;
+  float: right;
+  font-size: 18px;
+}
+
+#search {
+  padding: 12px;
+  border: 1px solid #acacac;
+  border-radius: 2px;
+  width: 300px;
+  font-size: 16px;
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 300;
+}
+
+</style>
+</head>
+
+<!--
+Example syntax (.slcc or .slcp) for populating this file:
+
+  template_contribution:
+    - name: cli_command          # Register a command
+      value:
+        name: status             # Name of command
+        handler: status_command  # Function to be called. Must be defined
+        help: "Prints status"    # Optional help description
+        shortcuts:               # Optional shorcut list
+          - name: st
+        argument:                # Argument list, if apliccable
+          - type: uint8          # Variable type
+            help: "Channel"      # Optional description
+          - type: string
+            help: "Text"
+    - name: cli_group            # Register a group
+      value:
+        name: shell              # Group name
+        help: "Shell commands"   # Optional help description
+        shortcuts:               # Optional shorcuts
+          - name: sh
+    - name: cli_command
+      value:
+        name: repeat
+        handler: repeat_cmd
+        help: "Repeat commands"
+        shortcuts:
+          - name: r
+          - name: rep
+        group: shell            # Associate command with group
+        argument:
+          - type: string
+            help: "Text"
+          - type: additional
+            help: "More text"
+-->
+
+<body>
+<div class="search">
+<input type="text" tabindex="0" id="search" placeholder="Search for command..." />
+</div>
+<h1>CLI Command Reference</h1>
+
+
+
+<div class="command-list">
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">info</span>
+      <span class="command-handler">sli_zigbee_af_cli_info_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints information about the network state, clusters, and endpoints.</div>
+      
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">libs</span>
+      <span class="command-handler">printAllLibraryStatus</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Lists which optional libraries of the stack are implemented on this device.</div>
+      
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">bsend</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_cli_bsend_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Source endpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">send</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_cli_send_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Destination
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Source endpoint
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Destination endpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">read</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_zcl_read_cli_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Reads a message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Cluster ID
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Attribute ID
+        </li>
+        <li>
+        <span class="argument-name">u8</span>1 if server direction, 0 if client direction
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">write</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_zcl_write_cli_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Writes a message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Cluster ID
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Attribute ID
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Mask
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Data type
+        </li>
+        <li>
+        <span class="argument-name">hex</span>Data byte
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">reset</span>
+      <span class="command-handler">resetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Resets the node.</div>
+      
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">raw</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_af_cli_raw_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Creates a message by specifying the raw bytes. Use the send command to send the message once it has been created. Ex: raw 0x000F {00 0A 00 11 22 33 44 55} sends a message to cluster 15 (0x000F) of length 8 which includes the ZCL header.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>ClusterId
+        </li>
+        <li>
+        <span class="argument-name">hex</span>Data
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">send_multicast</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_cli_send_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a pre-buffered multicast message to a given group ID from a given endpoint.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>groupId
+        </li>
+        <li>
+        <span class="argument-name">u8</span>src-endpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">send-using-multicast-binding</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_cli_send_using_multicast_binding_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">When sending using a binding, specifies whether a multicast binding should be used.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>useMulticastBinding
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">timesync</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_cli_timesync_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a read attr for the time of the device specified. It sets a flag so when it gets the response it writes the time to its own time attr.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Id
+        </li>
+        <li>
+        <span class="argument-name">u8</span>srcEndpoint
+        </li>
+        <li>
+        <span class="argument-name">u8</span>destEndpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">config-cca-mode</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_cli_config_cca_mode_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Set the configured 802.15.4 CCA mode in the radio. See documentation regarding RAIL_IEEE802154_CcaMode_t.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>A RAIL_IEEE802154_CcaMode_t value
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">version</span>
+      <span class="command-handler">sli_zigbee_cli_version_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Shows the version of the software.</div>
+      
+      
+    </div>
+  </div>
+
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name">events</span>
+      <span class="command-handler">printEvents</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Print active events.</div>
+      
+      
+    </div>
+  </div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> endpoints</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">endpoint related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoints print</span>
+      <span class="command-handler">endpointPrint</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Print status of endpoints.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoints enable</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">enableDisableEndpoint</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enables the endpoint for ZCL messages.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Endpoint index
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoints disable</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">enableDisableEndpoint</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Disable the endpoint for ZCL messages.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Endpoint index
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> security</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">security related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> security set-allow-trust-center-rejoin-using-well-known-key</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">optionSecurityAllowTrustCenterRejoinUsingWellKnownKey</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Bool: allow trust center rejoin using well-known key
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> security set-allow-trust-center-rejoin-using-well-known-key-timeout</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">optionSecurityAllowTrustCenterRejoinUsingWellKnownKeyTimeout</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>timeout
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> security set-key-request-policy</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">optionSecuritySetKeyRequestPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>TC link key request policy
+        </li>
+        <li>
+        <span class="argument-name">u8</span>App link key request policy
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> security mfg-token</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Get/set MFG token.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> security mfg-token get</span>
+      <span class="command-handler">getSetMfgToken</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Print MFG token.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> security mfg-token set</span>
+      <span class="command-handler">getSetMfgToken</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Set MFG token, CANNOT BE UNSET BY CLI.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> aps</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Security aps related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> aps on</span>
+      <span class="command-handler">optionApsSecurityCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> aps off</span>
+      <span class="command-handler">optionApsSecurityCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> zigbee_print</h2>
+  </div>
+  <div class="group-info">
+    
+    
+    <div class="command-list">
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> zigbee_print enable_type</h3>
+  </div>
+  <div class="group-info">
+    
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zigbee_print enable_type stack</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_debug_print_enable_stack_type_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable/disable debug `stack` print type.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Enable/disable
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zigbee_print enable_type core</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_debug_print_enable_core_type_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable/disable debug `core` print type.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Enable/disable
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zigbee_print enable_type app</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_debug_print_enable_app_type_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable/disable debug `app` print type.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Enable/disable
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zigbee_print enable_type zcl</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_debug_print_enable_zcl_type_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable/disable debug `zcl` print type.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Enable/disable
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zigbee_print enable_type legacy_af_debug</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_debug_print_enable_legacy_af_debug_type_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable/disable debug `legacy app framework debug` print type.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Enable/disable
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> suppress</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Commands to suppress automatic responses</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> suppress cluster</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sl_zigbee_suppress_cluster</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Suppress all automatic responses from specified cluster</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>cluster id value
+        </li>
+        <li>
+        <span class="argument-name">u8</span>server or client
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> suppress command</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sl_zigbee_suppress_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Suppress all automatic responses from specified cluster command.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>cluster id value
+        </li>
+        <li>
+        <span class="argument-name">u8</span>server or client
+        </li>
+        <li>
+        <span class="argument-name">u8</span>command id
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> suppress print</span>
+      <span class="command-handler">sl_zigbee_print_suppression_table</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Print the cluster/command suppression table</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> plugin</h2>
+  </div>
+  <div class="group-info">
+    
+    
+    <div class="command-list">
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> plugin address-table</h3>
+  </div>
+  <div class="group-info">
+    
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> plugin address-table add</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginAddressTableAddCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>Entry to be added
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> plugin address-table set</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginAddressTableSetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets an entry in the address table according to the arguments specified.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>
+        </li>
+        <li>
+        <span class="argument-name">hex</span>
+        </li>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> plugin address-table remove</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginAddressTableRemoveCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Removes an entry from the address table.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>Entry to be removed
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> plugin address-table lookup</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginAddressTableLookupCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Looks up an entry in the address table.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>Entry to be looked up
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> plugin address-table print</span>
+      <span class="command-handler">emberAfPluginAddressTablePrintCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the address table.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> concentrator</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">concentrator related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator status</span>
+      <span class="command-handler">emberAfPluginConcentratorStatus</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints current status and configured parameters of the concentrator.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator start</span>
+      <span class="command-handler">emberAfPluginConcentratorStartDiscoveryCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the periodic broadcast of MTORRs.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator stop</span>
+      <span class="command-handler">emberAfPluginConcentratorStopDiscoveryCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the periodic broadcast of MTORRs.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator agg</span>
+      <span class="command-handler">emberAfPluginConcentratorAggregationCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">(Requires Concentrator Support to be enabled on this device.) Schedules a Zigbee PRO Many-To-One Route Request (MTORR) to be sent out at the next opportunity, which will cause aggregation (many-to-one) routes to be created towards this concentrator.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator print-table</span>
+      <span class="command-handler">emberAfPluginConcentratorPrintSourceRouteTable</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the SoC/NCP source route table.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> concentrator set-router-behavior</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginConcentratorSetRouterBehaviorCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">This command allows the user to set the router behavior for this component. The argument values come from concentrator-support.h in the enum with members starting with EMBER_AF_PLUGIN_CONCENTRATOR_ROUTER_BEHAVIOR_.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The value of an EMBER_AF_PLUGIN_CONCENTRATOR_ROUTER_BEHAVIOR_ enum member
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> counters</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">counters related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters print</span>
+      <span class="command-handler">emberAfPluginCountersPrintCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints all counter values and clears them.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters print-counter-type</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginCounterPrintCounterTypeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the value of this particular counter.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The counter type to print
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters simple-print</span>
+      <span class="command-handler">emberAfPluginCountersSimplePrintCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints all counter values.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters clear</span>
+      <span class="command-handler">emberAfPluginCountersClearCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears all counter values.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters print-thresholds</span>
+      <span class="command-handler">emberAfPluginCountersPrintThresholdsCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the thresholds of all the counters.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters set-threshold</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginCountersSetThresholdCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets a threshold value for a particular type of counter.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Type of counter
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Threshold Value
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters reset-thresholds</span>
+      <span class="command-handler">emberAfPluginCountersResetThresholdsCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Resets all thresholds values to 0xFFFF.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> counters send-request</span>
+      <span class="command-handler">emberAfPluginCountersSendRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a request for OTA counters.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> ezmode-commissioning</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">ezmode-commissioning related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ezmode-commissioning client</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">+</span>
+      <span class="command-handler">emberAfPluginEzModeCommissioningClientCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts EZ-Mode client commissioning.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint
+        </li>
+        <li>
+        <span class="argument-name">u8</span>EMBER_AF_EZMODE_COMMISSIONING_SERVER_TO_CLIENT or EMBER_AF_EZMODE_COMMISSIONING_CLIENT_TO_SERVER
+        </li>
+        <li>
+        <span class="argument-name">u16</span>A list of cluster IDs
+        </li>
+        <li>
+        <span class="argument-name">+</span>Array type argument <em>(zero or more of previous argument)</em>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ezmode-commissioning server</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginEzModeCommissioningServerCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts EZ-Mode server commissioning.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The identify time in seconds
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> gateway</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">gateway related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> gateway time-sync-local</span>
+      <span class="command-handler">emberAfPluginGatewaySupportTimeSyncLocal</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> ias-zone-client</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">ias-zone-client related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ias-zone-client print-servers</span>
+      <span class="command-handler">sli_zigbee_af_ias_zone_client_print_servers_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the known IAS Zone Servers.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ias-zone-client clear-all</span>
+      <span class="command-handler">sli_zigbee_af_ias_zone_client_clear_all_servers_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears all known IAS Zone Servers from a local device.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> identify</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">identify related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> identify print</span>
+      <span class="command-handler">sli_zigbee_af_identify_cli_print</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Print which endpoints are reporting.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> mfglib</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">mfglib related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib start</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_start_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Start the mfglib test mode.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>Use the Rx callback.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib stop</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_stop_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stop the mfglib test mode.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib status</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_status_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the current status of the manufacturing library.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib set-channel</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_set_channel_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the channel used by the manufacturing library for testing.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The 802.15.4 channel number.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib set-power</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_set_power_and_mode_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Set the power level and mode for the manufacturing test.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>The power level
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The power mode
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib sleep</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_sleep_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sleep.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Sleep duration (mS).
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib programEui</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_program_eui_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Program EUI.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>IEEE address to program.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib mfgenable</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_enable_mfglib</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enable mfglib.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>1 = enable, 0 = disable.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib set-options</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_set_options</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets options in the manufacturing library for testing.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The options bitmask (0 = normal transmit, 1 = CSMA transmit).
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> mfglib tone</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">tone related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib tone start</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_tone_start_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts a tone test.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> mfglib tone stop</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_tone_stop_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the tone test.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> stream</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">stream related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stream start</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_stream_start_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Start the stream test.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stream stop</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_stream_stop_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stop the stream test.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> send</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">send related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> send random</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_send_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Send a series of test packets with random data..</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The number of packets to send.
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The length of the packet to send.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> send test</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_send_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Send a series of test packets with fixed data.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The number of packets to send.
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The length of the packet to send.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> send message</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_send_message_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Send a test message with the specified data in it.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The hex data to send, up to 16 bytes.
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The number of packets to send.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> ctune</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">ctune related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ctune set</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_set_ctune_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets ctune via the manufacturing library.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The ctune value is between 0x0000 - 0x01FF.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ctune get</span>
+      <span class="command-handler">sli_zigbee_af_mfglib_get_ctune_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Gets ctune via the manufacturing library.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> network-creator</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">network-creator related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator start</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorStartCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the network formation process.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>Whether or not to form a centralized network. If this value is false, the device will attempt to join a distributed network.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator stop</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the network formation process.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator form</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorFormCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Forms a network with specified parameters.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>Whether or not to form a centralized network. If this value is false, the device will attempt to join a distributed network.
+        </li>
+        <li>
+        <span class="argument-name">u16</span>PanID of the network to be formed
+        </li>
+        <li>
+        <span class="argument-name">i8</span>Tx power of the network to be formed
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Channel of the network to be formed
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator status</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorStatusCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the status of the network-creator component.</div>
+      
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> network-creator mask</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">mask related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator mask add</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorChannelMaskCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Adds a channel to the channel mask of choice.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The mask to which to add the channel. 1 chooses the primary channel mask, any other argument chooses the secondary channel mask.
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The channel to add to the channel mask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator mask subtract</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorChannelMaskCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Subtracts a channel from the channel mask of choice.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The mask from which to subtract the channel. 1 chooses the primary channel mask. Any other argument chooses the secondary channel mask.
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The channel to subtract from the channel mask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator mask set</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">emberAfPluginNetworkCreatorChannelMaskCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets a channel mask.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The mask  to set. 1 chooses the primary channel mask. Any other argument chooses the secondary channel mask.
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The bit mask to which to set the chosen channel mask.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> network-creator-security</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">network-creator-security related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security set-joining-link-key</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_set_joining_link_key_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the link key that a specific joining device will use when joining the network. This command can be also be used to add install code-derived link keys. If all FFs are entered for the EUI64 for the joining device, then this link key will be used for all joining devices without a joining key entry.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The EUI64 of the joining device
+        </li>
+        <li>
+        <span class="argument-name">hex</span>The link key that the joining device will use to enter the network
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security clear-joining-link-keys</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_clear_joining_link_key_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears all of the joining link keys stored in the stack.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security open-network</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_open_or_close_network_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Opens the network for joining.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security close-network</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_open_or_close_network_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Closes the network for joining.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security open-with-key</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_open_network_with_key_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Opens the network that would only allow the node with the specified EUI and link key pair to join.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The EUI64 of the joining device
+        </li>
+        <li>
+        <span class="argument-name">hex</span>The link key that the joining device will use to enter the network
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-creator-security set-distributed-key</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">sli_zigbee_af_network_creator_security_configure_distributed_key</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the TC Link key for a distributed network.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The pre-configured distributed key that the joining device will use to enter the network
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> network-steering</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">network-steering related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-steering status</span>
+      <span class="command-handler">emberAfPluginNetworkSteeringStatusCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Displays the current status of the network steering process.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-steering start</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginNetworkSteeringStartCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the network steering process.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>A mask of options for indicating specific behavior within the network-steering process.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-steering stop</span>
+      <span class="command-handler">emberAfPluginNetworkSteeringStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the network steering process.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network-steering pre-configured-key-set</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginNetworkSteeringSetPreconfiguredKeyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the pre-configured key so that the joining device can enter the network.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>Sets the preconfigured key
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> ota-server</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">ota-server related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server notify</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">otaImageNotifyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an OTA Image Notify message to the specified destination indicating a new version of an image is available for download.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The node ID (can be a broadcast address) to which this OTA Notify message should be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Target endpoint for the OTA Notify message (only meaningful for non-broadcast target destination)
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Specifies which parameters to include in the OTA Notify cluster command payload (0 = jitter value only; 1 = jitter and manufacturer id; 2 = jitter, mfr id, and device id; 3 = jitter, mfr id, device id, and firmware version)
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Corresponds to QueryJitter parameter in the OTA Upgrade cluster specification. Indicates whether the client receiving Image Notify Command should send in Query Next Image Request command or not.
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Manufacturer ID for the image being advertised (should match the mfr ID in the OTA files header)
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Image type ID for the image being advertised (should match the image type ID from the OTA files header)
+        </li>
+        <li>
+        <span class="argument-name">u32</span>Firmware version of the image being advertised (should match the version from the OTA files header)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server upgrade</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">otaSendUpgradeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Instructs a device to upgrade now.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Short destination to send message
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Endpoint destination to send message
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Manufacturer ID for the image (0xFFFF for wildcard)
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Image type for the image (0xFFFF for wildcard)
+        </li>
+        <li>
+        <span class="argument-name">u32</span>File version for the image (0xFFFFFFFF for wildcard)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> ota-server policy</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">policy related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy print</span>
+      <span class="command-handler">sli_zigbee_af_ota_server_policy_print</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the polices used by the OTA Server Policy component.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy query</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the policy used by the OTA Server Policy component when it receives a query request from the client.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>0 Upgrade if server has newer (default), 1 Downgrade if server has older, 2       Reinstall if server has same, 3 No next version (no next image is available for download)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy upgrade</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the policy used by the OTA Server Policy component when it receives an upgrade end request.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>0 Upgrade Now (default), 1 Upgrade in 2       minutes, 2 Ask me later to upgrade, 3 Abort Upgrade (send default response)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy page-req-miss</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the modulus number of blocks not to respond to. This is used in testing to simulate a device that fails to receive certain blocks from an Image Page Request message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The block modulus number to skip sending when responding to an Image Page Request. E.g. if 2, every other block will not be sent. 0 turns the feature off.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy page-req-sup</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets whether the Page Request feature is supported or not.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>1 if Page Request is supported, 0 if unsupported
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy block-request</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the policy used by the ota-server Policy component when it receives an image block request.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>0 Send block (default), 1 Delay download once for 2 minutes, 2 Always abort download after first block
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-server policy image-req-min-period</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">setPolicy</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the Minimum Block Period.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The minimum block period in milliseconds
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> ota-storage-common</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">ota-storage-common related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-storage-common printImages</span>
+      <span class="command-handler">sli_zigbee_af_ota_print_all_images</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the images.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-storage-common delete</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_ota_image_delete</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Deletes the image at the specified index.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The index at which to begin deleting the image
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-storage-common reload</span>
+      <span class="command-handler">sli_zigbee_af_ota_reload_storage_device</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Reload the storage device.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-storage-common storage-info</span>
+      <span class="command-handler">sli_zigbee_af_ota_storage_info_print_command</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints information about the storage device.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota-storage-common data-print</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">sli_zigbee_af_ota_storage_data_print</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints arbitrary bytes of the OTA image on disk.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The index of the image to print its data
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The offset into the OTA image that will be printed
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> poll-control-client</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">poll-control-client related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> poll-control-client mode</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">mode</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the fast polling mode.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>The fast polling mode
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> poll-control-client timeout</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">timeout</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the fast polling timeout.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The fast polling timeout
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> poll-control-client respond</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">respond</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the response mode.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>The response mode
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> poll-control-client print</span>
+      <span class="command-handler">print</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the fast polling mode and timeout.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> reporting</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">reporting related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting print</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_print</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the report table.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting clear</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_clear</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears all entries from the report table.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting remove</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_remove</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Removes an entry from the report table.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The index of the report to be removed
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting add</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_add</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Adds a new entry to the report table.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint from which the attribute is reported
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The cluster where the attribute is located
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The ID of the attribute being reported
+        </li>
+        <li>
+        <span class="argument-name">u8</span>0 for client-side attributes or 1 for server-side attributes
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The minimum reporting interval, measured in seconds.
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The maximum reporting interval, measured in seconds.
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The minimum change to the attribute that will result in a report being sent.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting clear-last-report-time</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_clear_last_report_time</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears the last report time of attributes.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> reporting test-timing</span>
+      <span class="command-handler">sli_zigbee_af_reporting_cli_test_timing</span>
+    </div>
+    <div class="command-info">
+      <div class="help">FOR TESTING PURPOSES - gather timing metrics for reporting table operations.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> simple-metering-client</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">simple-metering-client related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> simple-metering-client sch-snapshot</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">sli_zigbee_af_simple_metering_client_cli_sch_snapshot</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Schedules a snapshot.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The network address of the server to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint from which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The remote endpoint to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The issuerId
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The commandIndex
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The total number of commands
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The snapshot schedule Id
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The start time
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The snapshot schedule. 3 bytes
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The snapshot Type
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The snapshot schedule cause
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> simple-metering-client start-sampling</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_simple_metering_client_cli_start_sampling</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a start sampling command to a metering server.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The network address of the server to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint from which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The remote endpoint to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The issuerId
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The time to start sampling
+        </li>
+        <li>
+        <span class="argument-name">u8</span>An 8-bit enumeration that identifies the type of data being sampled
+        </li>
+        <li>
+        <span class="argument-name">u16</span>An unsigned 16-bit field representing the interval or time in seconds between samples
+        </li>
+        <li>
+        <span class="argument-name">u16</span>A 16-bit unsigned integer that represents the number of samples to be taken
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> simple-metering-client get-sampled-data</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">sli_zigbee_af_simple_metering_client_cli_get_sampled_data</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a start sampling command to a metering server.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The network address of the server to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint from which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The remote endpoint to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The sample ID as received in a previous startSamplingResponse
+        </li>
+        <li>
+        <span class="argument-name">u32</span>The earliest start time sampling
+        </li>
+        <li>
+        <span class="argument-name">u8</span>An 8-bit enumeration that identifies the required type of sampled data
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The total number of samples
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> simple-metering-client local-change-supply</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">sli_zigbee_af_simple_metering_client_cli_local_change_supply</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a start sampling command to a metering server.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The network address of the server to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint from which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The remote endpoint to which the request will be sent
+        </li>
+        <li>
+        <span class="argument-name">u8</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> stack-diagnostics</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">stack-diagnostics related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack-diagnostics info</span>
+      <span class="command-handler">printInfo</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints out general information about the state of the stack.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack-diagnostics child-table</span>
+      <span class="command-handler">printChildTable</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints out the entries in the stacks child table.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack-diagnostics neighbor-table</span>
+      <span class="command-handler">printNeighborTable</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints out the entries in the stacks neighbor table.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack-diagnostics route-table</span>
+      <span class="command-handler">printRouteTable</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints out the entries in the stacks route table.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> test-harness</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">test-harness related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness status</span>
+      <span class="command-handler">emberAfPluginTestHarnessStatusCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Displays the current status of the test harness.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness concentrator-start</span>
+      <span class="command-handler">emberAfPluginTestHarnessConcentratorStartStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the concentrators periodic broadcasts</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness concentrator-stop</span>
+      <span class="command-handler">emberAfPluginTestHarnessConcentratorStartStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the concentrators periodic broadcasts</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness set-radio-power</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetRadioPower</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the radio power.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The radio power to set
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness add-child</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessAddChildCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Adds a child to the child table.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The shortId of the child device
+        </li>
+        <li>
+        <span class="argument-name">hex</span>The EUI64 of the child (big endian)
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The node type of the child device
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness set-compliance-revision</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetNodeDescriptorComplianceRevision</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets a compliance revision for a device such that the device can act as pre-R21 or R21+ for testing purposes. The reason for doing this is because the end device may send a node descriptor request and the hub will respond with the node descriptor response, which will include the hubs compliance revision. If the compliance revision of the hub is R21+, only then will the TC link key request be made by the end device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The compliance version
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness set-max-children</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetMaxChildren</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the maximum children supported by the local node.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The maximum number of children to support
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness set-neighbor-table-size</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetNeighborTableSize</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the neighbor table size.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The size of the neighbor table
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> test-harness aps-sec-for-cluster</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">aps-sec-for-cluster related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness aps-sec-for-cluster on</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetApsSecurityForClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns on automatic APS security for the specified cluster.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The cluster ID to add APS security to automatically
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> test-harness aps-sec-for-cluster off</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetApsSecurityForClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns off automatic APS security for the previously specified cluster.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> attr</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">attr related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> attr options</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">setOptionsCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the options for the attributes tests.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>
+        </li>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> attr set-dest</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">setDestinationCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the destination for the attributes tests.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+        <li>
+        <span class="argument-name">u8</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> attr start-test</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">startTestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the attributes test.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+        <li>
+        <span class="argument-name">u16</span>
+        </li>
+        <li>
+        <span class="argument-name">i8</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> registration</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">registration related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> registration on</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetRegistrationCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns on automatic SE registration.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> registration off</span>
+      <span class="command-handler">emberAfPluginTestHarnessSetRegistrationCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns off automatic SE registration.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> key-establishment</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">key-establishment related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment normal-mode</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the key establishment mode to normal.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment no-resources</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">All received KE requests will be responded with no resources.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment out-of-sequence</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an out-of-sequence message.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The out-of-sequence command ID to send
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment timeout</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Artificially creates a timeout by delaying an outgoing message.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment delay-cbke</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes the advertised delays by the local device for CBKE.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Set the actual delay that occurs
+        </li>
+        <li>
+        <span class="argument-name">u16</span>Sets the advertised delay sent to the partner of key establishment
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment default-resp</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a default response error message in response to initiate KE.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment new-key-policy</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the policy of whether the TC allows new KE requests.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Allows / disallows new key establishment requests
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment reset-aps-fc</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Forces the local device to reset its outgoing APS FC.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment adv-aps-fc</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Advances the local devices outgoing APS FC by 4096.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment suite</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSelectSuiteCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Selects between the CBKE 163k1 and 283k1 suites.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Holds the type        of key establishment suite. It can be EMBER_AF_CBKE_KEY_ESTABLISHMENT_SUITE_163K1,        EMBER_AF_CBKE_KEY_ESTABLISHMENT_SUITE_283K1, or        EMBER_AF_INVALID_KEY_ESTABLISHMENT_SUITE
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment set-available-suite</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentSetAvailableSuiteCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Selects between the CBKE 163k1 and 283k1 suites.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Holds the type        of key establishment suite. It can be EMBER_AF_CBKE_KEY_ESTABLISHMENT_SUITE_163K1,        EMBER_AF_CBKE_KEY_ESTABLISHMENT_SUITE_283K1, or        EMBER_AF_INVALID_KEY_ESTABLISHMENT_SUITE
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment key-mangle</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyEstablishmentKeyMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Mangles the length of the ephemeral key.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>The positive or negative change in length
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h5 class="group-name"> key-establishment cert-mangle</h5>
+  </div>
+  <div class="group-info">
+    <span class="help">cert-mangle related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment cert-mangle length</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">emberAfPluginTestHarnessCertMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Mangles the length of the certificate.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>The positive or negative change in length
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment cert-mangle issuer</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginTestHarnessCertMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes the issuer in the certificate.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The EUI64 of the issuer (big endian)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment cert-mangle corrupt</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessCertMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Corrupts a single byte in the cert.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The index of the certificate byte to corrupt
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment cert-mangle change-byte</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessCertMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes a single byte in the cert.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The index of the certificate byte to change
+        </li>
+        <li>
+        <span class="argument-name">u8</span>The new value of the certificate byte
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-establishment cert-mangle subject</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">emberAfPluginTestHarnessCertMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes the subject (EUI64) of the cert.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>The EUI64 of the subject (big endian)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> price</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">price related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> price send-new-fields</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessPriceSendNewFieldsCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Controls whether the new SE 1.1 price fields are included.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Boolean indicating whether to send new fields
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> price send-se10-fields</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessPriceSendNewFieldsCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Controls whether the new SE 1.1 price fields are included.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Boolean indicating whether to send new fields
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> tc-keepalive</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">tc-keepalive related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> tc-keepalive send</span>
+      <span class="command-handler">emberAfPluginTestHarnessTcKeepaliveSendCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a Trust Center Keepalive.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> tc-keepalive start</span>
+      <span class="command-handler">emberAfPluginTestHarnessTcKeepaliveStartStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts the TC keepalive state machine.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> tc-keepalive stop</span>
+      <span class="command-handler">emberAfPluginTestHarnessTcKeepaliveStartStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Stops the TC keepalive state machine.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> ota</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">ota related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> ota image-mangle</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">emberAfPluginTestHarnessOtaImageMangleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Mangles the Simple Storage RAM OTA image.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>The byte index into the OTA image that will be mangled
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> key-update</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">key-update related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-update unicast</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyUpdateCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes TC NWK key update mechanism to unicast</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-update broadcast</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyUpdateCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Changes TC NWK key update mechanism to broadcast.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> key-update now</span>
+      <span class="command-handler">emberAfPluginTestHarnessKeyUpdateCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Starts a TC NWK key update now.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> stack</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">stack related commands.</span>
+    
+    <div class="command-list">
+    
+<div class="group">
+  <div class="group-header">
+    <h5 class="group-name"> stack limit-beacons</h5>
+  </div>
+  <div class="group-info">
+    <span class="help">limit-beacons related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack limit-beacons on</span>
+      <span class="command-handler">emberAfPluginTestHarnessLimitBeaconsOnOffCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enables a limit to the max number of outgoing beacons.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> stack limit-beacons off</span>
+      <span class="command-handler">emberAfPluginTestHarnessLimitBeaconsOnOffCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Disables a limit to the max number of outgoing beacons.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> channel-mask</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">channel-mask related commands</span>
+    
+    <div class="command-list">
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> endpoint</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">endpoint related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoint enable</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessEnableDisableEndpointCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enables the endpoint to receive messages and be discovered.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The endpoint number
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoint disable</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessEnableDisableEndpointCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Disables the endpoint to receive messages and be discovered.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The endpoint number
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoint status</span>
+      <span class="command-handler">emberAfPluginTestHarnessEndpointStatusCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Disables the endpoint to receive messages and be discovered.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> endpoint cluster-endpoint-index</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">emberAfPluginTestHarnessClusterEndpointIndexCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Gets the cluster endpoint index.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The local endpoint of the cluster
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The cluster whose index is needed
+        </li>
+        <li>
+        <span class="argument-name">u8</span>0 for client-side attributes or 1 for server-side attributes
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h4 class="group-name"> radio</h4>
+  </div>
+  <div class="group-info">
+    <span class="help">radio related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> radio on</span>
+      <span class="command-handler">emberAfPluginTestHarnessRadioOnOffCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns on the radio if it was previously turned off.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> radio off</span>
+      <span class="command-handler">emberAfPluginTestHarnessRadioOnOffCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns off the radio so that no messages are sent.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> update-tc-link-key</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">update-tc-link-key related commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> update-tc-link-key timer</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">emberAfPluginSetTCLinkKeyUpdateTimerCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">This sets the the amount of time between subsequent trust center link key updates in milliseconds.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u32</span>The amount of time between subsequent trust center link key updates in milliseconds
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> network</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Network related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network form</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">networkFormCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Forms a network on a given channel, with a given TX Power and PAN ID.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net form</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The channel on which to form the network
+        </li>
+        <li>
+        <span class="argument-name">i8</span>One-byte signed value indicating the TX Power that the radio should be set to
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The PAN ID on which to form the network
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network join</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">networkJoinCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Joins a network on a given channel, with a given TX Power and PAN ID.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net join</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The channel on which to join the network
+        </li>
+        <li>
+        <span class="argument-name">i8</span>One-byte signed value indicating the TX Power that the radio should be set to
+        </li>
+        <li>
+        <span class="argument-name">u16</span>The PAN ID on which to join the network
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network pjoin</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">networkPermitJoinCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Turns permit joining on for the amount of time indicated.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net pjoin</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>A single byte indicating how long the device should have permit joining turn on for. A value of 0xff turns permit join indefinitely.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network leave</span>
+      <span class="command-handler">networkLeaveCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Leaves a network.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net leave</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network rejoin</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">networkRejoinCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">ReJoins a network.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net rejoin</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Boolean network key availability
+        </li>
+        <li>
+        <span class="argument-name">u32</span>Channel mask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network rejoin-diff-device-type</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">i32</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">networkRejoinDiffDeviceTypeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Rejoins an existing network in a secure or insecure manner with a different device type.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net rejoin-diff-device-type</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Boolean network key availability
+        </li>
+        <li>
+        <span class="argument-name">i32</span>Channel mask
+        </li>
+        <li>
+        <span class="argument-name">u8</span>An enumeration indicating the device type to rejoin as.The stack only accepts EMBER_END_DEVICE and EMBER_SLEEPY_END_DEVICE.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network extpanid</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">networkExtendedPanIdCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Writes the extended pan ID for the device.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net extpanid</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>extpanid
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network isopen</span>
+      <span class="command-handler">networkCheckPjoinCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Checks network pjoin status.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net isopen</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network broad-pjoin</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">networkPermitJoinCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Permits joining on the network for a given number of seconds AND broadcasts a ZDO Mgmt Permit Joining request to all routers.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net broad-pjoin</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>A single byte indicating how long the device should have permit joining turned on for. A value of 0xff turns on permit join indefinitely.
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network change-channel</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">networkChangeChannelCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Attempts to change device over to a different channel given in the channel argument.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net change-channel</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>The channel to change to
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network set</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">networkSetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the network index used by all future CLI commands.  Before executing a CLI command, the framework switches to this network.  After the command finishes executing, the framework switches back to the previous network.  The CLI uses the same network index until the device resets or it is changed through this command.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net set</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network init</span>
+      <span class="command-handler">networkInitCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Initializes a network; this is a test command used for tc-swap-out testing.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net init</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network id</span>
+      <span class="command-handler">networkIdCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the current Node ID, EUI64, and Pan ID.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net id</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network change-keep-alive-mode</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">changeKeepAliveModeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Switches between different keep alive modes supported by a router.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net change-keep-alive-mode</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>Keep alive mode
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network timeout-option-mask</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">networkChangeChildTimeoutOptionMaskCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Attempts to change the child timeout option mask to filter out undesirable values (e.g. no more than 3 days).</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net timeout-option-mask</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>timeout option mask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network multi-phy-start</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">i8</span>
+        <span class="command-argument">[u8]</span>
+      <span class="command-handler">networkMultiPhyStartCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Used to start multi-PHY interface other than native and form the network. The stack uses same PanId as native radio network.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net multi-phy-start</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>page
+        </li>
+        <li>
+        <span class="argument-name">u8</span>channel
+        </li>
+        <li>
+        <span class="argument-name">i8</span>power
+        </li>
+        <li>
+        <span class="argument-name">u8</span><em>(optional)</em> optionsMask (Bit 0 = Routers allowed, Bit 1 = Broadcast allowed)
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network multi-phy-stop</span>
+      <span class="command-handler">networkMultiPhyStopCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Terminates the multi-PHY interface</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net multi-phy-stop</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> network find</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">network find commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network find joinable</span>
+      <span class="command-handler">findJoinableNetworkCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">findJoinableNetwork</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net find joinable</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> network find unused</span>
+      <span class="command-handler">findUnusedPanIdCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">findUnusedPanId</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> net find unused</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> keys</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Security keys related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> keys print</span>
+      <span class="command-handler">keysPrintCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints all security keys.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> keys delete</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">keysDeleteCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Delete the specified link key index.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> keys clear</span>
+      <span class="command-handler">keysClearCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears all security keys.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> option</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Option related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option register</span>
+      <span class="command-handler">optionRegisterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt register</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option target</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">optionDiscoveryTargetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt target</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>targetId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option disc</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">optionDiscoverCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt disc</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>profileId
+        </li>
+        <li>
+        <span class="argument-name">u16</span>clusterId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option link</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">optionLinkCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt link</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+        <li>
+        <span class="argument-name">hex</span>eui64
+        </li>
+        <li>
+        <span class="argument-name">hex</span>key
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option install-code</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">optionInstallCodeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt install-code</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+        <li>
+        <span class="argument-name">hex</span>eui64
+        </li>
+        <li>
+        <span class="argument-name">hex</span>installCode
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> option binding-table</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Binding table related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option binding-table print</span>
+      <span class="command-handler">optionBindingTablePrintCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints the binding table to the command line.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt binding-table print</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option binding-table clear</span>
+      <span class="command-handler">optionBindingTableClearCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears the binding table.</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt binding-table clear</span>
+      </div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> option binding-table set</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">optionBindingTableSetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sets the binding table</div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> opt binding-table set</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+        <li>
+        <span class="argument-name">u16</span>cluster
+        </li>
+        <li>
+        <span class="argument-name">u8</span>localEp
+        </li>
+        <li>
+        <span class="argument-name">u8</span>remoteEp
+        </li>
+        <li>
+        <span class="argument-name">hex</span>eui64
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> print-rx-msgs</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Enables/Disables printing of Rx messages.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> print-rx-msgs enable</span>
+      <span class="command-handler">optionPrintRxCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Enables printing of Rx messages.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> print-rx-msgs disable</span>
+      <span class="command-handler">optionPrintRxCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Disables printing of Rx messages.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> apsretry</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">APS retry flag force commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> apsretry on</span>
+      <span class="command-handler">optionApsRetryCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> apsretry off</span>
+      <span class="command-handler">optionApsRetryCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> apsretry default</span>
+      <span class="command-handler">optionApsRetryCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> changekey</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">changekey related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> changekey link</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">changeKeyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> changek link</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>key
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> changekey network</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">changeKeyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      <div class="alias-list">
+      <span class="aliases-title">Alias</span>
+      <span class="alias"> changek network</span>
+      </div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>key
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> zdo</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Zdo related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo route</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoRouteRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO route request command to the target.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">u8</span>index
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo power</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoPowerDescriptorRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO Power Descriptor Request to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo mgmt-lqi</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoMgmtLqiCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO MGMT-LQI (LQI Table) Request to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">u8</span>startIndex
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo mgmt-bind</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoMgmtBindCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO MGMT-Bind (Binding Table) Request to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">u8</span>startIndex
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo leave</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoLeaveRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO Management Leave command to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">u8</span>removeChildren
+        </li>
+        <li>
+        <span class="argument-name">u8</span>rejoin
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo active</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoActiveEpCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an active endpoint request to the device with the given short ID.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>nodeId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo bind</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">zdoBindCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a ZDO Bind command to a device specified in the command arguments.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>Destination
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Source endpoint
+        </li>
+        <li>
+        <span class="argument-name">u8</span>Destination endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>clusterID
+        </li>
+        <li>
+        <span class="argument-name">hex</span>remoteEUI64
+        </li>
+        <li>
+        <span class="argument-name">hex</span>destEUI64
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo node</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoNodeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a node descriptor request to a given target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo match</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoMatchCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a matchDescriptorsRequest to the given destination with the given profile.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>nodeId
+        </li>
+        <li>
+        <span class="argument-name">u16</span>profile
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo simple</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoSimpleCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a simple descriptor request for the short address and endpoint specified.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>dest
+        </li>
+        <li>
+        <span class="argument-name">u8</span>targetEndpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo ieee</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoIeeeAddressRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Requests an IEEE address based on a given node ID.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>nodeId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo nwk</span>
+        <span class="command-argument">hex</span>
+      <span class="command-handler">zdoNwkAddressRequestCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends a network address request for the given IEEE address.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">hex</span>ieee
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> zdo unbind</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Zdo unbind related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo unbind group</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoUnbindGroupCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an unbind request for a multicast binding to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">hex</span>source eui64
+        </li>
+        <li>
+        <span class="argument-name">u8</span>source endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>clusterID
+        </li>
+        <li>
+        <span class="argument-name">u16</span>groupAddress
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> zdo unbind unicast</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">hex</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoUnbindUnicastCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an unbind request for a unicast binding to the target device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>target
+        </li>
+        <li>
+        <span class="argument-name">hex</span>source eui64
+        </li>
+        <li>
+        <span class="argument-name">u8</span>source endpoint
+        </li>
+        <li>
+        <span class="argument-name">u16</span>clusterID
+        </li>
+        <li>
+        <span class="argument-name">hex</span>destinationEUI64
+        </li>
+        <li>
+        <span class="argument-name">u8</span>destination endpoint
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> nwk-upd</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Zdo nwk-upd related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> nwk-upd scan-chan-mask</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">zdoNetworkUpdateScanCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Performs an energy scan on given channel mask.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>targetNodeId
+        </li>
+        <li>
+        <span class="argument-name">u8</span>scanDuration
+        </li>
+        <li>
+        <span class="argument-name">u16</span>scanCount
+        </li>
+        <li>
+        <span class="argument-name">u32</span>channelMask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> nwk-upd set</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u32</span>
+      <span class="command-handler">zdoNetworkUpdateSetCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Broadcasts the ID of the new network manager and active channels.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>nwkMgeId
+        </li>
+        <li>
+        <span class="argument-name">u32</span>channelMask
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> nwk-upd scan</span>
+        <span class="command-argument">u16</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoNetworkUpdateScanCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Performs an energy scan.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>targetNodeId
+        </li>
+        <li>
+        <span class="argument-name">u8</span>scanDuration
+        </li>
+        <li>
+        <span class="argument-name">u16</span>scanCount
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> nwk-upd chanPg</span>
+        <span class="command-argument">u8</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoNetworkUpdateChannelCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an update channel page req. The stack sends nwk enhanced update req for non-zero page.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>channel
+        </li>
+        <li>
+        <span class="argument-name">u8</span>page
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> nwk-upd chan</span>
+        <span class="command-argument">u8</span>
+      <span class="command-handler">zdoNetworkUpdateChannelCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Sends an update channel request.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u8</span>channel
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> out-cl-list</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Zdo out-cl-list related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> out-cl-list add</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoAddClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Adds clusters to the known client (out) clusters on this device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>clusterId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> out-cl-list clear</span>
+      <span class="command-handler">zdoClearClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears the ZDO list of client (out) clusters.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h3 class="group-name"> in-cl-list</h3>
+  </div>
+  <div class="group-info">
+    <span class="help">Zdo in-cl-list related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> in-cl-list add</span>
+        <span class="command-argument">u16</span>
+      <span class="command-handler">zdoAddClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Adds clusters to the known client (in) clusters on this device.</div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">u16</span>clusterId
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> in-cl-list clear</span>
+      <span class="command-handler">zdoClearClusterCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Clears the ZDO list of client (in) clusters.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> print</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">print related commands.</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> print attr</span>
+      <span class="command-handler">printAttributeTableCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints attribute.</div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> print time</span>
+      <span class="command-handler">printTimeCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help">Prints time.</div>
+      
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="group-header">
+    <h2 class="group-name"> custom</h2>
+  </div>
+  <div class="group-info">
+    <span class="help">Custom commands</span>
+    
+    <div class="command-list">
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> custom tokdump</span>
+      <span class="command-handler">mfgappTokenDump</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> custom changeNwkKey</span>
+      <span class="command-handler">changeNwkKeyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> custom printNextKey</span>
+      <span class="command-handler">printNextKeyCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> custom version</span>
+      <span class="command-handler">versionCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+    </div>
+  </div>
+    
+    
+  
+  <div class="command">
+    <div class="command-header-bar"></div>
+    <div class="command-header">
+      <span class="command-name"> custom txPower</span>
+        <span class="command-argument">i8</span>
+      <span class="command-handler">setTxPowerCommand</span>
+    </div>
+    <div class="command-info">
+      <div class="help"></div>
+      
+      
+      <div class="argument-list">
+      <div class="arguments-title">Arguments</div>
+      <ul>
+        <li>
+        <span class="argument-name">i8</span>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+    </div>
+  </div>
+</div></div>
+
+<script>
+searchbar = document.getElementById('search');
+searchbar.addEventListener('input', function(e) {
+  value = e.target.value.toLowerCase();
+  commands = document.querySelectorAll('.command-name');
+  commands.forEach(function(el) {
+    if (el.textContent.trim().toLowerCase().includes(value)) {
+      el.closest('.command').style.display = 'block';
+    } else {
+      el.closest('.command').style.display = 'none';
+    }
+  });
+});
+</script>
+</body>
+</html>
