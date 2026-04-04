@@ -1,0 +1,6 @@
+{
+  "sdkRoot" : "/home/phu/SimplicityStudio/SDKs/gecko_sdk/",
+  "apackRoot" : "/home/phu/SimplicityStudio_v5/developer/adapter_packs/zap",
+  "partOpn" : "linux_64",
+  "boards" : "none"
+}
