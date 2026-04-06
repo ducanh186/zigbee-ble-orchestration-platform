@@ -45,7 +45,7 @@ void netMgrInit(void)
   } else {
     sl_led_turn_off(STATUS_LED);
     g_searching = true;
-    sl_zigbee_event_set_active(&g_searchEvent);
+    sl_zigbee_event_set_delay_ms(&g_searchEvent, NETWORK_SEARCH_DELAY_MS);
     sl_zigbee_event_set_active(&g_ledBlinkEvent);
   }
 }
@@ -92,6 +92,11 @@ static void searchHandler(sl_zigbee_event_t *event)
 
   EmberStatus st = emberAfPluginNetworkSteeringStart();
   emberAfCorePrintln("NET: steering start st=0x%02X", st);
+
+  if (st != EMBER_SUCCESS) {
+    // Start failed (stack not ready, busy, etc.) — retry
+    sl_zigbee_event_set_delay_ms(&g_searchEvent, NETWORK_RETRY_DELAY_MS);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -189,9 +194,18 @@ void emberAfPostAttributeChangeCallback(uint8_t endpoint,
 
 void emberAfPluginOnOffClusterServerPostInitCallback(uint8_t endpoint)
 {
-  emberAfPostAttributeChangeCallback(endpoint,
-                                     ZCL_ON_OFF_CLUSTER_ID,
-                                     ZCL_ON_OFF_ATTRIBUTE_ID,
-                                     CLUSTER_MASK_SERVER,
-                                     0, 0, 0, NULL);
+  // Sync LED1 with the persisted on/off state at boot
+  bool onOff = false;
+  if (emberAfReadServerAttribute(endpoint,
+                                 ZCL_ON_OFF_CLUSTER_ID,
+                                 ZCL_ON_OFF_ATTRIBUTE_ID,
+                                 (uint8_t *)&onOff,
+                                 sizeof(onOff))
+      == EMBER_ZCL_STATUS_SUCCESS) {
+    if (onOff) {
+      sl_led_turn_on(LIGHT_LED);
+    } else {
+      sl_led_turn_off(LIGHT_LED);
+    }
+  }
 }

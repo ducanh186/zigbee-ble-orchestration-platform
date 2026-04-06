@@ -75,10 +75,10 @@ configuration:
 - {name: SL_BOARD_ENABLE_VCOM, value: '1'}
 - condition: [iostream_usart]
   name: SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE
-  value: usartHwFlowControlCtsAndRts
+  value: usartHwFlowControlNone
 - condition: [iostream_eusart]
   name: SL_IOSTREAM_EUSART_VCOM_FLOW_CONTROL_TYPE
-  value: eusartHwFlowControlCtsAndRts
+  value: eusartHwFlowControlNone
 - {name: SL_CLI_MAX_INPUT_ARGUMENTS, value: '16'}
 - {name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE, value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_ROUTER}
 - {name: SLI_ZIGBEE_PRIMARY_NETWORK_SECURITY_TYPE, value: SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0}

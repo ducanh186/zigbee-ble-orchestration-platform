@@ -1,0 +1,32 @@
+{
+  "device_name": "Z3Light",
+  "description": "Zigbee 3.0 light application (Router) using NVM3 persistent storage",
+  "zigbee_device_type": "Router",
+  "target": {
+    "mcu": "EFR32MG12P332F1024GL125",
+    "board": "BRD4162A (EFR32MG12 2.4 GHz 19 dBm Radio Board)",
+    "mainboard": "BRD4001A (Wireless Starter Kit Mainboard)"
+  },
+  "build": {
+    "sdk": "Gecko SDK v4.5.0",
+    "sdk_id": "com.silabs.sdk.stack.super:4.5.0._1927637552",
+    "toolchain": "GNU ARM CDT 12.2.1.20221205",
+    "toolchain_id": "com.silabs.ss.tool.ide.arm.toolchain.gnu.cdt:12.2.1.20221205",
+    "build_config": "LINK_LIBRARIES (links against precompiled SDK libraries)",
+    "ide": "Simplicity Studio v5"
+  },
+  "firmware_version": "source-only, no version tag yet",
+  "source_commit": "ae57686 (2026-03-27)",
+  "source_path": "end_devices/Z3Light/",
+  "binaries": {
+    "status": "READY",
+    "expected_outputs": [
+      "Z3Light.s37 (Motorola S-record, primary flash image)",
+      "Z3Light.hex (Intel HEX, alternative flash image)",
+      "Z3Light.gbl (GBL image for OTA upgrade)"
+    ],
+    "flash_command": "commander flash artifact/Z3Light/Z3Light.s37 --device EFR32MG12P332F1024GL125"
+  },
+  "build_instructions": "Open end_devices/Z3Light/Z3Light.slcp in Simplicity Studio v5 with Gecko SDK 4.5.0. Build with GNU ARM 12.2.1. Copy .s37 into this directory.",
+  "date_generated": "2026-04-06"
+}
