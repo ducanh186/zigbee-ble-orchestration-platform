@@ -11,12 +11,13 @@ services:
     volumes:
       - ../config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ../config/acl.conf:/mosquitto/config/acl.conf:ro
+      - ../config/bridge.conf:/mosquitto/config/conf.d/bridge.conf:ro
       - ../passwords:/mosquitto/passwords
       - ../data:/mosquitto/data
     environment:
       - TZ=UTC
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 -W 3"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u monitor -P monitor123 -t '$$SYS/broker/uptime' -C 1 -W 3"]
       interval: 30s
       timeout: 10s
       retries: 3

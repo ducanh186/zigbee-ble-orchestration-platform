@@ -60,9 +60,9 @@ Get-Content $EnvFile | ForEach-Object {
     }
 }
 
-$EC2_HOST   = $config["EC2_HOST"]
-$EC2_USER   = $config["EC2_USER"]
-$EC2_KEY    = $config["EC2_KEY"]
+$EC2_HOST = $config["EC2_HOST"]
+$EC2_USER = $config["EC2_USER"]
+$EC2_KEY = $config["EC2_KEY"]
 $REMOTE_DIR = $config["REMOTE_DIR"]
 
 # Expand ~ in key path
@@ -136,7 +136,7 @@ Write-Host "--- [3/6] Preparing remote directories ---" -ForegroundColor Yellow
 Invoke-EC2 @"
 set -e
 cd $REMOTE_DIR
-mkdir -p deploy/mosquitto/config
+mkdir -p deploy/mosquitto/config/conf.d
 mkdir -p deploy/mosquitto/passwords
 mkdir -p deploy/cloud
 cp -f mqtt/config/mosquitto.conf deploy/mosquitto/config/
@@ -150,9 +150,10 @@ echo 'Directories prepared.'
 Write-Host ""
 Write-Host "--- [4/6] Generating MQTT passwords ---" -ForegroundColor Yellow
 
-$gwPass  = if ($config["MQTT_GATEWAY_PASS"]) { $config["MQTT_GATEWAY_PASS"] } else { "gateway123" }
-$cliPass = if ($config["MQTT_CLIENT_PASS"])  { $config["MQTT_CLIENT_PASS"] }  else { "client123" }
+$gwPass = if ($config["MQTT_GATEWAY_PASS"]) { $config["MQTT_GATEWAY_PASS"] } else { "gateway123" }
+$cliPass = if ($config["MQTT_CLIENT_PASS"]) { $config["MQTT_CLIENT_PASS"] }  else { "client123" }
 $monPass = if ($config["MQTT_MONITOR_PASS"]) { $config["MQTT_MONITOR_PASS"] } else { "monitor123" }
+$brPass = if ($config["MQTT_BRIDGE_PASS"]) { $config["MQTT_BRIDGE_PASS"] }  else { "bridge123" }
 
 Invoke-EC2 @"
 set -e
@@ -163,6 +164,7 @@ docker run --rm -v "`$PASSDIR:/passwords" eclipse-mosquitto:2.0 sh -c "
   mosquitto_passwd -b /passwords/passwd gateway '$gwPass'
   mosquitto_passwd -b /passwords/passwd client  '$cliPass'
   mosquitto_passwd -b /passwords/passwd monitor '$monPass'
+  mosquitto_passwd -b /passwords/passwd bridge  '$brPass'
 "
 echo 'MQTT passwords generated.'
 "@
@@ -173,16 +175,16 @@ echo 'MQTT passwords generated.'
 Write-Host ""
 Write-Host "--- [5/6] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
 
-$pgUser     = if ($config["POSTGRES_USER"])     { $config["POSTGRES_USER"] }     else { "sb_user" }
-$pgPass     = if ($config["POSTGRES_PASSWORD"]) { $config["POSTGRES_PASSWORD"] } else { "sb_pass" }
-$pgDb       = if ($config["POSTGRES_DB"])       { $config["POSTGRES_DB"] }       else { "sb_cloud" }
-$sbDbUrl    = if ($config["SB_DATABASE_URL"])  { $config["SB_DATABASE_URL"] }  else { "postgresql+asyncpg://${pgUser}:${pgPass}@postgres:5432/${pgDb}" }
-$sbMqttHost = if ($config["SB_MQTT_HOST"])     { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
+$pgUser = if ($config["POSTGRES_USER"]) { $config["POSTGRES_USER"] }     else { "sb_user" }
+$pgPass = if ($config["POSTGRES_PASSWORD"]) { $config["POSTGRES_PASSWORD"] } else { "sb_pass" }
+$pgDb = if ($config["POSTGRES_DB"]) { $config["POSTGRES_DB"] }       else { "sb_cloud" }
+$sbDbUrl = if ($config["SB_DATABASE_URL"]) { $config["SB_DATABASE_URL"] }  else { "postgresql+asyncpg://${pgUser}:${pgPass}@postgres:5432/${pgDb}" }
+$sbMqttHost = if ($config["SB_MQTT_HOST"]) { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
 $sbMqttUser = if ($config["SB_MQTT_USERNAME"]) { $config["SB_MQTT_USERNAME"] } else { "client" }
 $sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } else { "client123" }
-$sbTenant   = if ($config["SB_TENANT_ID"])     { $config["SB_TENANT_ID"] }     else { "hust" }
-$sbSite     = if ($config["SB_SITE_ID"])       { $config["SB_SITE_ID"] }       else { "lab01" }
-$sbGw       = if ($config["SB_GATEWAY_ID"])    { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
+$sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { "hust" }
+$sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
+$sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
 
 Invoke-EC2 @"
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'

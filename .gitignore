@@ -3,7 +3,7 @@ z3.pem
 !README.md
 CLAUDE.md
 .claude/
-!.github/
+.github/
 # Deploy secrets
 deploy/.env.deploy
 *.pem
