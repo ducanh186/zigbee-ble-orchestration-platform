@@ -63,8 +63,9 @@ class MQTTService:
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         logger.info("MQTT connected with rc=%s", rc)
         prefix = self.topic_prefix
-        client.subscribe(f"{prefix}/devices/+/reported", qos=1)
-        client.subscribe(f"{prefix}/devices/+/event", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/reported", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/event", qos=1)
         client.subscribe(f"{prefix}/commands/+/reply", qos=1)
         client.subscribe(f"{prefix}/gateway/online", qos=1)
 
@@ -75,6 +76,8 @@ class MQTTService:
             topic: str = msg.topic
 
             if "/devices/" in topic and topic.endswith("/reported"):
+                self._handle_reported(topic, payload)
+            elif "/devices/" in topic and topic.endswith("/telemetry"):
                 self._handle_reported(topic, payload)
             elif "/devices/" in topic and topic.endswith("/event"):
                 self._handle_event(topic, payload)
@@ -94,8 +97,10 @@ class MQTTService:
     def _handle_reported(self, topic: str, envelope: dict) -> None:
         """Handle device reported state -- upsert device + insert state row."""
         parts = topic.split("/")
-        device_id_idx = parts.index("devices") + 1
-        device_id = parts[device_id_idx]
+        # Topic: sb/v1/{t}/{s}/{g}/devices/{device_type}/{device_id}/reported|telemetry
+        devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
+        device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
 
         async def _write():
@@ -112,7 +117,7 @@ class MQTTService:
                 if not device:
                     device = Device(
                         id=device_id,
-                        device_type=inner.get("device_type", "unknown"),
+                        device_type=inner.get("device_type", device_type),
                         eui64=inner.get("eui64"),
                         name=device_id,
                         is_online=True,
@@ -139,8 +144,9 @@ class MQTTService:
     def _handle_event(self, topic: str, envelope: dict) -> None:
         """Handle device event -- insert event row."""
         parts = topic.split("/")
-        device_id_idx = parts.index("devices") + 1
-        device_id = parts[device_id_idx]
+        # Topic: sb/v1/{t}/{s}/{g}/devices/{device_type}/{device_id}/event
+        devices_idx = parts.index("devices")
+        device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
 
         async def _write():

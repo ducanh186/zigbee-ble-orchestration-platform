@@ -1,0 +1,26 @@
+{
+  "device_name": "ncp-uart-hw",
+  "description": "Zigbee Pro NCP (Network Co-Processor) firmware with UART EZSP interface and hardware flow control",
+  "device_type": "NCP (Network Co-Processor)",
+  "target": {
+    "mcu": "EFR32MG12P332F1024GL125",
+    "board": "BRD4162A (EFR32MG12 2.4 GHz 19 dBm Radio Board)",
+    "mainboard": "BRD4001A (Wireless Starter Kit Mainboard)"
+  },
+  "build": {
+    "sdk": "Gecko SDK v4.5.0",
+    "toolchain": "GNU ARM Embedded (arm-none-eabi-gcc)",
+    "toolchain_id": "com.silabs.ss.tool.ide.arm.toolchain.gnu.cdt:12.2.1.20221205",
+    "build_config": "Release (Makefile-based, single network)",
+    "optimization": "-Os",
+    "ide": "Simplicity Studio v5"
+  },
+  "firmware_version": "SDK sample, no custom version tag",
+  "date_built": "2026-04-01T01:28:21+07:00",
+  "binaries": {
+    "ncp-uart-hw.s37": "NCP firmware image (Motorola S-record, 656 KB)"
+  },
+  "flash_command": "commander flash ncp-uart-hw.s37 --device EFR32MG12P332F1024GL125",
+  "notes": "Requires bootloader-uart-xmodem to be flashed first. This is the coordinator-side radio firmware that the gateway host (Z3GatewayHost) communicates with over UART/EZSP.",
+  "date_generated": "2026-04-06"
+}

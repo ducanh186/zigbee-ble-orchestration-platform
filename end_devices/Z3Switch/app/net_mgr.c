@@ -46,7 +46,7 @@ void netMgrInit(void)
   } else {
     sl_led_turn_off(STATUS_LED);
     g_searching = true;
-    sl_zigbee_event_set_active(&g_searchEvent);
+    sl_zigbee_event_set_delay_ms(&g_searchEvent, NETWORK_SEARCH_DELAY_MS);
     sl_zigbee_event_set_active(&g_ledBlinkEvent);
   }
 }
@@ -94,6 +94,11 @@ static void searchHandler(sl_zigbee_event_t *event)
 
   EmberStatus st = emberAfPluginNetworkSteeringStart();
   emberAfCorePrintln("NET: steering start st=0x%02X", st);
+
+  if (st != EMBER_SUCCESS) {
+    // Start failed (stack not ready, busy, etc.) — retry
+    sl_zigbee_event_set_delay_ms(&g_searchEvent, NETWORK_RETRY_DELAY_MS);
+  }
 }
 
 // ---------------------------------------------------------------------------

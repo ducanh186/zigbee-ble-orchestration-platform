@@ -62,20 +62,20 @@ configuration:
 - {name: SL_BOARD_ENABLE_VCOM, value: '1'}
 - condition: [iostream_usart]
   name: SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE
-  value: usartHwFlowControlCtsAndRts
+  value: usartHwFlowControlNone
 - condition: [iostream_eusart]
   name: SL_IOSTREAM_EUSART_VCOM_FLOW_CONTROL_TYPE
-  value: eusartHwFlowControlCtsAndRts
+  value: eusartHwFlowControlNone
 - {name: SL_CLI_MAX_INPUT_ARGUMENTS, value: '16'}
-- {name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE, value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_END_DEVICE}
+- {name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE, value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_ROUTER}
 - {name: SLI_ZIGBEE_PRIMARY_NETWORK_SECURITY_TYPE, value: SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0}
 - {name: EMBER_BINDING_TABLE_SIZE, value: '10'}
 - condition: [iostream_usart]
   name: SL_IOSTREAM_USART_VCOM_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
-  value: '0'
+  value: '1'
 - condition: [iostream_eusart]
   name: SL_IOSTREAM_EUSART_VCOM_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
-  value: '0'
+  value: '1'
 - {name: SL_CLI_PROMPT_STRING, value: '"Z3Switch>"'}
 - condition: [device_series_1]
   name: NVM3_DEFAULT_NVM_SIZE

@@ -104,8 +104,8 @@ build/debug/project/app.o: app.c \
  autogen/sl_cli_instances.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/cli/inc/sl_cli_command.h \
  autogen/sl_cli_handles.h app/app_config.h app/app_state.h app/app_log.h \
- app/app_utils.h app/net_mgr.h app/valve_ctrl.h app/cmd_handler.h \
- app/device_monitor.h
+ app/app_utils.h app/app_mqtt.h app/net_mgr.h app/valve_ctrl.h \
+ app/cmd_handler.h app/device_monitor.h
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/platform-header.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/emlib/inc/em_core.h:
@@ -221,6 +221,7 @@ app/app_config.h:
 app/app_state.h:
 app/app_log.h:
 app/app_utils.h:
+app/app_mqtt.h:
 app/net_mgr.h:
 app/valve_ctrl.h:
 app/cmd_handler.h:
