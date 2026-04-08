@@ -34,6 +34,7 @@ void cli_json_command(sl_cli_command_arg_t *arguments);
 #include "app/app_state.h"
 #include "app/app_log.h"
 #include "app/app_utils.h"
+#include "app/app_mqtt.h"
 #include "app/net_mgr.h"
 #include "app/valve_ctrl.h"
 #include "app/cmd_handler.h"
@@ -145,6 +146,10 @@ void emberAfMainInitCallback(void)
   appStateInit();
   appStateNotifyChanged();
 
+  // MQTT client: init and connect to local broker
+  appMqttInit();
+  appMqttStart();
+
   // Register "json" CLI command at runtime
   {
     static const sl_cli_command_info_t json_cmd_info =
@@ -181,6 +186,7 @@ void emberAfMainTickCallback(void)
 {
   netMgrTick();
   deviceMonitorTick();
+  appMqttTick();
 }
 
 //----------------------

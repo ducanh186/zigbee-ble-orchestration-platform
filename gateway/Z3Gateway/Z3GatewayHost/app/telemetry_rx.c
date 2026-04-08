@@ -2,6 +2,7 @@
 #include "app_state.h"
 #include "app_utils.h"
 #include "app_log.h"
+#include "app_mqtt.h"
 #include "valve_ctrl.h"
 #include "app/framework/include/af.h"
 #include "app_zcl_fallback.h"
@@ -42,6 +43,20 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
           (unsigned)sender,
           onOff ? "on" : "off"
         );
+
+        // Publish state change over MQTT
+        {
+          EmberEUI64 eui;
+          if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
+            char euiStr[20];
+            eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+            appMqttPublishDeviceReported(sender, euiStr, "light",
+                                         onOff ? "on" : "off");
+          } else {
+            emberAfCorePrintln("MQTT: skip report, EUI64 unknown for 0x%04X",
+                               (unsigned)sender);
+          }
+        }
       } else {
         break;
       }

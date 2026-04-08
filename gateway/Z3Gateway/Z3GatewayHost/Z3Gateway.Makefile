@@ -94,6 +94,15 @@ OBJS =
 ####################################################################
 -include Z3Gateway.project.mak
 
+# ===== MQTT client (libmosquitto) =====
+LIBS += -lmosquitto
+
+$(OUTPUT_DIR)/project/app/app_mqtt.o: app/app_mqtt.c
+	@echo 'Building app/app_mqtt.c'
+	@mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/app_mqtt.c
+CDEPS += $(OUTPUT_DIR)/project/app/app_mqtt.d
+OBJS += $(OUTPUT_DIR)/project/app/app_mqtt.o
 
 ####################################################################
 # Rules                                                            #

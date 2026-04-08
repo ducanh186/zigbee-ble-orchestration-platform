@@ -96,7 +96,7 @@ build/debug/project/app/telemetry_rx.o: app/telemetry_rx.c \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h \
- app/app_log.h app/valve_ctrl.h app/app_zcl_fallback.h
+ app/app_log.h app/app_mqtt.h app/valve_ctrl.h app/app_zcl_fallback.h
 app/app_config.h:
 app/app_state.h:
 app/app_utils.h:
@@ -201,5 +201,6 @@ autogen/zap-enabled-incoming-commands.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h:
 app/app_log.h:
+app/app_mqtt.h:
 app/valve_ctrl.h:
 app/app_zcl_fallback.h:
