@@ -11,7 +11,7 @@ services:
     volumes:
       - ../config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ../config/acl.conf:/mosquitto/config/acl.conf:ro
-      - ../config/bridge.conf:/mosquitto/config/conf.d/bridge.conf:ro
+      - ../config/conf.d:/mosquitto/config/conf.d:ro
       - ../passwords:/mosquitto/passwords
       - ../data:/mosquitto/data
     environment:
