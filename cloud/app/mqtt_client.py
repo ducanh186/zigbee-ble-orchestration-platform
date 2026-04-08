@@ -25,6 +25,7 @@ class MQTTService:
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
         )
         self._db_session_factory = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     # ------------------------------------------------------------------
     # Configuration helpers
@@ -44,6 +45,7 @@ class MQTTService:
     # ------------------------------------------------------------------
 
     def connect(self) -> None:
+        self._loop = asyncio.get_running_loop()
         self.client.username_pw_set(
             self.settings.mqtt_username, self.settings.mqtt_password
         )
@@ -72,6 +74,7 @@ class MQTTService:
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
         try:
+            logger.info("MQTT rx: %s (%d bytes)", msg.topic, len(msg.payload))
             payload = json.loads(msg.payload.decode("utf-8"))
             topic: str = msg.topic
 
@@ -133,7 +136,7 @@ class MQTTService:
                     state=inner.get("state", inner),
                     reported_at=datetime.fromisoformat(
                         envelope.get("ts", datetime.now(UTC).isoformat())
-                    ),
+                    ).replace(tzinfo=None),
                 )
                 session.add(state_row)
                 await session.commit()
@@ -163,7 +166,7 @@ class MQTTService:
                     payload=inner,
                     occurred_at=datetime.fromisoformat(
                         envelope.get("ts", datetime.now(UTC).isoformat())
-                    ),
+                    ).replace(tzinfo=None),
                 )
                 session.add(event)
                 await session.commit()
@@ -242,17 +245,19 @@ class MQTTService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _run_async(coro_func) -> None:
-        """Schedule an async coroutine from a synchronous paho callback."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(coro_func())
-            else:
-                loop.run_until_complete(coro_func())
-        except RuntimeError:
-            asyncio.run(coro_func())
+    def _run_async(self, coro_func) -> None:
+        """Schedule an async coroutine from a synchronous paho callback thread."""
+
+        async def _wrapped():
+            try:
+                await coro_func()
+            except Exception:
+                logger.exception("Async DB write failed")
+
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(_wrapped(), self._loop)
+        else:
+            asyncio.run(_wrapped())
 
 
 # Module-level singleton used across the application.
