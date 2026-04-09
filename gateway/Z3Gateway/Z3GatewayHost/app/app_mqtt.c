@@ -20,9 +20,11 @@
 
 // ===== Broker connection =====
 #define MQTT_CLIENT_ID   "z3gw-host"
-#define MQTT_HOST        "localhost"
+#define MQTT_HOST        "98.83.4.87"
 #define MQTT_PORT        1883
 #define MQTT_KEEPALIVE   60
+#define MQTT_USERNAME    "gateway"
+#define MQTT_PASSWORD    "gateway123"
 
 // Reconnect: 1 s initial, 30 s max, exponential backoff
 #define MQTT_RECONN_MIN  1
@@ -245,6 +247,9 @@ void appMqttInit(void)
   mosquitto_log_callback_set(sMosq, onLog);
   mosquitto_reconnect_delay_set(sMosq, MQTT_RECONN_MIN, MQTT_RECONN_MAX, true);
 
+  // Authenticate with broker
+  mosquitto_username_pw_set(sMosq, MQTT_USERNAME, MQTT_PASSWORD);
+
   // Initialize inbound command queue
   mqttQueueInit();
 
@@ -338,9 +343,9 @@ void appMqttPublishDeviceReported(uint16_t nodeId, const char *eui64Str,
   char envelope[512];
   buildEnvelope(envelope, sizeof(envelope), inner);
 
-  // Topic: devices/{eui64}/reported
-  char topicSuffix[80];
-  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/reported", eui64Str);
+  // Topic: devices/{device_type}/{eui64}/reported
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/reported", deviceType, eui64Str);
 
   appMqttPublish(topicSuffix, envelope, 1, true);
 }
