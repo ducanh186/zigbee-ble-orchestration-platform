@@ -31,6 +31,25 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # Table creation helper -------------------------------------------------------
 async def init_db() -> None:
-    """Create all tables that do not yet exist."""
+    """Create missing tables and apply lightweight column migrations.
+
+    `create_all` does not add columns to existing tables, so for evolving
+    schemas we append idempotent ALTER TABLE statements for Postgres.
+    """
+    from sqlalchemy import text
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if engine.dialect.name == "postgresql":
+            await conn.execute(
+                text(
+                    "ALTER TABLE commands "
+                    "ADD COLUMN IF NOT EXISTS timeout_ms INTEGER NOT NULL DEFAULT 5000"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE commands "
+                    "ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP"
+                )
+            )
