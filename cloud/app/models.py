@@ -10,8 +10,12 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB as JSON
+from sqlalchemy import JSON as _JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+
+# JSONB on Postgres, plain JSON on sqlite (tests)
+JSON = _JSON().with_variant(JSONB(), "postgresql")
 
 from cloud.app.database import Base
 
@@ -110,6 +114,8 @@ class Command(Base):
     target = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="accepted")
     reason = Column(String, nullable=True)
+    timeout_ms = Column(Integer, nullable=False, default=5000)
+    expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
