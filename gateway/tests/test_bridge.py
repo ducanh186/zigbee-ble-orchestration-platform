@@ -33,7 +33,7 @@ def test_bridge_routes_registry_health_log_and_desired(bridge, fake_mqtt, fake_i
         )
     )
 
-    assert fake_mqtt.published[0]["topic"] == "sb/v1/hust/lab01/gw-ubuntu-01/devices/light-01/registry"
+    assert fake_mqtt.published[0]["topic"] == "sb/v1/hust/lab01/gw-ubuntu-01/devices/light/light-01/registry"
     assert fake_mqtt.published[0]["retain"] is True
     assert fake_mqtt.published[1]["topic"] == "sb/v1/hust/lab01/gw-ubuntu-01/gateway/health"
     assert fake_mqtt.published[1]["retain"] is True
@@ -46,7 +46,7 @@ def test_bridge_routes_registry_health_log_and_desired(bridge, fake_mqtt, fake_i
         source="cloud",
     )
     bridge.handle_mqtt_message(
-        "sb/v1/hust/lab01/gw-ubuntu-01/devices/light-01/desired",
+        "sb/v1/hust/lab01/gw-ubuntu-01/devices/light/light-01/desired",
         desired_json,
     )
 

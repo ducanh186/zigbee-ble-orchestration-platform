@@ -37,6 +37,8 @@ component:
 - {id: zigbee_core_cli}
 - {id: zigbee_counters}
 - {id: zigbee_debug_print}
+- {id: zigbee_find_and_bind_initiator}
+- {id: zigbee_identify}
 - {id: zigbee_network_steering}
 - {id: zigbee_pro_stack}
 - {id: zigbee_scan_dispatch}

@@ -16,6 +16,9 @@
 #define PIR_POLL_INTERVAL_MS  200U     /* Read sensor every 200ms */
 #define PIR_WARMUP_MS         60000U   /* 60s warm-up after power-on */
 
+/*--- ZCL endpoint used by this sensor ---*/
+#define PIR_ENDPOINT              1
+
 /*--- API ---*/
 void pirSensorInit(void);
 

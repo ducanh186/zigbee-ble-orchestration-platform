@@ -16,25 +16,53 @@
  ******************************************************************************/
 
 #include "app/framework/include/af.h"
+#include "find-and-bind-initiator.h"
 #include "app/pir_sensor.h"
 
-/** @brief Complete network steering.
- *
- * This callback is fired when the Network Steering plugin is complete.
- *
- * @param status On success this will be set to EMBER_SUCCESS to indicate a
- * network was joined successfully. On failure this will be the status code of
- * the last join or scan attempt. Ver.: always
- *
- * @param totalBeacons The total number of 802.15.4 beacons that were heard,
- * including beacons from different devices with the same PAN ID. Ver.: always
- * @param joinAttempts The number of join attempts that were made to get onto
- * an open Zigbee network. Ver.: always
- *
- * @param finalState The finishing state of the network steering process. From
- * this, one is able to tell on which channel mask and with which key the
- * process was complete. Ver.: always
- */
+/* ---------- Find & Bind Initiator ---------- */
+#define FIND_BIND_DELAY_MS      3000u    /* delay after join before F&B */
+#define FIND_BIND_RETRY_MAX     5
+#define FIND_BIND_RETRY_MS      15000u   /* 15s between retries */
+
+static sl_zigbee_event_t s_findBindEvent;
+static bool     s_bindingDone  = false;
+static uint8_t  s_findBindRetry = 0;
+
+static void findBindHandler(sl_zigbee_event_t *event)
+{
+  (void)event;
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) return;
+  if (s_bindingDone) return;
+
+  EmberStatus st = emberAfPluginFindAndBindInitiatorStart(PIR_ENDPOINT);
+  sl_zigbee_app_debug_println("F&B: initiator start st=0x%02X (attempt %d/%d)",
+                              st, s_findBindRetry + 1, FIND_BIND_RETRY_MAX);
+}
+
+/* Called by the Find & Bind plugin when initiator process completes */
+void emberAfPluginFindAndBindInitiatorCompleteCallback(EmberStatus status)
+{
+  sl_zigbee_app_debug_println("F&B: initiator complete st=0x%02X (attempt %d)",
+                              status, s_findBindRetry + 1);
+
+  if (status == EMBER_SUCCESS) {
+    s_bindingDone = true;
+    sl_zigbee_app_debug_println("F&B: BINDING OK — PIR motion will now control light");
+  } else {
+    s_findBindRetry++;
+    if (s_findBindRetry < FIND_BIND_RETRY_MAX) {
+      sl_zigbee_app_debug_println("F&B: retry in %u ms", FIND_BIND_RETRY_MS);
+      sl_zigbee_event_set_delay_ms(&s_findBindEvent, FIND_BIND_RETRY_MS);
+    } else {
+      sl_zigbee_app_debug_println("F&B: gave up after %d attempts — use CLI: "
+                                  "plugin find_and_bind initiator 1",
+                                  FIND_BIND_RETRY_MAX);
+    }
+  }
+}
+
+/* ---------- Network callbacks ---------- */
+
 void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
                                                   uint8_t totalBeacons,
                                                   uint8_t joinAttempts,
@@ -45,15 +73,44 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
 
 void emberAfStackStatusCallback(EmberStatus status)
 {
+  sl_zigbee_app_debug_println("NET: stack status=0x%02X", status);
+
   if (status == EMBER_NETWORK_UP) {
-    /* PIR MVP: no Zigbee reporting yet */
+    /* Set sensor type = PIR (0x00) and sensor type bitmap = PIR (0x01) */
+    uint8_t sensorType = EMBER_ZCL_OCCUPANCY_SENSOR_TYPE_PIR;
+    uint8_t sensorTypeBitmap = 0x01u;
+    emberAfWriteServerAttribute(PIR_ENDPOINT,
+                                ZCL_OCCUPANCY_SENSING_CLUSTER_ID,
+                                ZCL_OCCUPANCY_SENSOR_TYPE_ATTRIBUTE_ID,
+                                &sensorType,
+                                ZCL_ENUM8_ATTRIBUTE_TYPE);
+    emberAfWriteServerAttribute(PIR_ENDPOINT,
+                                ZCL_OCCUPANCY_SENSING_CLUSTER_ID,
+                                ZCL_OCCUPANCY_SENSOR_TYPE_BITMAP_ATTRIBUTE_ID,
+                                &sensorTypeBitmap,
+                                ZCL_BITMAP8_ATTRIBUTE_TYPE);
+
+    /* Kick off Find & Bind initiator to auto-bind to lights */
+    s_findBindRetry = 0;
+    s_bindingDone = false;
+    sl_zigbee_event_set_delay_ms(&s_findBindEvent, FIND_BIND_DELAY_MS);
   }
 }
 
-/** @brief
- *
- * Application framework equivalent of ::emberRadioNeedsCalibratingHandler
- */
+/** @brief Must be called from app_init() in main.c */
+void appFindBindInit(void)
+{
+  sl_zigbee_event_init(&s_findBindEvent, findBindHandler);
+
+  /* If already on network at boot (e.g. after reset), try F&B */
+  if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    s_findBindRetry = 0;
+    s_bindingDone = false;
+    sl_zigbee_event_set_delay_ms(&s_findBindEvent, FIND_BIND_DELAY_MS);
+  }
+}
+
+/** @brief Application framework equivalent of ::emberRadioNeedsCalibratingHandler */
 void emberAfRadioNeedsCalibratingCallback(void)
 {
   sl_mac_calibrate_current_channel();

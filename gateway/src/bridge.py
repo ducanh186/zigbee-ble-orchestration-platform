@@ -146,7 +146,7 @@ class GatewayBridge:
         self._validate_envelope_namespace(envelope)
 
         if route.kind == "device_desired":
-            self._handle_device_desired(route.device_id, envelope)
+            self._handle_device_desired(route.device_id, envelope, device_type=route.device_type)
         elif route.kind == "command_request":
             self._handle_command_request(route.command_id, envelope)
         elif route.kind == "ota_manifest":
@@ -185,6 +185,8 @@ class GatewayBridge:
             )
         elif record.kind == "command_reply":
             self._handle_command_reply(record)
+        elif record.kind == "telemetry":
+            self._publish_device_topic("device_telemetry", self.topics.device_telemetry, record)
         elif record.kind == "ota_progress":
             self._publish_ota_topic("ota_progress", self.topics.ota_progress, record)
         elif record.kind == "ota_event":
@@ -233,10 +235,11 @@ class GatewayBridge:
         device_id = record.device_id or record.payload.get("device_id")
         if not device_id:
             raise ValueError(f"{record.kind} IPC records must include device_id")
+        device_type = record.payload.get("device_type", "unknown")
         payload = dict(record.payload)
         payload.setdefault("device_id", device_id)
         self.publish_message(
-            topic_builder(device_id),
+            topic_builder(device_id, device_type),
             source=record.source,
             payload=payload,
             kind=kind,
@@ -259,11 +262,13 @@ class GatewayBridge:
             trace_id=record.trace_id,
         )
 
-    def _handle_device_desired(self, device_id: str | None, envelope: MQTTEnvelope) -> None:
+    def _handle_device_desired(self, device_id: str | None, envelope: MQTTEnvelope, device_type: str | None = None) -> None:
         if not device_id:
             raise ValueError("Desired topic is missing device_id")
         payload = dict(envelope.payload)
         payload.setdefault("device_id", device_id)
+        if device_type:
+            payload.setdefault("device_type", device_type)
         desired_envelope = envelope.model_copy(update={"payload": payload})
         self._cached_desired[device_id] = desired_envelope
 

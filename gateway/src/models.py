@@ -15,6 +15,7 @@ COMMAND_STATUSES = ("accepted", "queued", "sent", "executed", "failed", "timeout
 IPC_KINDS = (
     "registry",
     "reported",
+    "telemetry",
     "event",
     "gateway_health",
     "gateway_log",

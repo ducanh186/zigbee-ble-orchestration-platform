@@ -23,6 +23,9 @@
 #include "sl_power_manager.h"
 #endif
 #include "app/pir_sensor.h"
+
+/* Defined in app.c — initializes Find & Bind event */
+extern void appFindBindInit(void);
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 #include "sl_system_kernel.h"
 #else
@@ -36,6 +39,7 @@
 void app_init(void)
 {
   pirSensorInit();
+  appFindBindInit();
 }
 
 void app_process_action(void)

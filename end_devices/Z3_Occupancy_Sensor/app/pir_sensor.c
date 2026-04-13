@@ -8,6 +8,32 @@ static bool s_warmedUp = false;
 static bool s_lastDetected = false;
 static sl_zigbee_event_t s_pollEvent;
 
+/* ---------- Zigbee On/Off command helper ---------- */
+static void pirSendOnOffToBindings(bool on)
+{
+  /* Guard: only send if we are on the network */
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    sl_zigbee_app_debug_println("PIR: skip Zigbee cmd — not joined");
+    return;
+  }
+
+  /* Fill the On or Off command frame (cluster 0x0006, client→server) */
+  if (on) {
+    emberAfFillCommandOnOffClusterOn();
+  } else {
+    emberAfFillCommandOnOffClusterOff();
+  }
+
+  /* Set source endpoint so the binding table can be matched */
+  emberAfGetCommandApsFrame()->sourceEndpoint = PIR_ENDPOINT;
+
+  /* Send to all matching bindings (On/Off cluster, endpoint 1) */
+  EmberStatus st = emberAfSendCommandUnicastToBindings();
+  sl_zigbee_app_debug_println("PIR: Zigbee %s sent st=0x%02X",
+                              on ? "ON" : "OFF", st);
+}
+
+/* ---------- PIR poll handler ---------- */
 static void pirPollHandler(sl_zigbee_event_t *event)
 {
   (void)event;
@@ -25,6 +51,15 @@ static void pirPollHandler(sl_zigbee_event_t *event)
   /* Only act + log on state change */
   if (detected != s_lastDetected) {
     s_lastDetected = detected;
+
+    /* --- LOCAL PATH: Occupancy attribute + LED0 --- */
+    uint8_t occupancyValue = detected ? 1u : 0u;
+    emberAfWriteServerAttribute(PIR_ENDPOINT,
+                                ZCL_OCCUPANCY_SENSING_CLUSTER_ID,
+                                ZCL_OCCUPANCY_ATTRIBUTE_ID,
+                                &occupancyValue,
+                                ZCL_BITMAP8_ATTRIBUTE_TYPE);
+
     if (detected) {
       sl_led_turn_on(&sl_led_led0);
       sl_zigbee_app_debug_println("PIR: MOTION DETECTED (pin=%u)", pinState);
@@ -32,6 +67,9 @@ static void pirPollHandler(sl_zigbee_event_t *event)
       sl_led_turn_off(&sl_led_led0);
       sl_zigbee_app_debug_println("PIR: CLEAR (pin=%u)", pinState);
     }
+
+    /* --- ZIGBEE PATH: send On/Off command to bound light(s) --- */
+    pirSendOnOffToBindings(detected);
   }
 
   /* Schedule next poll */

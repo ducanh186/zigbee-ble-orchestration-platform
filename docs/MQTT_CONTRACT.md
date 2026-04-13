@@ -34,7 +34,7 @@ Mọi MQTT message đều dùng chung JSON envelope:
   "gateway_id": "gw-ubuntu-01",
   "source": "gateway",
   "trace_id": "trace-01",
-  "correlation_id": "cmd-01",
+  "correlation_id": "c  d-01",
   "payload": {}
 }
 ```
