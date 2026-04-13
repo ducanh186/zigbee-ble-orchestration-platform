@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -28,12 +29,18 @@ async def create_command(
         raise HTTPException(status_code=404, detail="Device not found")
 
     command_id = uuid4().hex
+    timeout_ms = body.timeout_ms or 5000
+    expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
+        milliseconds=timeout_ms
+    )
     cmd = Command(
         id=command_id,
         device_id=device_id,
         op=body.op,
         target=body.target,
         status="accepted",
+        timeout_ms=timeout_ms,
+        expires_at=expires_at,
     )
     db.add(cmd)
     await db.commit()
