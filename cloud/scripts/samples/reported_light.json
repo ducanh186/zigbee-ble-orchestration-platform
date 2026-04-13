@@ -1,0 +1,19 @@
+{
+  "schema": "sb.v1",
+  "msg_id": "5c6d467f5f90460da65a9db62288def6",
+  "ts": "2026-04-13T07:15:00Z",
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "gateway",
+  "payload": {
+    "device_id": "light-01",
+    "device_type": "light",
+    "eui64": "00124b0001aa22bb",
+    "nwk_addr": "0x4F2A",
+    "state": {
+      "power": "on",
+      "reachable": true
+    }
+  }
+}
