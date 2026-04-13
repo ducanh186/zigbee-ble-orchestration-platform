@@ -1,0 +1,15 @@
+{
+  "schema": "sb.v1",
+  "msg_id": "9f4e2c1a2b3d4e5f6a7b8c9d0e1f2a3b",
+  "ts": "2026-04-13T07:16:01Z",
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "gateway",
+  "correlation_id": "REPLACE_WITH_COMMAND_ID",
+  "payload": {
+    "status": "executed",
+    "device_id": "light-01",
+    "reason": null
+  }
+}
