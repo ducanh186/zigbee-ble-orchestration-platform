@@ -34,6 +34,9 @@ class CommandCreate(BaseModel):
     timeout_ms: int | None = 5000
 
 
+TERMINAL_STATUSES: frozenset[str] = frozenset({"executed", "failed", "timeout"})
+
+
 class CommandOut(BaseModel):
     id: str
     device_id: str
@@ -41,6 +44,8 @@ class CommandOut(BaseModel):
     target: dict[str, Any]
     status: str
     reason: str | None
+    timeout_ms: int
+    expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
