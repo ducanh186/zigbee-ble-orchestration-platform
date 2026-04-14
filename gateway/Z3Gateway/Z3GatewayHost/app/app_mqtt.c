@@ -315,12 +315,9 @@ void appMqttTick(void)
     emberAfCorePrintln("MQTT: processing [%s]", entry.topic);
     appLogLog("mqtt", "rx_process", "topic=%s", entry.topic);
 
-    // Route payload to cmdHandleLine.
-    // For bring-up the payload is sent as bare {"id":N,"op":"..."}.
-    // Prepend "@CMD " to match cmdHandleLine's expected format.
-    char cmdBuf[MQTT_Q_PAYLOAD_MAX + 8];
-    snprintf(cmdBuf, sizeof(cmdBuf), "@CMD %s", entry.payload);
-    cmdHandleLine(cmdBuf);
+    // Route to the sb/v1 command handler: parser -> dispatcher -> device module.
+    // (Legacy `@CMD`-over-stdio remains available via `cmdHandleLine` for CLI.)
+    cmdHandleMqttPayload(entry.topic, entry.payload);
   }
 }
 
@@ -348,4 +345,58 @@ void appMqttPublishDeviceReported(uint16_t nodeId, const char *eui64Str,
   snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/reported", deviceType, eui64Str);
 
   appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttPublishCommandReply(const char *command_id,
+                                const char *device_id,
+                                const char *status,
+                                const char *reason)
+{
+  if (!sMosq || !command_id || !*command_id || !status) return;
+
+  // Per MQTT_CONTRACT: correlation_id on reply == command_id.
+  // Payload always carries: command_id, device_id, status, reason.
+  // Any of device_id/reason may be NULL -> emitted as JSON null.
+  char ts[32];
+  iso8601Now(ts, sizeof(ts));
+  uint32_t id = ++sMsgId;
+
+  // Build device_id field (quoted or null)
+  char devField[96];
+  if (device_id && *device_id) {
+    snprintf(devField, sizeof(devField), "\"%s\"", device_id);
+  } else {
+    snprintf(devField, sizeof(devField), "null");
+  }
+
+  // Build reason field (quoted or null)
+  char reasonField[96];
+  if (reason && *reason) {
+    snprintf(reasonField, sizeof(reasonField), "\"%s\"", reason);
+  } else {
+    snprintf(reasonField, sizeof(reasonField), "null");
+  }
+
+  char envelope[512];
+  snprintf(envelope, sizeof(envelope),
+    "{\"schema\":\"sb.v1\","
+     "\"msg_id\":\"%lu\","
+     "\"ts\":\"%s\","
+     "\"tenant_id\":\"" MQTT_TENANT "\","
+     "\"site_id\":\"" MQTT_SITE "\","
+     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"source\":\"gateway\","
+     "\"correlation_id\":\"%s\","
+     "\"payload\":{\"command_id\":\"%s\","
+                  "\"device_id\":%s,"
+                  "\"status\":\"%s\","
+                  "\"reason\":%s}}",
+    (unsigned long)id, ts, command_id,
+    command_id, devField, status, reasonField);
+
+  char topicSuffix[96];
+  snprintf(topicSuffix, sizeof(topicSuffix), "commands/%s/reply", command_id);
+
+  // QoS 1, retain=false (per MQTT_CONTRACT.md)
+  appMqttPublish(topicSuffix, envelope, 1, false);
 }

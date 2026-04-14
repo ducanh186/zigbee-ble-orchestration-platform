@@ -5,6 +5,9 @@
 #include "app_log.h"
 #include "net_mgr.h"
 #include "valve_ctrl.h"
+#include "app_mqtt.h"
+#include "sb_command.h"
+#include "device_dispatch.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -204,4 +207,30 @@ void cmdHandleLine(const char *line)
   }
 
   appLogAck(id, false, "unknown op");
+}
+
+// ===== sb/v1 MQTT entry: parser -> dispatcher =====
+// This is the production path. It is intentionally thin: all device-specific
+// logic lives in the dispatcher and the per-device modules.
+void cmdHandleMqttPayload(const char *topic, const char *body)
+{
+  if (!topic || !body) return;
+
+  sb_command_t cmd;
+  if (!sbCommandParse(topic, body, &cmd)) {
+    // If we at least have a command_id, try to tell the cloud.
+    // device_id is unknown here (parse failed) -> pass NULL -> emitted as null.
+    char fallbackId[64] = {0};
+    if (sbCommandExtractIdFromTopic(topic, fallbackId, sizeof(fallbackId))) {
+      appMqttPublishCommandReply(fallbackId, NULL, "failed", "bad_payload");
+    }
+    appLogLog("CMD", "parse_fail", "\"topic\":\"%s\"", topic);
+    return;
+  }
+
+  appLogLog("CMD", "parsed",
+    "\"command_id\":\"%s\",\"device_id\":\"%s\",\"op\":\"%s\",\"cmd\":\"%s\"",
+    cmd.command_id, cmd.device_id, cmd.op, cmd.command);
+
+  (void)deviceDispatch(&cmd);
 }

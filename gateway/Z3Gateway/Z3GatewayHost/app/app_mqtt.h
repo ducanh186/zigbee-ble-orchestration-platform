@@ -31,6 +31,17 @@ void appMqttTick(void);
 void appMqttPublishDeviceReported(uint16_t nodeId, const char *eui64Str,
                                   const char *deviceType, const char *powerState);
 
+// Publish a command_reply message on topic commands/{command_id}/reply.
+// Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).
+// `device_id` may be NULL/empty (e.g. parse_fail before we extracted it);
+//             in that case the field is emitted as null.
+// `status`    e.g. "accepted" | "queued" | "sent" | "executed" | "failed" | "timeout"
+// `reason`    may be NULL; emitted as null JSON when absent.
+void appMqttPublishCommandReply(const char *command_id,
+                                const char *device_id,
+                                const char *status,
+                                const char *reason);
+
 #ifdef __cplusplus
 }
 #endif

@@ -68,6 +68,14 @@ sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/event
 
 Giá trị `device_type` đã biết: `light`, `motion`, `lock`, `switch`, `unknown`.
 
+> **Phase 0 freeze (v1):** chỉ `light`, `switch`, `motion` có capability chính thức — xem
+> [DEVICE_CAPABILITY_MATRIX.md](./DEVICE_CAPABILITY_MATRIX.md).
+> Đối ngoại (MQTT + `payload.device_type`) **luôn dùng `motion`**;
+> các tên cũ `occ` / `occupancy` chỉ là legacy nội bộ.
+> Trong `payload.state` của cảm biến `motion`, giá trị occupancy được biểu diễn là
+> `"occupied"` / `"unoccupied"` (đó là *trạng thái đo*, không phải *device_type*).
+> `lock` và `unknown` hợp lệ trong topic nhưng chưa có capability v1.
+
 ### Lệnh điều khiển (Commands)
 
 ```text

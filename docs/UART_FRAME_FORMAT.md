@@ -12,6 +12,12 @@ That means:
 
 In other words, there is no project-specific application UART frame format for the host-radio boundary in native mode.
 
+> **Legacy note (Phase 0 freeze):** older planning docs and the debug CLI still
+> reference `@DATA` / `@CMD` / `@ACK` line markers. Those are **superseded** by the
+> IPC boundary defined below and are **not** part of the production contract.
+> `@CMD` may still appear on the local debug console of the Z3Gateway host app,
+> but cloud / bridge / adapter components MUST NOT rely on it.
+
 ## Application Boundary Used By This Repo
 
 The application contract implemented by this repo is:
@@ -73,21 +79,38 @@ Optional fields:
 
 ## IPC Kinds
 
-### Adapter -> bridge
+### Phase 0 freeze (v1 — required)
 
-- `registry`
+Adapter -> bridge:
+
 - `reported`
 - `event`
-- `gateway_health`
-- `gateway_log`
 - `command_reply`
-- `ota_progress`
-- `ota_event`
 
-### Bridge -> adapter
+Bridge -> adapter:
 
 - `desired`
 - `command_request`
+
+Mọi adapter v1 **phải** hỗ trợ đúng 5 kind trên. Xem
+[ADAPTER_ACTION_MAP.md](./ADAPTER_ACTION_MAP.md) để biết ánh xạ
+MQTT ↔ IPC ↔ action.
+
+### Deferred (không thuộc v1)
+
+Các kind dưới đây vẫn tồn tại trong schema để tương thích về sau, nhưng
+**không bắt buộc** ở Phase 0. Adapter có thể bỏ qua khi nhận, và không cần phát:
+
+Adapter -> bridge (deferred):
+
+- `registry`
+- `gateway_health`
+- `gateway_log`
+- `ota_progress`
+- `ota_event`
+
+Bridge -> adapter (deferred):
+
 - `ota_manifest`
 - `ota_desired`
 

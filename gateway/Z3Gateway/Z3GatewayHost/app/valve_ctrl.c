@@ -36,6 +36,16 @@ typedef struct {
 
 static TxTrack_t g_tx = {0};
 
+// Optional TX-complete hook (registered by light_ctrl for MQTT lifecycle).
+static valve_tx_complete_cb_t g_txDoneCb = NULL;
+static void                  *g_txDoneUser = NULL;
+
+void valveCtrlSetTxCompleteCb(valve_tx_complete_cb_t cb, void *user)
+{
+  g_txDoneCb   = cb;
+  g_txDoneUser = user;
+}
+
 static EmberStatus queueValveOnOff(bool wantOpen, bool useDirect)
 {
   uint8_t cmdId = wantOpen ? ZCL_ON_COMMAND_ID : ZCL_OFF_COMMAND_ID;
@@ -169,7 +179,13 @@ bool valveCtrlPair(const char *eui64Str, EmberNodeId nodeId, uint8_t bindIndex, 
   return true;
 }
 
-// FINAL TX result callback
+// FINAL TX result callback.
+// NOTE: `status == EMBER_SUCCESS` here means the APS layer got an ACK for the
+// unicast frame (with retries already applied). This is TX-level success --
+// it does NOT guarantee the device actually actuated the On/Off attribute.
+// True end-state verification requires a ZCL Read Attribute on OnOff or
+// listening to reported-attribute updates (telemetry_rx.c). Callers that
+// publish this as "executed" MUST document that caveat.
 bool emberAfMessageSentCallback(EmberOutgoingMessageType type,
                                uint16_t indexOrDestination,
                                EmberApsFrame *apsFrame,
@@ -211,6 +227,11 @@ bool emberAfMessageSentCallback(EmberOutgoingMessageType type,
 
       g_tx.active = false;
       appLogData();
+
+      // Notify registered listeners (e.g. light_ctrl -> MQTT command_reply).
+      if (g_txDoneCb) {
+        g_txDoneCb(txOk, status, g_txDoneUser);
+      }
     }
   }
 
