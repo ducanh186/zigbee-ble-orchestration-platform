@@ -28,4 +28,11 @@ uint8_t valveCtrlGetBindIndex(void);
 uint8_t valveCtrlGetDstEp(void);
 const EmberEUI64 *valveCtrlGetEuiLe(void);
 
+// Optional TX-complete hook.
+// When set, valve_ctrl invokes cb() from emberAfMessageSentCallback() for
+// every On/Off TX it owns, regardless of which path (numeric id or MQTT)
+// started it. Used by light_ctrl to publish command_reply lifecycle.
+typedef void (*valve_tx_complete_cb_t)(bool ok, uint8_t zstatus, void *user);
+void valveCtrlSetTxCompleteCb(valve_tx_complete_cb_t cb, void *user);
+
 #endif

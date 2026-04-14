@@ -39,6 +39,7 @@ void cli_json_command(sl_cli_command_arg_t *arguments);
 #include "app/valve_ctrl.h"
 #include "app/cmd_handler.h"
 #include "app/device_monitor.h"
+#include "app/light_ctrl.h"
 
 // ===== Original Z3Gateway token dump constants =====
 #define MFGSAMP_NUM_EZSP_TOKENS 8
@@ -150,6 +151,10 @@ void emberAfMainInitCallback(void)
   appMqttInit();
   appMqttStart();
 
+  // Light command module: register TX-complete hook with valve_ctrl so
+  // lifecycle replies (executed/failed) can be published.
+  lightCtrlInit();
+
   // Register "json" CLI command at runtime
   {
     static const sl_cli_command_info_t json_cmd_info =
@@ -187,6 +192,7 @@ void emberAfMainTickCallback(void)
   netMgrTick();
   deviceMonitorTick();
   appMqttTick();
+  lightCtrlTick();
 }
 
 //----------------------
