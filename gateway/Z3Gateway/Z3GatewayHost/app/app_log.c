@@ -3,7 +3,7 @@
 #include "app_state.h"
 #include "app_utils.h"
 #include "net_mgr.h"
-#include "valve_ctrl.h"
+#include "device_registry.h"
 
 #include "app/framework/include/af.h"
 
@@ -35,23 +35,14 @@ void appLogEmitHeartbeat(void)
   appLogInfo();
 }
 
-// ===== HELPER: EUI64 -> hex string =====
-static const char *modeStr(void) { return (g_mode == MODE_AUTO) ? "auto" : "manual"; }
-
 void appLogData(void)
 {
   emberAfCorePrintln(
-    "@DATA {\"flow\":%u,\"valve\":\"%s\",\"battery\":%u,\"mode\":\"%s\""
-    ",\"tx_pending\":%s,\"valve_path\":\"%s\""
-    ",\"valve_node_id\":\"0x%04X\",\"valve_known\":%s}",
-    g_flow,
-    valveCtrlIsOpen() ? "open" : "closed",
+    "@DATA {\"battery\":%u,"
+    "\"device_known\":%s,\"device_node_id\":\"0x%04X\"}",
     g_batteryPercent,
-    modeStr(),
-    valveCtrlTxActive() ? "true" : "false",
-    valveCtrlPathStr(),
-    (uint16_t)valveCtrlGetNodeId(),
-    valveCtrlIsKnown() ? "true" : "false"
+    deviceRegistryIsKnown() ? "true" : "false",
+    (uint16_t)deviceRegistryGetNodeId()
   );
 }
 
@@ -59,12 +50,10 @@ void appLogAck(uint32_t id, bool ok, const char *msg)
 {
   if (!msg) msg = "";
   emberAfCorePrintln(
-    "@ACK {\"id\":%lu,\"ok\":%s,\"msg\":\"%s\",\"mode\":\"%s\",\"valve\":\"%s\"}",
+    "@ACK {\"id\":%lu,\"ok\":%s,\"msg\":\"%s\"}",
     (unsigned long)id,
     ok ? "true" : "false",
-    msg,
-    modeStr(),
-    valveCtrlIsOpen() ? "open" : "closed"
+    msg
   );
 }
 
@@ -73,15 +62,12 @@ void appLogAckZb(uint32_t id, bool ok, const char *msg, uint8_t zstatus, const c
   if (!msg) msg = "";
   if (!stage) stage = "";
   emberAfCorePrintln(
-    "@ACK {\"id\":%lu,\"ok\":%s,\"msg\":\"%s\",\"zstatus\":\"0x%02X\",\"stage\":\"%s\","
-    "\"mode\":\"%s\",\"valve\":\"%s\"}",
+    "@ACK {\"id\":%lu,\"ok\":%s,\"msg\":\"%s\",\"zstatus\":\"0x%02X\",\"stage\":\"%s\"}",
     (unsigned long)id,
     ok ? "true" : "false",
     msg,
     (unsigned)zstatus,
-    stage,
-    modeStr(),
-    valveCtrlIsOpen() ? "open" : "closed"
+    stage
   );
 }
 
@@ -136,24 +122,21 @@ void appLogInfo(void)
     ch = params.radioChannel;
   }
 
-  char valveEuiStr[17] = "0000000000000000";
-  if (valveCtrlIsKnown()) {
-    const EmberEUI64 *ve = valveCtrlGetEuiLe();
-    if (ve) eui64ToStringBigEndian(valveEuiStr, sizeof(valveEuiStr), *ve);
+  char devEuiStr[17] = "0000000000000000";
+  if (deviceRegistryIsKnown()) {
+    const EmberEUI64 *de = deviceRegistryGetEuiLe();
+    if (de) eui64ToStringBigEndian(devEuiStr, sizeof(devEuiStr), *de);
   }
 
   emberAfCorePrintln(
     "@INFO {\"node_id\":\"0x%04X\",\"eui64\":\"%s\",\"pan_id\":\"0x%04X\",\"ch\":%u,"
-    "\"tx_power\":%d,\"net_state\":%d,\"mode\":\"%s\","
-    "\"valve_path\":\"%s\",\"valve_known\":%s,\"valve_eui64\":\"%s\","
-    "\"valve_node_id\":\"0x%04X\",\"bind_index\":%u,\"uptime\":%lu}",
+    "\"tx_power\":%d,\"net_state\":%d,"
+    "\"device_known\":%s,\"device_eui64\":\"%s\","
+    "\"device_node_id\":\"0x%04X\",\"uptime\":%lu}",
     nodeId, euiStr, panId, ch, (int)pwr, st,
-    modeStr(),
-    valveCtrlPathStr(),
-    valveCtrlIsKnown() ? "true" : "false",
-    valveEuiStr,
-    (uint16_t)valveCtrlGetNodeId(),
-    (unsigned)valveCtrlGetBindIndex(),
+    deviceRegistryIsKnown() ? "true" : "false",
+    devEuiStr,
+    (uint16_t)deviceRegistryGetNodeId(),
     (unsigned long)appLogGetUptimeSec()
   );
 }

@@ -1,140 +1,223 @@
-# Refactor Repo Sang Z3Gateway-Native Gateway Core
+# Z3Gateway-Native Gateway Core — Architecture Plan
 
 ## Summary
 
-- Biến repo thành **gateway core** cho kiến trúc **Z3Gateway-native only**: host-radio dùng **EZSP/ASH** của Z3Gateway, repo **không còn** custom application UART runtime giữa Ubuntu và EFR32.
-- Áp dụng MQTT contract chuẩn mới với namespace cố định:
+- Repo là **gateway core** cho kiến trúc **Z3Gateway-native only**: host-radio dùng **EZSP/ASH** của Z3Gateway.
+- **Z3Gateway C là single process** trên Ubuntu host, chạy trực tiếp:
+  - MQTT client (subscribe + publish)
+  - Zigbee EZSP/ASH handling
+  - Command lifecycle management
+  - Device registry
+  - Local automation / rule engine
+- Áp dụng MQTT contract chuẩn với namespace cố định:
   `sb/v1/{tenant_id}/{site_id}/{gateway_id}/...`
-- Dùng **local IPC qua Unix domain socket + NDJSON** làm boundary nội bộ giữa `z3gateway adapter` và `mqtt bridge`.
-- Dọn repo theo kiểu **hard delete**: chỉ giữ 2 file `plan.md` và `iot_zigbee_sprint_plan.md` ngoài các thành phần còn thuộc scope mới; bỏ toàn bộ dashboard demo, scripts phụ, legacy docs, legacy custom-UART code.
+- **Không có IPC socket**, không có MQTT bridge process riêng, không có NDJSON wire format giữa các process.
 
-## Implementation Changes
+## Production Architecture (Frozen)
 
-### 1. Repo cleanup và structure đích
+```text
+Flutter App ──HTTP──▶ Cloud API (FastAPI :8000) ◄──▶ Mosquitto (:1883) ◄──MQTT──▶ Z3Gateway C ◄──EZSP/ASH──▶ EFR32 NCP ◄──Zigbee──▶ End Devices
+                           │ PostgreSQL                                     │
+                           ▼                                                ├─ MQTT client
+                        sb_cloud DB                                         ├─ command queue
+                                                                            ├─ device registry
+                                                                            ├─ rule engine
+                                                                            └─ local automation
+```
 
-- Giữ scope repo ở 3 phần:
-  - `gateway` runtime
-  - `mqtt` broker config/dev compose
-  - `docs` contract tối thiểu 
-- Hard delete các phần không còn thuộc scope:
-  - toàn bộ `dashboard/`
-  - toàn bộ `scripts/`
-  - toàn bộ legacy custom-UART simulator/test hiện tại
-  - toàn bộ doc legacy `wfms/`, `iot/`, `home/`, valve-flow-monitoring, coordinator button/CLI internals
-  - file hướng dẫn/tooling nội bộ không còn phục vụ runtime mới
-- Giữ và viết lại:
-  - `gateway` thành bridge mới
-  - `mqtt/config/*` và `mqtt/docker/docker-compose.yml`
-  - `docs/MQTT_CONTRACT.md`
-  - `docs/UART_FRAME_FORMAT.md`
-  - thêm `docs/OTA_CAMPAIGN_CONTRACT.md`
-  - `gateway/README.md`, `.env.example`, dependency files
+### Boundary mới
 
-### 2. Runtime architecture mới
+| Boundary | Protocol | Ownership |
+|---|---|---|
+| Cloud ↔ MQTT broker | MQTT over TCP | Mosquitto broker |
+| MQTT broker ↔ Z3Gateway C | MQTT over TCP | Z3Gateway C (Paho C client) |
+| Z3Gateway C ↔ NCP radio | EZSP/ASH over serial/UART | Silabs EmberZNet stack |
+| NCP ↔ Zigbee end-devices | Zigbee 802.15.4 over-the-air | Silabs Zigbee stack |
 
-- `gateway` trở thành **MQTT <-> IPC bridge**, không còn lớp `RealUart`/`FakeUart`.
-- IPC transport mặc định:
-  - Unix domain socket
-  - path mặc định: `/tmp/sb-gateway.sock`
-  - override bằng env `SB_IPC_SOCKET_PATH`
-- IPC wire format:
-  - NDJSON, 1 JSON object / line
-  - không prefix `@DATA/@CMD/@ACK`
-- IPC message kinds cố định:
-  - adapter -> bridge: `registry`, `reported`, `event`, `gateway_health`, `gateway_log`, `command_reply`, `ota_progress`, `ota_event`
-  - bridge -> adapter: `desired`, `command_request`, `ota_manifest`, `ota_desired`
-- Runtime modules cần có:
-  - config/env loading
-  - topic builder/parser cho `sb/v1`
-  - Pydantic models cho MQTT envelope và IPC record
-  - IPC client/server codec NDJSON
-  - MQTT publisher/subscriber với retained/LWT/QoS đúng contract
-  - command lifecycle tracker
-  - OTA artifact staging manager
+## Implementation Structure
 
-### 3. Public contracts cần khóa và implement đúng
+### Repo structure
 
-- MQTT topic tree cố định:
-  - `.../gateway/online`
-  - `.../gateway/health`
-  - `.../gateway/log`
-  - `.../devices/{device_id}/registry`
-  - `.../devices/{device_id}/reported`
-  - `.../devices/{device_id}/desired`
-  - `.../devices/{device_id}/event`
-  - `.../commands/{command_id}/request`
-  - `.../commands/{command_id}/reply`
-  - `.../ota/campaigns/{campaign_id}/manifest`
-  - `.../ota/devices/{device_id}/desired`
-  - `.../ota/devices/{device_id}/progress`
-  - `.../ota/devices/{device_id}/event`
-- MQTT envelope chung bắt buộc cho mọi publish/subscribe payload:
-  - `schema`, `msg_id`, `ts`, `tenant_id`, `site_id`, `gateway_id`, `source`, `payload`
-  - optional nhưng support đầy đủ: `trace_id`, `correlation_id`
-- Topic semantics:
-  - retained: `gateway/online`, `gateway/health`, `devices/*/registry`, `devices/*/reported`, `devices/*/desired`, `ota/campaigns/*/manifest`, `ota/devices/*/desired`, `ota/devices/*/progress`
-  - non-retained: `gateway/log`, `devices/*/event`, `commands/*/request`, `commands/*/reply`, `ota/devices/*/event`
-  - LWT: `gateway/online = offline`; on connect publish retained `online`
-- Command lifecycle cố định:
-  - `accepted -> queued -> sent -> executed | failed | timeout`
-  - mỗi transition publish 1 message lên `commands/{command_id}/reply`
-  - `correlation_id` của toàn bộ lifecycle message = `command_id`
-- Identity model cố định:
-  - `device_id` = logical stable ID
-  - `eui64` = hardware stable identity trong payload
-  - `nwk_addr` = runtime/debug only, không dùng làm primary key
-- OTA behavior cố định:
-  - cloud chỉ publish `manifest` và `ota desired`
-  - gateway tải `.ota` từ `artifact.url`, verify `sha256`/`size_bytes`, lưu vào `SB_OTA_DIR` mặc định `./ota-files`
-  - gateway không publish binary qua MQTT
-  - progress/event MQTT chỉ phản ánh workflow staging/offer/result
+```
+gateway/          Z3Gateway C source — single process, MQTT + Zigbee
+  Z3Gateway/
+    Z3GatewayHost/
+      app/        Application modules (C):
+        app_mqtt.c/h         MQTT client integration
+        sb_command.c/h       Command lifecycle management
+        cmd_handler.c/h      CLI debug handler (legacy @CMD)
+        device_registry.c/h  Device ID → nodeId/endpoint mapping
+        device_dispatch.c/h  device_type → action routing
+        light_ctrl.c/h       Light on/off/level actions
+        switch_logic.c/h     Switch event handling
+        rule_engine.c/h      Local automation rules
+        telemetry_rx.c       Attribute report handling
+        device_monitor.c/h   Device reachability tracking
+        app_state.c/h        Gateway state management
+        app_utils.c/h        Utility functions
+        app_log.c/h          Logging
+        net_mgr.c/h          Network management
+        app_config.h         Build-time configuration
+cloud/            Cloud backend — FastAPI REST API + MQTT subscriber (Python)
+mqtt/             Mosquitto broker configuration + Docker Compose
+deploy/           EC2 deployment scripts + docker-compose
+docs/             Architecture contracts, sprint plan, implementation plans
+end_devices/      End device firmware source (Simplicity Studio projects)
+artifact/         Pre-built firmware binaries (.s37)
+```
 
-### 4. Broker config và docs
+### Z3Gateway C internal modules
 
-- Rewrite Mosquitto ACL theo namespace `sb/v1/+/+/+/#`
-- Giữ 3 principal tối thiểu:
-  - `gateway`: readwrite toàn namespace của gateway
-  - `client`: read state/registry/event/reply/progress/health/log, write `desired`, `command request`, `ota manifest`, `ota desired`
-  - `monitor`: read-only toàn namespace
-- Rewrite docs theo source of truth mới:
-  - `MQTT_CONTRACT.md`: topic tree, envelope, retained/LWT/QoS, examples
-  - `UART_FRAME_FORMAT.md`: ghi rõ native mode **không định nghĩa custom app UART trên host-radio**; serial host-radio là EZSP/ASH của Z3Gateway; phần frame application của repo là IPC NDJSON
-  - `OTA_CAMPAIGN_CONTRACT.md`: manifest, desired, progress, event, staging rules
+| Module | Responsibility |
+|---|---|
+| `app_mqtt` | MQTT connect, subscribe, publish, LWT, envelope build/parse |
+| `sb_command` | Command queue, pending table, timeout tracking, lifecycle publish |
+| `cmd_handler` | Legacy `@CMD` CLI debug (stdio only, not production path) |
+| `device_registry` | `device_id → (nodeId, endpoint, device_type)` mapping |
+| `device_dispatch` | Route incoming MQTT command/desired to correct device handler |
+| `light_ctrl` | `light_on()`, `light_off()`, `light_set_level()` via Ember AF |
+| `switch_logic` | Handle switch toggle event → publish event + trigger local rules |
+| `rule_engine` | Evaluate local automation rules (switch→light, motion→light) |
+| `telemetry_rx` | Handle `emberAfReportAttributesCallback` → build + publish reported |
+| `device_monitor` | Track device reachability, last-seen timestamps |
+| `app_state` | Gateway online/health status, publish gateway/* topics |
+
+## Public Contracts (Frozen)
+
+### MQTT topic tree cố định
+
+```text
+sb/v1/{tenant}/{site}/{gateway}/gateway/online
+sb/v1/{tenant}/{site}/{gateway}/gateway/health
+sb/v1/{tenant}/{site}/{gateway}/gateway/log
+sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/registry
+sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/reported
+sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/telemetry
+sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/event
+sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/request
+sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/reply
+sb/v1/{tenant}/{site}/{gateway}/ota/campaigns/{campaign_id}/manifest
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/progress
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/event
+```
+
+### MQTT envelope bắt buộc
+
+Required: `schema`, `msg_id`, `ts`, `tenant_id`, `site_id`, `gateway_id`, `source`, `payload`
+Optional: `trace_id`, `correlation_id`
+
+### Command lifecycle cố định
+
+```text
+accepted → queued → sent → executed | failed | timeout
+```
+
+Mỗi transition publish 1 message lên `commands/{command_id}/reply`.
+Toàn bộ lifecycle do Z3Gateway C quản lý và publish trực tiếp.
+
+### Identity model cố định
+
+- `device_id` = logical stable ID (primary key)
+- `eui64` = hardware stable identity trong payload
+- `nwk_addr` = runtime/debug only
+
+### OTA behavior cố định
+
+- Cloud chỉ publish `manifest` và `ota desired`
+- Z3Gateway C tải `.ota` từ `artifact.url`, verify `sha256`/`size_bytes`, lưu vào `SB_OTA_DIR`
+- Z3Gateway C offer OTA file qua native Zigbee OTA
+- Z3Gateway C không publish binary qua MQTT
+- Progress/event MQTT chỉ phản ánh workflow staging/offer/result
+
+## Internal Data Flow
+
+### Cloud-driven command path
+
+```text
+Cloud/API  →  MQTT commands/{command_id}/request
+           →  Z3Gateway C nhận trực tiếp
+           →  parse command
+           →  dispatch theo device_type
+           →  send Zigbee command via Ember AF
+           →  publish commands/{command_id}/reply
+           →  publish device reported nếu state đổi
+```
+
+### Device-driven uplink path
+
+```text
+Zigbee device state/event
+  →  Z3Gateway C nhận trực tiếp (EZSP callback)
+  →  normalize payload
+  →  publish MQTT reported / event
+```
+
+### Gateway-driven local automation path
+
+```text
+Switch event / motion event
+  →  Z3Gateway C rule engine
+  →  light control action
+  →  publish switch/motion event
+  →  publish light reported sau khi state đổi
+```
+
+### Queue / pending model
+
+- Internal command queue trong Z3Gateway C
+- Pending command table với timeout tracking
+- Retry / debounce / anti-loop guard
+- **Không có IPC** — tất cả queue nội bộ trong cùng process
+
+## Configuration Defaults
+
+| Variable | Default | Description |
+|---|---|---|
+| `SB_TENANT_ID` | `hust` | Tenant ID |
+| `SB_SITE_ID` | `lab01` | Site ID |
+| `SB_GATEWAY_ID` | `gw-ubuntu-01` | Gateway ID |
+| `SB_MQTT_HOST` | `localhost` | MQTT broker host |
+| `SB_MQTT_PORT` | `1883` | MQTT broker port |
+| `SB_OTA_DIR` | `./ota-files` | OTA artifact storage |
+| `SB_COMMAND_TIMEOUT_MS` | `5000` | Command timeout |
 
 ## Test Plan
 
 - Unit tests:
-  - topic builder/parser cho toàn bộ `sb/v1`
-  - envelope validation, required/optional fields
-  - IPC NDJSON encode/decode, kind routing
-  - command lifecycle state machine
+  - MQTT topic builder/parser cho toàn bộ `sb/v1`
+  - Envelope validation, required/optional fields
+  - Command lifecycle state machine
   - OTA manifest validation và artifact metadata checks
-- Integration tests với fake IPC peer:
-  - adapter gửi `registry/reported/event` -> bridge publish đúng topic, retained flag đúng
-  - MQTT `desired` -> bridge phát IPC `desired`
-  - MQTT `commands/.../request` -> bridge phát IPC `command_request` và republish đủ lifecycle replies
-  - MQTT OTA manifest/device desired -> gateway stage file, emit progress/event
-  - MQTT connect/disconnect -> `gateway/online` retained + LWT đúng
+- Integration tests:
+  - Z3Gateway C connects to Mosquitto, subscribes, publishes correctly
+  - MQTT `command request` → Z3Gateway C processes → publishes lifecycle replies
+  - MQTT `desired` → Z3Gateway C dispatches → publishes reported
+  - MQTT connect/disconnect → `gateway/online` retained + LWT đúng
 - Manual smoke:
-  1. chạy Mosquitto từ docker compose
-  2. chạy bridge với fake IPC peer
-  3. publish sample `command request`, `desired`, `ota manifest`
-  4. verify topic shape, payload envelope, retained behavior
+  1. Chạy Mosquitto từ docker compose
+  2. Chạy Z3Gateway C
+  3. Publish sample `command request`, `desired` via `mosquitto_pub`
+  4. Verify topic shape, payload envelope, retained behavior
 - Không test custom UART, không test serial EFR32, không test EZSP parser trong repo này.
-- Bổ sung tooling test chuẩn:
-  - thêm `pytest` vào dev dependencies
-  - bỏ test `FakeUart` cũ hoàn toàn
 
-## Assumptions And Defaults
+## Assumptions
 
-- Runtime target là **Ubuntu/Linux only**; Windows chỉ còn là môi trường soạn code, không là target vận hành.
-- Repo sau refactor **không** giữ dashboard, cloud backend, mobile app, hay agent/tooling scripts.
-- Repo **không** implement lại Z3Gateway serial/EZSP; boundary của repo dừng ở IPC socket với adapter local.
-- Legacy custom coordinator mode với `@STATE/@EVENT/@REQ/...` bị loại khỏi repo, không archive, không compat stub.
-- Default env mới:
-  - `SB_TENANT_ID=hust`
-  - `SB_SITE_ID=lab01`
-  - `SB_GATEWAY_ID=gw-ubuntu-01`
-  - `SB_IPC_SOCKET_PATH=/tmp/sb-gateway.sock`
-  - `SB_OTA_DIR=./ota-files`
-  - `SB_COMMAND_TIMEOUT_MS=5000`
+- Runtime target là **Ubuntu/Linux only**; Windows chỉ là môi trường soạn code.
+- Z3Gateway C là **single process** — không có bridge process, không có adapter process riêng.
+- Boundary của Z3Gateway C:
+  - **Bên ngoài**: MQTT broker (pub/sub)
+  - **Bên dưới**: NCP radio (EZSP/ASH, owned by Silabs stack)
+- Legacy `@CMD` trên stdio chỉ dùng cho debug CLI local, không phải production path.
+
+## Historical Note
+
+> **IPC architecture (superseded):** phiên bản trước của plan này định nghĩa:
+> - `gateway` = "MQTT ↔ IPC bridge" (Python process)
+> - Unix domain socket `/tmp/sb-gateway.sock` với NDJSON wire format
+> - 12 IPC kinds giữa bridge và adapter
+> - Fake IPC peer cho testing
+>
+> Kiến trúc đó đã được thay thế bởi direct MQTT integration trong Z3Gateway C.
+> Xem git history nếu cần tham khảo phiên bản IPC.

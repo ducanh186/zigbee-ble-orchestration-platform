@@ -1070,13 +1070,6 @@ $(OUTPUT_DIR)/project/app/net_mgr.o: app/net_mgr.c
 CDEPS += $(OUTPUT_DIR)/project/app/net_mgr.d
 OBJS += $(OUTPUT_DIR)/project/app/net_mgr.o
 
-$(OUTPUT_DIR)/project/app/valve_ctrl.o: app/valve_ctrl.c
-	@$(POSIX_TOOL_PATH)echo 'Building app/valve_ctrl.c'
-	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
-	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/valve_ctrl.c
-CDEPS += $(OUTPUT_DIR)/project/app/valve_ctrl.d
-OBJS += $(OUTPUT_DIR)/project/app/valve_ctrl.o
-
 $(OUTPUT_DIR)/project/app/telemetry_rx.o: app/telemetry_rx.c
 	@$(POSIX_TOOL_PATH)echo 'Building app/telemetry_rx.c'
 	@$(POSIX_TOOL_PATH)mkdir -p $(@D)

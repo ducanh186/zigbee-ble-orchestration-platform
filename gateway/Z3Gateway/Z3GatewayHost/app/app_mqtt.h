@@ -28,8 +28,20 @@ void appMqttTick(void);
 // eui64Str: hex string like "0b57fffe1234abcd" (used as device_id and topic key)
 // deviceType: e.g. "light"
 // powerState: e.g. "on" or "off"
+// level: brightness level 0-254 (only meaningful for light; pass 0 for non-dimmable)
 void appMqttPublishDeviceReported(uint16_t nodeId, const char *eui64Str,
                                   const char *deviceType, const char *powerState);
+
+// Extended reported with level field (Phase 3.1).
+void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
+                                      const char *deviceType, const char *powerState,
+                                      uint8_t level);
+
+// Publish a device event (e.g. switch toggle).
+// Per MQTT_CONTRACT: devices/{device_type}/{device_id}/event (QoS1, no retain).
+// eventName: e.g. "toggle"
+void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
+                               const char *deviceType, const char *eventName);
 
 // Publish a command_reply message on topic commands/{command_id}/reply.
 // Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).

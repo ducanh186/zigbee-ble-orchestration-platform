@@ -2,13 +2,13 @@
 #include "app_mqtt.h"
 #include "app_log.h"
 #include "app_utils.h"
+#include "app_config.h"
 #include "device_registry.h"
-#include "valve_ctrl.h"
 
 #include <string.h>
 #include <stdio.h>
 
-// --- Single in-flight tracker for v1 (valve_ctrl already serializes its own TX) ---
+// --- Single in-flight tracker for v1 ---
 typedef struct {
   bool     active;
   char     command_id[64];
@@ -21,16 +21,45 @@ typedef struct {
 static LightTrack_t s_track = {0};
 
 // --- Forward declarations ---
-static void onValveTxComplete(bool ok, uint8_t zstatus, void *user);
 static void publishReply(const char *command_id, const char *device_id,
                          const char *status, const char *reason);
 
 // -------------------------------------------------------------------
-// Init
+// ZCL On/Off send (extracted from former valve_ctrl)
+// -------------------------------------------------------------------
+static EmberStatus lightSendOnOff(bool wantOn, uint8_t dstEp,
+                                  EmberNodeId nodeId)
+{
+  uint8_t cmdId = wantOn ? ZCL_ON_COMMAND_ID : ZCL_OFF_COMMAND_ID;
+
+  emberAfFillExternalBuffer(
+    (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
+    ZCL_ON_OFF_CLUSTER_ID,
+    cmdId,
+    "");
+
+  emberAfSetCommandEndpoints(COORD_EP_CONTROL, dstEp);
+
+  EmberApsFrame *aps = emberAfGetCommandApsFrame();
+  if (aps) {
+#ifdef EMBER_APS_OPTION_ACK_REQUEST
+    aps->options |= EMBER_APS_OPTION_ACK_REQUEST;
+#endif
+#ifdef EMBER_APS_OPTION_RETRY
+    aps->options |= EMBER_APS_OPTION_RETRY;
+#endif
+  }
+
+  return emberAfSendCommandUnicast(EMBER_OUTGOING_DIRECT, nodeId);
+}
+
+// -------------------------------------------------------------------
+// Init (no-op now; hook registration was valve-specific)
 // -------------------------------------------------------------------
 void lightCtrlInit(void)
 {
-  valveCtrlSetTxCompleteCb(onValveTxComplete, NULL);
+  // Nothing to register — emberAfMessageSentCallback lives in this
+  // file and the framework calls it directly.
 }
 
 // -------------------------------------------------------------------
@@ -95,13 +124,21 @@ bool lightCtrlHandleCommand(const sb_command_t *cmd)
     return false;
   }
 
-  // Kick off the send. valveCtrlQueueTx already builds the ZCL On/Off cluster
-  // (0x0006) frame, sets endpoints, and calls emberAfSendCommandUnicast.
-  // Passing id=0 tells valve_ctrl NOT to emit the legacy numeric @ACK path.
-  bool ok = valveCtrlQueueTx(0u, wantOn);
-  if (!ok) {
-    publishReply(cmd->command_id, cmd->device_id, "failed", "enqueue_failed");
-    appLogLog("LIGHT", "enqueue_fail", "\"device_id\":\"%s\"", cmd->device_id);
+  // Check network
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    publishReply(cmd->command_id, cmd->device_id, "failed", "not_joined");
+    appLogLog("LIGHT", "reject", "\"reason\":\"not_joined\"");
+    return false;
+  }
+
+  // Send ZCL On/Off
+  EmberStatus st = lightSendOnOff(wantOn, resolved.endpoint, resolved.nodeId);
+  if (st != EMBER_SUCCESS) {
+    char reason[48];
+    snprintf(reason, sizeof(reason), "send_fail:0x%02X", (unsigned)st);
+    publishReply(cmd->command_id, cmd->device_id, "failed", reason);
+    appLogLog("LIGHT", "send_fail", "\"device_id\":\"%s\",\"zstatus\":\"0x%02X\"",
+              cmd->device_id, (unsigned)st);
     return false;
   }
 
@@ -116,10 +153,9 @@ bool lightCtrlHandleCommand(const sb_command_t *cmd)
           sizeof(s_track.correlation_id) - 1);
   s_track.deadlineTick = msTick() + cmd->timeout_ms;
 
-  // In the current native path, `valveCtrlQueueTx` returning true means the
-  // frame was handed to the stack for unicast. "queued" and "sent" are
-  // effectively the same moment; we emit both to satisfy the contract and
-  // keep the state machine observable.
+  // In the native path, the frame was handed to the stack for unicast.
+  // "queued" and "sent" are effectively the same moment; we emit both
+  // to satisfy the contract and keep the state machine observable.
   publishReply(cmd->command_id, cmd->device_id, "queued", NULL);
   publishReply(cmd->command_id, cmd->device_id, "sent",   NULL);
 
@@ -131,53 +167,137 @@ bool lightCtrlHandleCommand(const sb_command_t *cmd)
 }
 
 // -------------------------------------------------------------------
-// valve_ctrl -> us, on emberAfMessageSentCallback completion.
+// emberAfMessageSentCallback — TX completion from the Ember stack.
 //
 // IMPORTANT semantic note:
-//   What we publish here as "executed" is TX-LEVEL success -- i.e. the APS
-//   layer reported EMBER_SUCCESS for the unicast On/Off frame (APS ACK from
-//   the device's radio stack, with retries already applied by the stack).
+//   What we publish here as "executed" is TX-LEVEL success — i.e. the
+//   APS layer reported EMBER_SUCCESS for the unicast On/Off frame (APS
+//   ACK from the device's radio stack, with retries already applied).
 //   It is NOT an application-level confirmation that the bulb actually
-//   toggled its On/Off attribute. For true end-state verification we would
-//   have to follow up with a ZCL Read Attribute on 0x0006/0x0000 (OnOff)
-//   or wait for the device's reported attribute update handled in
-//   app/telemetry_rx.c (`emberAfReportAttributesCallback`). That
-//   application-level confirmation path is NOT wired into the command
-//   lifecycle in v1 -- it lives on the telemetry channel only.
+//   toggled its On/Off attribute. For true end-state verification we
+//   would need a ZCL Read Attribute on 0x0006/0x0000. That path is NOT
+//   wired into the command lifecycle in v1 — it lives on the telemetry
+//   channel only (telemetry_rx.c, reported state).
 // -------------------------------------------------------------------
-static void onValveTxComplete(bool ok, uint8_t zstatus, void *user)
+bool emberAfMessageSentCallback(EmberOutgoingMessageType type,
+                               uint16_t indexOrDestination,
+                               EmberApsFrame *apsFrame,
+                               uint16_t messageLength,
+                               uint8_t *messageContents,
+                               EmberStatus status)
 {
-  (void)user;
-  if (!s_track.active) return; // not our TX
+  (void)type;
+  (void)indexOrDestination;
+  (void)messageLength;
+  (void)messageContents;
 
-  char cmdId[64];
-  char devId[64];
-  strncpy(cmdId, s_track.command_id, sizeof(cmdId) - 1);
-  cmdId[sizeof(cmdId) - 1] = '\0';
-  strncpy(devId, s_track.device_id, sizeof(devId) - 1);
-  devId[sizeof(devId) - 1] = '\0';
+  if (!apsFrame) return false;
 
-  s_track.active = false;
+  if (apsFrame->clusterId == ZCL_ON_OFF_CLUSTER_ID
+      && apsFrame->sourceEndpoint == COORD_EP_CONTROL) {
+    if (!s_track.active) return false;
 
-  if (ok) {
-    // "executed" here == APS tx confirm from emberAfMessageSentCallback.
-    publishReply(cmdId, devId, "executed", NULL);
-    appLogLog("LIGHT", "executed_tx",
-              "\"command_id\":\"%s\",\"device_id\":\"%s\",\"zstatus\":\"0x%02X\","
-              "\"note\":\"tx_level_only\"",
-              cmdId, devId, (unsigned)zstatus);
+    bool txOk = (status == EMBER_SUCCESS);
+
+    char cmdId[64];
+    char devId[64];
+    strncpy(cmdId, s_track.command_id, sizeof(cmdId) - 1);
+    cmdId[sizeof(cmdId) - 1] = '\0';
+    strncpy(devId, s_track.device_id, sizeof(devId) - 1);
+    devId[sizeof(devId) - 1] = '\0';
+
+    s_track.active = false;
+
+    if (txOk) {
+      publishReply(cmdId, devId, "executed", NULL);
+      appLogLog("LIGHT", "executed_tx",
+                "\"command_id\":\"%s\",\"device_id\":\"%s\",\"zstatus\":\"0x%02X\","
+                "\"note\":\"tx_level_only\"",
+                cmdId, devId, (unsigned)status);
+    } else {
+      char reason[48];
+      snprintf(reason, sizeof(reason), "tx_failed:0x%02X", (unsigned)status);
+      publishReply(cmdId, devId, "failed", reason);
+      appLogLog("LIGHT", "failed",
+                "\"command_id\":\"%s\",\"device_id\":\"%s\",\"zstatus\":\"0x%02X\"",
+                cmdId, devId, (unsigned)status);
+    }
+  }
+
+  return false;
+}
+
+// -------------------------------------------------------------------
+// Phase 4.2: Local toggle for gateway-driven automation
+// -------------------------------------------------------------------
+// This is the LOCAL AUTOMATION path.  It sends a ZCL Toggle command
+// to the registered light WITHOUT creating a command_id, WITHOUT
+// tracking the TX result, and WITHOUT publishing command_reply.
+//
+// The light's resulting state change will arrive as an attribute report
+// -> telemetry_rx.c -> MQTT reported -> cloud sees new state.
+//
+// Anti-loop guarantee: this function does NOT call ruleEngineOnSwitchEvent
+// or any rule dispatch. It is a leaf action.
+// -------------------------------------------------------------------
+
+static EmberStatus lightSendToggle(uint8_t dstEp, EmberNodeId nodeId)
+{
+  emberAfFillExternalBuffer(
+    (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
+    ZCL_ON_OFF_CLUSTER_ID,
+    ZCL_TOGGLE_COMMAND_ID,
+    "");
+
+  emberAfSetCommandEndpoints(COORD_EP_CONTROL, dstEp);
+
+  EmberApsFrame *aps = emberAfGetCommandApsFrame();
+  if (aps) {
+#ifdef EMBER_APS_OPTION_ACK_REQUEST
+    aps->options |= EMBER_APS_OPTION_ACK_REQUEST;
+#endif
+#ifdef EMBER_APS_OPTION_RETRY
+    aps->options |= EMBER_APS_OPTION_RETRY;
+#endif
+  }
+
+  return emberAfSendCommandUnicast(EMBER_OUTGOING_DIRECT, nodeId);
+}
+
+void lightCtrlLocalToggle(void)
+{
+  // Resolve the registered (paired) device
+  device_resolved_t resolved;
+  if (!deviceRegistryResolve("*", &resolved)) {
+    appLogLog("LIGHT", "local_toggle_skip", "\"reason\":\"no_paired_device\"");
+    return;
+  }
+
+  // Don't interfere with an active cloud command
+  if (s_track.active) {
+    appLogLog("LIGHT", "local_toggle_skip", "\"reason\":\"command_in_flight\"");
+    return;
+  }
+
+  // Check network
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    appLogLog("LIGHT", "local_toggle_skip", "\"reason\":\"not_joined\"");
+    return;
+  }
+
+  EmberStatus st = lightSendToggle(resolved.endpoint, resolved.nodeId);
+  if (st != EMBER_SUCCESS) {
+    appLogLog("LIGHT", "local_toggle_fail",
+              "\"zstatus\":\"0x%02X\"", (unsigned)st);
   } else {
-    char reason[48];
-    snprintf(reason, sizeof(reason), "tx_failed:0x%02X", (unsigned)zstatus);
-    publishReply(cmdId, devId, "failed", reason);
-    appLogLog("LIGHT", "failed",
-              "\"command_id\":\"%s\",\"device_id\":\"%s\",\"zstatus\":\"0x%02X\"",
-              cmdId, devId, (unsigned)zstatus);
+    appLogLog("LIGHT", "local_toggle_sent",
+              "\"node_id\":\"0x%04X\",\"ep\":%u",
+              (unsigned)resolved.nodeId, (unsigned)resolved.endpoint);
   }
 }
 
 // -------------------------------------------------------------------
-// Reply publisher (thin wrapper so dispatcher + switch_logic can share it)
+// Reply publisher (thin wrapper)
 // -------------------------------------------------------------------
 static void publishReply(const char *command_id, const char *device_id,
                          const char *status, const char *reason)

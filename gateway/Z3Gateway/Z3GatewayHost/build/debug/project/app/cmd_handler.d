@@ -96,7 +96,8 @@ build/debug/project/app/cmd_handler.o: app/cmd_handler.c \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h \
- app/app_log.h app/net_mgr.h app/valve_ctrl.h
+ app/app_log.h app/net_mgr.h app/app_mqtt.h app/sb_command.h \
+ app/device_dispatch.h app/device_registry.h
 app/cmd_handler.h:
 app/app_config.h:
 app/app_state.h:
@@ -203,4 +204,7 @@ autogen/zap-enabled-incoming-commands.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h:
 app/app_log.h:
 app/net_mgr.h:
-app/valve_ctrl.h:
+app/app_mqtt.h:
+app/sb_command.h:
+app/device_dispatch.h:
+app/device_registry.h:
