@@ -1,14 +1,14 @@
 # Device Capability Matrix (v1)
 
 Tài liệu này **đóng băng** tập năng lực (capability) của từng `device_type` cho Phase 0.
-Mọi publisher/subscriber MQTT, IPC adapter, và cloud service **phải** tuân theo danh sách này.
+Mọi publisher/subscriber MQTT, Z3Gateway C, và cloud service **phải** tuân theo danh sách này.
 Bất kỳ mở rộng nào đều phải đưa vào phase sau, không được âm thầm thêm vào v1.
 
 Xem thêm:
 
 - Namespace và envelope: [MQTT_CONTRACT.md](./MQTT_CONTRACT.md)
-- Ánh xạ MQTT ↔ IPC ↔ adapter: [ADAPTER_ACTION_MAP.md](./ADAPTER_ACTION_MAP.md)
-- Ranh giới IPC và native: [UART_FRAME_FORMAT.md](./UART_FRAME_FORMAT.md)
+- Ánh xạ MQTT ↔ Z3Gateway C action: [ADAPTER_ACTION_MAP.md](./ADAPTER_ACTION_MAP.md)
+- Ranh giới native và MQTT: [UART_FRAME_FORMAT.md](./UART_FRAME_FORMAT.md)
 
 ---
 
@@ -20,7 +20,7 @@ Xem thêm:
 
 **Chuẩn hoá tên**: đối ngoại (MQTT topic + `payload.device_type`) dùng `motion`.
 Các tên cũ như `occ`, `occupancy` chỉ là từ vựng nội bộ/legacy — **không** xuất hiện trên
-MQTT hoặc IPC.
+MQTT.
 
 > Trong `payload.state`, cảm biến `motion` vẫn dùng giá trị `occupied` / `unoccupied`
 > để mô tả trạng thái đo được (đó là giá trị *trạng thái*, không phải *device_type*).
@@ -169,7 +169,7 @@ Không bắt buộc ở v1. Các thay đổi occupancy được biểu diễn qu
 Các mục sau **có** trong contract/topic tree nhưng **không** nằm trong Phase 0 freeze.
 Cloud/adapter không được yêu cầu hỗ trợ chúng ở v1:
 
-- OTA (`ota/...` topic, `ota_manifest`, `ota_desired`, `ota_progress`, `ota_event` IPC kinds)
+- OTA (`ota/...` topics)
 - Groups (`groups/...`)
 - Scenes (`scenes/...`)
 - `device_type = lock`, `device_type = unknown` (hợp lệ trong contract, không có capability chính thức)

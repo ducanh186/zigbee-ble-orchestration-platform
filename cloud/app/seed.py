@@ -61,6 +61,16 @@ async def seed() -> None:
                 name="Light 02",
             )
 
+            # Switch (Phase 3)
+            await _upsert(
+                session,
+                Device,
+                "switch-01",
+                device_type="switch",
+                room_id="room-01",
+                name="Switch 01",
+            )
+
             # User
             await _upsert(
                 session, User, "admin", username="admin", home_id="home-01"

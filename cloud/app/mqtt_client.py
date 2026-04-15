@@ -7,12 +7,13 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
+from cloud.app.schemas import validate_event_payload, validate_reported_payload
 
 logger = logging.getLogger(__name__)
 
 
 class MQTTService:
-    """MQTT client service that bridges the cloud backend to the gateway broker.
+    """MQTT client service that connects the cloud backend to the gateway broker.
 
     Subscribes to device reported state, events, command replies, and gateway
     online status.  Provides ``publish_command`` for sending command requests.
@@ -106,6 +107,16 @@ class MQTTService:
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
 
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_reported_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Reported payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            # Still persist raw data but log the warning
+            validated = inner
+
         async def _write():
             if not self._db_session_factory:
                 return
@@ -145,32 +156,61 @@ class MQTTService:
         self._run_async(_write)
 
     def _handle_event(self, topic: str, envelope: dict) -> None:
-        """Handle device event -- insert event row."""
+        """Handle device event -- auto-register device + insert event row."""
         parts = topic.split("/")
         # Topic: sb/v1/{t}/{s}/{g}/devices/{device_type}/{device_id}/event
         devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
+
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_event_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Event payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            validated = inner
 
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Event
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
 
             async with self._db_session_factory() as session:
+                # Auto-register device if not yet known (Phase 3.3)
+                result = await session.execute(
+                    select(Device).where(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                if not device:
+                    device = Device(
+                        id=device_id,
+                        device_type=validated.get("device_type", device_type),
+                        eui64=validated.get("eui64"),
+                        name=device_id,
+                        is_online=True,
+                    )
+                    session.add(device)
+                    logger.info("Auto-registered device %s (type=%s) from event",
+                                device_id, device_type)
+
                 event = Event(
                     device_id=device_id,
-                    event_type=inner.get(
-                        "event", inner.get("event_type", "unknown")
+                    event_type=validated.get(
+                        "event", validated.get("event_type", "unknown")
                     ),
-                    payload=inner,
+                    payload=validated,
                     occurred_at=datetime.fromisoformat(
                         envelope.get("ts", datetime.now(UTC).isoformat())
                     ).replace(tzinfo=None),
                 )
                 session.add(event)
                 await session.commit()
-                logger.info("Saved event for %s", device_id)
+                logger.info("Saved event for %s (type=%s, event=%s)",
+                            device_id, device_type, event.event_type)
 
         self._run_async(_write)
 

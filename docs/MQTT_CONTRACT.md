@@ -146,8 +146,8 @@ Quy tắc:
 
 - `correlation_id` của mọi reply đều bằng `{command_id}`
 - `commands/{command_id}/reply` không bao giờ retain
-- Gateway phát ra: `accepted`, `queued`, `sent`
-- Adapter phát ra kết quả cuối cùng (`executed` / `failed`), hoặc gateway phát `timeout`
+- Z3Gateway C phát ra toàn bộ lifecycle: `accepted`, `queued`, `sent`
+- Z3Gateway C phát ra kết quả cuối cùng (`executed` / `failed` / `timeout`)
 
 Ví dụ payload reply tối giản:
 

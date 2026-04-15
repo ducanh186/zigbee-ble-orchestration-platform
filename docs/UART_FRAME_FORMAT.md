@@ -1,141 +1,108 @@
-# Native Boundary and IPC Frame Format
+# Native Boundary and Application Architecture
 
-## Native Mode Boundary
+## Production Architecture (Frozen)
 
-For this repository, the production architecture is **Z3Gateway-native only**.
-
-That means:
-
-- `Ubuntu host <-> NCP radio` uses **EZSP/ASH**
-- the serial/UART link between host and EFR32 is **owned by Z3Gateway**
-- this repository does **not** define any custom `@DATA/@CMD/@ACK` application protocol on that serial link
-
-In other words, there is no project-specific application UART frame format for the host-radio boundary in native mode.
-
-> **Legacy note (Phase 0 freeze):** older planning docs and the debug CLI still
-> reference `@DATA` / `@CMD` / `@ACK` line markers. Those are **superseded** by the
-> IPC boundary defined below and are **not** part of the production contract.
-> `@CMD` may still appear on the local debug console of the Z3Gateway host app,
-> but cloud / bridge / adapter components MUST NOT rely on it.
-
-## Application Boundary Used By This Repo
-
-The application contract implemented by this repo is:
+The production architecture is **single-process Z3Gateway C with direct MQTT integration**.
 
 ```text
-Z3Gateway adapter <-> local IPC socket <-> MQTT bridge
+Cloud / API / Mobile
+    │
+    ▼
+MQTT broker (Mosquitto)
+    │
+    ▼
+Z3Gateway C  ← single process on Ubuntu host
+    │            • MQTT client (subscribe + publish)
+    │            • command lifecycle management
+    │            • device registry
+    │            • local automation / rule engine
+    │            • Zigbee EZSP/ASH handling
+    ▼
+EFR32 NCP (radio) ── EZSP/ASH over serial/UART
+    │
+    ▼
+Zigbee end-devices (light, switch, motion)
 ```
 
-Transport:
+Key points:
 
-- Unix domain socket
-- default path: `/tmp/sb-gateway.sock`
-- one full-duplex adapter connection at a time
+- **Z3Gateway C is the sole host process** — it handles both Zigbee radio communication
+  and MQTT pub/sub directly in a single binary.
+- There is **no IPC socket**, **no separate MQTT bridge process**, and **no NDJSON wire
+  format** between components.
+- The MQTT client (using Paho C or equivalent) runs inside Z3Gateway C.
+- The serial/UART link between the Ubuntu host and EFR32 NCP uses **EZSP/ASH** —
+  this is owned by the Silabs Z3Gateway stack, not by this repository.
 
-Wire format:
+## Host–Radio Boundary
 
-- NDJSON
-- UTF-8
-- one JSON object per line
+This repository does **not** define any custom application UART frame format on the
+host–radio serial link. The EZSP/ASH protocol between Z3Gateway and the NCP is the
+only wire format on that boundary, and it is entirely managed by the Silabs EmberZNet
+stack.
 
-## IPC Record Schema
+> **Legacy note:** older planning docs and the debug CLI reference `@DATA` / `@CMD` /
+> `@ACK` line markers. Those are **superseded** and are **not** part of the production
+> contract. `@CMD` may still appear on the local debug console of Z3Gateway for manual
+> testing, but no production component relies on it.
 
-Common fields:
+## Application Boundary (Frozen)
 
-```json
-{
-  "v": 1,
-  "kind": "reported",
-  "msg_id": "0df5d2c39615483e87679b5411696cc4",
-  "ts": "2026-03-19T07:20:00Z",
-  "source": "adapter",
-  "trace_id": "trace-01",
-  "correlation_id": "cmd-01",
-  "device_id": "light-01",
-  "command_id": "cmd-01",
-  "campaign_id": "ota-camp-01",
-  "status": "executed",
-  "payload": {}
-}
+The application boundary used by this repo is:
+
+```text
+Z3Gateway C  <──MQTT──>  MQTT broker  <──MQTT──>  Cloud / API / Mobile
 ```
 
-Required fields:
+There is no intermediate process or socket. Z3Gateway C directly:
 
-- `v`
-- `kind`
-- `msg_id`
-- `ts`
-- `source`
-- `payload`
+- **Subscribes** to command requests, desired state, OTA manifests from cloud
+- **Publishes** reported state, events, command replies, gateway health to cloud
 
-Optional fields:
+The MQTT contract is defined in [MQTT_CONTRACT.md](./MQTT_CONTRACT.md).
 
-- `trace_id`
-- `correlation_id`
-- `device_id`
-- `command_id`
-- `campaign_id`
-- `status`
+## Internal Data Flow
 
-## IPC Kinds
+### Cloud-driven command path
 
-### Phase 0 freeze (v1 — required)
-
-Adapter -> bridge:
-
-- `reported`
-- `event`
-- `command_reply`
-
-Bridge -> adapter:
-
-- `desired`
-- `command_request`
-
-Mọi adapter v1 **phải** hỗ trợ đúng 5 kind trên. Xem
-[ADAPTER_ACTION_MAP.md](./ADAPTER_ACTION_MAP.md) để biết ánh xạ
-MQTT ↔ IPC ↔ action.
-
-### Deferred (không thuộc v1)
-
-Các kind dưới đây vẫn tồn tại trong schema để tương thích về sau, nhưng
-**không bắt buộc** ở Phase 0. Adapter có thể bỏ qua khi nhận, và không cần phát:
-
-Adapter -> bridge (deferred):
-
-- `registry`
-- `gateway_health`
-- `gateway_log`
-- `ota_progress`
-- `ota_event`
-
-Bridge -> adapter (deferred):
-
-- `ota_manifest`
-- `ota_desired`
-
-## Examples
-
-### Reported device state
-
-```json
-{"v":1,"kind":"reported","msg_id":"7cfaf7eb8d7e4c0ca3d166714d165ecb","ts":"2026-03-19T07:21:00Z","source":"adapter","device_id":"light-01","payload":{"device_id":"light-01","device_type":"light","eui64":"00124b0001aa22bb","nwk_addr":"0x4F2A","state":{"power":"on","level":180,"reachable":true}}}
+```text
+Cloud/API
+  → MQTT  .../commands/{command_id}/request
+  → Z3Gateway C receives directly
+  → parse command payload
+  → dispatch by device_type (light_on, light_off, light_set_level, ...)
+  → send Zigbee command via Ember AF / EZSP
+  → publish .../commands/{command_id}/reply  (accepted → sent → executed|failed|timeout)
+  → publish .../devices/{type}/{id}/reported  if state changed
 ```
 
-### Desired state forwarded from MQTT
+### Device-driven uplink path
 
-```json
-{"v":1,"kind":"desired","msg_id":"94c75323c9b34558bf806b44a0fb2ced","ts":"2026-03-19T07:22:00Z","source":"cloud","device_id":"light-01","payload":{"device_id":"light-01","desired":{"power":"off"}}}
+```text
+Zigbee device state change / attribute report
+  → NCP receives over-the-air, delivers via EZSP
+  → Z3Gateway C callback (emberAfReportAttributesCallback, etc.)
+  → normalize payload (device_id, device_type, state)
+  → publish MQTT  .../devices/{type}/{id}/reported   (QoS 1, retain)
+  → publish MQTT  .../devices/{type}/{id}/event       (QoS 1, no retain)  — if discrete event
 ```
 
-### Command request forwarded from MQTT
+### Gateway-driven local automation path
 
-```json
-{"v":1,"kind":"command_request","msg_id":"5eaf455478bb4118b02ddb0f65b8696a","ts":"2026-03-19T07:23:00Z","source":"cloud","device_id":"light-01","command_id":"cmd-01","correlation_id":"cmd-01","payload":{"device_id":"light-01","op":"device.command","target":{"endpoint":1,"cluster_id":"0x0006","command":"off"},"timeout_ms":5000}}
+```text
+Switch toggle event  (or motion occupied event)
+  → Z3Gateway C rule engine evaluates local rules
+  → send Zigbee command to target light
+  → publish  .../devices/switch/{id}/event
+  → publish  .../devices/light/{id}/reported   after state confirms
 ```
 
-### Command reply from adapter
+## Historical Note
 
-```json
-{"v":1,"kind":"command_reply","msg_id":"90c3d5c8d70a4929b680e011d2f4b0b1","ts":"2026-03-19T07:23:01Z","source":"adapter","device_id":"light-01","command_id":"cmd-01","status":"executed","payload":{"device_id":"light-01","status":"executed","reason":null}}
-```
+> **IPC architecture (superseded):** earlier versions of this project defined an
+> internal boundary using a Unix domain socket (`/tmp/sb-gateway.sock`) with NDJSON
+> records between a "local adapter" process and a "MQTT bridge" process. That
+> architecture was replaced by direct MQTT integration inside Z3Gateway C. The IPC
+> kinds (`reported`, `event`, `command_reply`, `desired`, `command_request`,
+> `ota_manifest`, `ota_desired`, etc.) are no longer part of the production contract.
+> See git history for the original IPC specification.

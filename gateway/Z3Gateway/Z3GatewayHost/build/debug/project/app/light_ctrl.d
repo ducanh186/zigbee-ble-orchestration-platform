@@ -1,4 +1,5 @@
-build/debug/project/app.o: app.c \
+build/debug/project/app/light_ctrl.o: app/light_ctrl.c app/light_ctrl.h \
+ app/sb_command.h app/app_mqtt.h app/app_log.h app/app_utils.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/platform-header.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/emlib/inc/em_core.h \
@@ -83,29 +84,24 @@ build/debug/project/app.o: app.c \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/serial/../serial.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/plugin-component-mappings.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af-storage.h \
- autogen/zap-command.h autogen/zap-id.h autogen/zap-id.h \
- autogen/zap-print.h autogen/zap-enabled-incoming-commands.h \
+ autogen/zap-command.h \
+ /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h \
+ autogen/zap-id.h autogen/zap-id.h autogen/zap-print.h \
+ autogen/zap-enabled-incoming-commands.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/util.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/../include/af.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/global-callback.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/global-other-callback.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/service-function/sl_service_function.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/af-main.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/zigbee-framework/zigbee-device-common.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/stack/include/zigbee-device-stack.h \
- autogen/zap-cluster-command-parser.h autogen/sl_component_catalog.h \
- autogen/zap-command-structs.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/signature-decode/sl_signature_decode.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/stack/include/zigbee-security-manager.h \
- autogen/sl_cli_instances.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/cli/inc/sl_cli_command.h \
- autogen/sl_cli_handles.h app/app_config.h app/app_state.h app/app_log.h \
- app/app_utils.h app/app_mqtt.h app/net_mgr.h app/cmd_handler.h \
- app/device_monitor.h app/light_ctrl.h app/sb_command.h
+ app/app_config.h app/device_registry.h
+app/light_ctrl.h:
+app/sb_command.h:
+app/app_mqtt.h:
+app/app_log.h:
+app/app_utils.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/platform-header.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/emlib/inc/em_core.h:
@@ -193,6 +189,7 @@ config/sl_cli_config.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/plugin-component-mappings.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af-storage.h:
 autogen/zap-command.h:
+/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h:
 autogen/zap-id.h:
 autogen/zap-id.h:
 autogen/zap-print.h:
@@ -200,30 +197,10 @@ autogen/zap-enabled-incoming-commands.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/util.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/../include/af.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/global-callback.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/global-other-callback.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/service-function/sl_service_function.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/af-main.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/zigbee-framework/zigbee-device-common.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/stack/include/zigbee-device-stack.h:
-autogen/zap-cluster-command-parser.h:
-autogen/sl_component_catalog.h:
-autogen/zap-command-structs.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/signature-decode/sl_signature_decode.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/stack/include/zigbee-security-manager.h:
-autogen/sl_cli_instances.h:
-/home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/cli/inc/sl_cli_command.h:
-autogen/sl_cli_handles.h:
 app/app_config.h:
-app/app_state.h:
-app/app_log.h:
-app/app_utils.h:
-app/app_mqtt.h:
-app/net_mgr.h:
-app/cmd_handler.h:
-app/device_monitor.h:
-app/light_ctrl.h:
-app/sb_command.h:
+app/device_registry.h:
