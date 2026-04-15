@@ -52,7 +52,7 @@ def envelope(source: str, payload: dict, correlation_id: str | None = None) -> d
     env = {
         "schema": "sb.v1",
         "msg_id": uuid4().hex,
-        "ts": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "ts": int(datetime.now(UTC).timestamp() * 1000),
         "tenant_id": TENANT,
         "site_id": SITE,
         "gateway_id": GATEWAY,
@@ -60,7 +60,12 @@ def envelope(source: str, payload: dict, correlation_id: str | None = None) -> d
         "payload": payload,
     }
     if correlation_id:
-        env["correlation_id"] = correlation_id
+        # Contract format: "cmd_" + command_id. Callers pass the raw command_id.
+        env["correlation_id"] = (
+            correlation_id
+            if correlation_id.startswith("cmd_")
+            else f"cmd_{correlation_id}"
+        )
     return env
 
 
@@ -100,7 +105,7 @@ def seed_device_if_needed(client: httpx.Client) -> None:
     try:
         payload = json.loads((SAMPLES / "reported_light.json").read_text("utf-8"))
         topic = f"{topic_prefix()}/devices/light/{DEVICE_ID}/reported"
-        mq.publish(topic, json.dumps(payload), qos=1).wait_for_publish(timeout=2.0)
+        mq.publish(topic, json.dumps(payload), qos=0).wait_for_publish(timeout=2.0)
         time.sleep(0.5)
     finally:
         mq.loop_stop()
@@ -141,7 +146,7 @@ def main() -> int:
             mq.publish(
                 f"{topic_prefix()}/commands/{cmd_id}/reply",
                 json.dumps(reply),
-                qos=1,
+                qos=0,
             ).wait_for_publish(timeout=2.0)
             result = poll_command(http, cmd_id, expect="executed", timeout_s=5.0)
             print(f"  [ok] reply processed → status=executed (updated_at={result['updated_at']})")
@@ -159,7 +164,7 @@ def main() -> int:
             mq.publish(
                 f"{topic_prefix()}/devices/light/{DEVICE_ID}/reported",
                 json.dumps(reported),
-                qos=1,
+                qos=0,
             ).wait_for_publish(timeout=2.0)
             time.sleep(0.5)
             r = http.get(f"{API_URL}/api/devices/{DEVICE_ID}/state")

@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
+
+TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
+
+
+def _fmt_ts(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.strftime(TS_DISPLAY_FORMAT)
 
 
 class DeviceOut(BaseModel):
@@ -18,6 +26,10 @@ class DeviceOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_serializer("created_at", "updated_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
 
 class DeviceStateOut(BaseModel):
     id: int
@@ -26,6 +38,10 @@ class DeviceStateOut(BaseModel):
     reported_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("reported_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
 
 
 class CommandCreate(BaseModel):
@@ -51,6 +67,10 @@ class CommandOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_serializer("expires_at", "created_at", "updated_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
 
 class EventOut(BaseModel):
     id: int
@@ -60,6 +80,10 @@ class EventOut(BaseModel):
     occurred_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("occurred_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
 
 
 class HealthOut(BaseModel):

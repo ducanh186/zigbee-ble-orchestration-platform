@@ -11,6 +11,25 @@ from cloud.app.config import settings as _settings
 logger = logging.getLogger(__name__)
 
 
+def _now_ms() -> int:
+    return int(datetime.now(UTC).timestamp() * 1000)
+
+
+def _ts_ms_to_naive_utc(ts: object) -> datetime:
+    """Parse MQTT envelope `ts` (epoch ms) into a naive UTC datetime for DB.
+
+    Accepts int/float ms. If `ts` is missing or unparseable, falls back to now.
+    """
+    try:
+        if isinstance(ts, (int, float)):
+            return datetime.fromtimestamp(int(ts) / 1000.0, tz=UTC).replace(
+                tzinfo=None
+            )
+    except (ValueError, OSError, OverflowError):
+        pass
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class MQTTService:
     """MQTT client service that bridges the cloud backend to the gateway broker.
 
@@ -64,12 +83,15 @@ class MQTTService:
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         logger.info("MQTT connected with rc=%s", rc)
+        # Demo deployment uses QoS 0 for all topics (see docs/MQTT_CONTRACT.md
+        # "Retain và QoS" → "Demo vs production"). Production must raise to
+        # the per-topic QoS defined in that table.
         prefix = self.topic_prefix
-        client.subscribe(f"{prefix}/devices/+/+/reported", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/event", qos=1)
-        client.subscribe(f"{prefix}/commands/+/reply", qos=1)
-        client.subscribe(f"{prefix}/gateway/online", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/reported", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/event", qos=0)
+        client.subscribe(f"{prefix}/commands/+/reply", qos=0)
+        client.subscribe(f"{prefix}/gateway/online", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
@@ -134,9 +156,7 @@ class MQTTService:
                 state_row = DeviceState(
                     device_id=device_id,
                     state=inner.get("state", inner),
-                    reported_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    reported_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(state_row)
                 await session.commit()
@@ -164,9 +184,7 @@ class MQTTService:
                         "event", inner.get("event_type", "unknown")
                     ),
                     payload=inner,
-                    occurred_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(event)
                 await session.commit()
@@ -225,12 +243,13 @@ class MQTTService:
         envelope = {
             "schema": "sb.v1",
             "msg_id": uuid4().hex,
-            "ts": datetime.now(UTC).replace(microsecond=0).isoformat(),
+            "ts": _now_ms(),
             "tenant_id": s.tenant_id,
             "site_id": s.site_id,
             "gateway_id": s.gateway_id,
             "source": "cloud",
-            "correlation_id": command_id,
+            # Optional per contract; format is "cmd_" + command_id.
+            "correlation_id": f"cmd_{command_id}",
             "payload": {
                 "device_id": device_id,
                 "op": op,
@@ -238,7 +257,8 @@ class MQTTService:
                 "timeout_ms": timeout_ms,
             },
         }
-        self.client.publish(topic, json.dumps(envelope), qos=1)
+        # Demo: QoS 0. Production: QoS 1 per docs/MQTT_CONTRACT.md.
+        self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published command %s for %s", command_id, device_id)
 
     # ------------------------------------------------------------------
