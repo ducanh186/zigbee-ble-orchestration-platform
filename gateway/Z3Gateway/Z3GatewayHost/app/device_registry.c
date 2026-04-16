@@ -80,7 +80,19 @@ void emberAfTrustCenterJoinCallback(EmberNodeId newNodeId,
     deviceMonitorOnJoin(newNodeId, newNodeEui64);
   }
 
-  if (!g_known) return;
+  if (!g_known) {
+    // v1 auto-register: pair the first device that joins the network.
+    if (status == EMBER_STANDARD_SECURITY_SECURED_REJOIN
+        || status == EMBER_STANDARD_SECURITY_UNSECURED_JOIN) {
+      char euiStr[17];
+      eui64ToStringBigEndian(euiStr, sizeof(euiStr), newNodeEui64);
+      deviceRegistryPair(euiStr, newNodeId, 1);
+      appLogLog("REG", "auto_paired",
+        "\"eui64\":\"%s\",\"node_id\":\"0x%04X\",\"trigger\":\"tc_join\"",
+        euiStr, (unsigned)newNodeId);
+    }
+    return;
+  }
 
   // If this is our registered device rejoining, update its node ID.
   if (memcmp(newNodeEui64, g_euiLe, EUI64_SIZE) == 0) {

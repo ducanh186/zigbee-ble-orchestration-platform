@@ -10,6 +10,7 @@ from cloud.app.schemas import (
     LightReportedState,
     SwitchEventPayload,
     SwitchReportedState,
+    translate_command_for_gateway,
     validate_event_payload,
     validate_reported_payload,
 )
@@ -182,3 +183,52 @@ class TestValidateEventPayload:
         inner = {"device_id": "x", "event": "something"}
         result = validate_event_payload("motion", inner)
         assert result == inner
+
+
+# ---- translate_command_for_gateway ----
+
+class TestTranslateCommandForGateway:
+    def test_raw_passthrough(self):
+        target = {"endpoint": 1, "cluster_id": "0x0006", "command": "on"}
+        op, t = translate_command_for_gateway("light", "device.command", target)
+        assert op == "device.command"
+        assert t is target
+
+    def test_raw_invalid_target_raises(self):
+        with pytest.raises((ValueError, ValidationError)):
+            translate_command_for_gateway(
+                "light", "device.command",
+                {"endpoint": 1, "cluster_id": "0x9999", "command": "on"},
+            )
+
+    def test_user_friendly_power_on(self):
+        op, t = translate_command_for_gateway("light", "set", {"power": "on"})
+        assert op == "device.command"
+        assert t == {"endpoint": 1, "cluster_id": "0x0006", "command": "on"}
+
+    def test_user_friendly_power_off(self):
+        op, t = translate_command_for_gateway("light", "set", {"power": "off"})
+        assert op == "device.command"
+        assert t == {"endpoint": 1, "cluster_id": "0x0006", "command": "off"}
+
+    def test_user_friendly_level(self):
+        op, t = translate_command_for_gateway("light", "set", {"level": 180})
+        assert op == "device.command"
+        assert t == {
+            "endpoint": 1,
+            "cluster_id": "0x0008",
+            "command": "set_level",
+            "level": 180,
+        }
+
+    def test_user_friendly_empty_target_raises(self):
+        with pytest.raises((ValueError, ValidationError)):
+            translate_command_for_gateway("light", "set", {})
+
+    def test_switch_rejects_commands(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway("switch", "set", {"power": "on"})
+
+    def test_unknown_type_rejects(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway("motion", "set", {"power": "on"})
