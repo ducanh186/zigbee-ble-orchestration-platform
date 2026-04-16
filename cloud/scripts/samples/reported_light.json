@@ -1,7 +1,7 @@
 {
   "schema": "sb.v1",
   "msg_id": "5c6d467f5f90460da65a9db62288def6",
-  "ts": "2026-04-13T07:15:00Z",
+  "ts": 1776064500000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",

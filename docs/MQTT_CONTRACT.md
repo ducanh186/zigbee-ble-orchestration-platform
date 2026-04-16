@@ -28,13 +28,13 @@ Mọi MQTT message đều dùng chung JSON envelope:
 {
   "schema": "sb.v1",
   "msg_id": "e6f67ab087c64f1e9457a2f6e03f9a68",
-  "ts": "2026-03-19T07:00:00Z",
+  "ts": 1773990000000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
   "source": "gateway",
   "trace_id": "trace-01",
-  "correlation_id": "cmd-01",
+  "correlation_id": "cmd_01",
   "payload": {}
 }
 ```
@@ -42,6 +42,31 @@ Mọi MQTT message đều dùng chung JSON envelope:
 **Trường bắt buộc:** `schema`, `msg_id`, `ts`, `tenant_id`, `site_id`, `gateway_id`, `source`, `payload`.
 
 **Trường tùy chọn:** `trace_id`, `correlation_id`.
+
+### Kiểu của `correlation_id`
+
+`correlation_id` là **optional**. Khi có mặt, nó dùng để nối các message cùng
+một luồng nghiệp vụ (ví dụ: request ↔ reply). Quy ước format:
+
+- Luồng lệnh (commands): `correlation_id = "cmd_" + {command_id}`. Ví dụ nếu
+  `command_id = "a1b2c3"` thì `correlation_id = "cmd_a1b2c3"`.
+- Các luồng khác (OTA, scene...) nếu muốn dùng correlation_id thì áp dụng
+  prefix tương tự (`ota_`, `scene_`...), không tự phát minh format mới.
+
+Subscriber **không** được dùng `correlation_id` làm khoá chính để tra cứu
+command; khoá chính luôn là `command_id` lấy từ topic
+`commands/{command_id}/reply`. `correlation_id` chỉ để trace / log.
+
+### Kiểu của `ts`
+
+`ts` là **số nguyên** — Unix epoch tính bằng **milliseconds** (UTC). Ví dụ
+`1773990000000` tương ứng `2026-03-19T07:00:00Z`.
+
+- Publisher (gateway / cloud / adapter) luôn phát `ts` dạng số nguyên ms.
+- Subscriber tự chuyển sang định dạng hiển thị cần dùng. Cloud chuẩn hoá về
+  chuỗi `HH:MM MM/DD/YYYY` trước khi trả ra REST API cho consumer.
+- Không truyền `ts` dưới dạng chuỗi ISO8601, chuỗi số có dấu nháy, hay chuỗi
+  đã format — việc format là trách nhiệm của phía hiển thị.
 
 ## Cây topic
 
@@ -108,6 +133,14 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 
 ## Retain và QoS
 
+> **Demo vs production:** Bảng dưới liệt kê QoS của **kiến trúc thực tế** (production).
+> Bản triển khai demo hiện tại của dự án (`cloud/`, `gateway/`, broker local
+> và EC2) **publish/subscribe toàn bộ topic ở QoS 0** để đơn giản hoá vận hành
+> và giảm overhead khi test. Khi chuyển sang production, publisher/subscriber
+> phải nâng QoS theo bảng này — đặc biệt là các luồng trạng thái và lệnh
+> (retained + QoS 1) không được hạ cấp. Retain policy giữ nguyên cho cả hai
+> môi trường.
+
 | Topic | QoS | Retain | Ghi chú |
 | --- | --- | --- | --- |
 | `gateway/online` | 1 | có | Dùng Last Will and Testament (LWT) |
@@ -144,7 +177,9 @@ accepted → queued → sent → executed | failed | timeout
 
 Quy tắc:
 
-- `correlation_id` của mọi reply đều bằng `{command_id}`
+- `correlation_id` của mọi reply (nếu có) luôn là `"cmd_" + {command_id}`;
+  bản thân `correlation_id` là **optional** — gateway/adapter có thể bỏ qua,
+  consumer vẫn phải tra command theo `{command_id}` trong topic
 - `commands/{command_id}/reply` không bao giờ retain
 - Z3Gateway C phát ra toàn bộ lifecycle: `accepted`, `queued`, `sent`
 - Z3Gateway C phát ra kết quả cuối cùng (`executed` / `failed` / `timeout`)
@@ -183,7 +218,7 @@ Payload:
 {
   "schema": "sb.v1",
   "msg_id": "5c6d467f5f90460da65a9db62288def6",
-  "ts": "2026-03-19T07:15:00Z",
+  "ts": 1773990900000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
@@ -216,12 +251,12 @@ Payload:
 {
   "schema": "sb.v1",
   "msg_id": "fb5247dbeb4f480ebcb1e835a85d8182",
-  "ts": "2026-03-19T07:16:00Z",
+  "ts": 1773990960000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
   "source": "cloud",
-  "correlation_id": "cmd-01",
+  "correlation_id": "cmd_01",
   "payload": {
     "device_id": "light-01",
     "op": "device.command",
