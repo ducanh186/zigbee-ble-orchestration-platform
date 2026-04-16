@@ -5,7 +5,7 @@
 
 // ===== App constants =====
 #define COORD_EP_TELEM       1
-#define COORD_EP_CONTROL     2
+#define COORD_EP_CONTROL     1
 
 #define OPEN_JOIN_MS         180000u
 

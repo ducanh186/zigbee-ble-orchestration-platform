@@ -3,6 +3,7 @@
 #include "app_utils.h"
 #include "app_log.h"
 #include "app_mqtt.h"
+#include "device_registry.h"
 #include "rule_engine.h"
 #include "app/framework/include/af.h"
 #include "app_zcl_fallback.h"
@@ -54,6 +55,17 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
           if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
             char euiStr[20];
             eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+
+            // v1 auto-register: if no device paired yet, register on
+            // first attribute report (covers already-joined devices).
+            if (!deviceRegistryIsKnown()) {
+              deviceRegistryPair(euiStr, sender, 1);
+              appLogLog("REG", "auto_paired",
+                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                "\"trigger\":\"attr_report\"",
+                euiStr, (unsigned)sender);
+            }
+
             appMqttPublishDeviceReportedFull(sender, euiStr, "light",
                                              onOff ? "on" : "off",
                                              s_lastLightLevel);

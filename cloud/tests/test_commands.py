@@ -57,3 +57,51 @@ async def test_post_command_default_timeout(client, fake_mqtt, seed_light):
     r = await client.post(f"/api/devices/{seed_light}/command", json=body)
     assert r.status_code == 201
     assert r.json()["timeout_ms"] == 5000
+
+
+@pytest.mark.asyncio
+async def test_post_command_user_friendly_power_on(client, fake_mqtt, seed_light):
+    body = {"op": "set", "target": {"power": "on"}}
+    r = await client.post(f"/api/devices/{seed_light}/command", json=body)
+    assert r.status_code == 201, r.text
+    cmd = r.json()
+    # DB and response store the translated gateway format
+    assert cmd["op"] == "device.command"
+    assert cmd["target"] == {"endpoint": 1, "cluster_id": "0x0006", "command": "on"}
+
+    # MQTT receives gateway format
+    assert len(fake_mqtt.published) == 1
+    pub = fake_mqtt.published[0]
+    assert pub["op"] == "device.command"
+    assert pub["target"]["command"] == "on"
+    assert pub["target"]["cluster_id"] == "0x0006"
+
+
+@pytest.mark.asyncio
+async def test_post_command_user_friendly_power_off(client, fake_mqtt, seed_light):
+    body = {"op": "set", "target": {"power": "off"}}
+    r = await client.post(f"/api/devices/{seed_light}/command", json=body)
+    assert r.status_code == 201
+    assert r.json()["target"]["command"] == "off"
+    assert fake_mqtt.published[0]["target"]["command"] == "off"
+
+
+@pytest.mark.asyncio
+async def test_post_command_user_friendly_invalid_target_422(
+    client, fake_mqtt, seed_light
+):
+    body = {"op": "set", "target": {"color": "red"}}
+    r = await client.post(f"/api/devices/{seed_light}/command", json=body)
+    assert r.status_code == 422
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
+async def test_post_command_switch_rejects_422(
+    client, fake_mqtt, seed_switch
+):
+    body = {"op": "set", "target": {"power": "on"}}
+    r = await client.post(f"/api/devices/{seed_switch}/command", json=body)
+    assert r.status_code == 422
+    assert "does not accept commands" in r.json()["detail"]
+    assert fake_mqtt.published == []

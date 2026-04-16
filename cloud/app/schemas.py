@@ -96,6 +96,64 @@ class LightCommandTarget(BaseModel):
         return self
 
 
+class UserFriendlyLightTarget(BaseModel):
+    """Validates user-friendly light command targets like {"power": "on"}."""
+
+    power: PowerState | None = None
+    level: int | None = Field(default=None, ge=0, le=254)
+
+    @model_validator(mode="after")
+    def _at_least_one(self):
+        if self.power is None and self.level is None:
+            raise ValueError("target must include 'power' and/or 'level'")
+        return self
+
+
+# Default Zigbee endpoint for lights (standard for most Zigbee HA devices).
+_DEFAULT_LIGHT_ENDPOINT = 1
+
+
+def translate_command_for_gateway(
+    device_type: str, op: str, target: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
+    """Translate a REST command into the gateway MQTT wire format.
+
+    If *op* is already ``"device.command"`` the target is validated and passed
+    through unchanged.  Any other *op* value is treated as user-friendly
+    shorthand and translated into the ``device.command`` + ZCL target format
+    that the gateway expects.
+
+    Returns ``(op, target)`` ready for MQTT publication.
+    Raises ``ValueError`` on invalid input.
+    """
+    # --- raw gateway format: validate and passthrough ---
+    if op == "device.command":
+        if device_type == "light":
+            LightCommandTarget(**target)  # raises on bad input
+        return op, target
+
+    # --- user-friendly translation ---
+    if device_type == "light":
+        friendly = UserFriendlyLightTarget(**target)
+        if friendly.power is not None:
+            return "device.command", {
+                "endpoint": _DEFAULT_LIGHT_ENDPOINT,
+                "cluster_id": "0x0006",
+                "command": friendly.power.value,
+            }
+        # level-only (cluster 0x0008)
+        return "device.command", {
+            "endpoint": _DEFAULT_LIGHT_ENDPOINT,
+            "cluster_id": "0x0008",
+            "command": "set_level",
+            "level": friendly.level,
+        }
+
+    raise ValueError(
+        f"device type '{device_type}' does not accept commands in v1"
+    )
+
+
 def validate_reported_payload(device_type: str, inner: dict) -> dict | None:
     """Validate an incoming reported payload by device_type.
 

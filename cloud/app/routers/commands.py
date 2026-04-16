@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pydantic import ValidationError
+
 from cloud.app.database import get_db
 from cloud.app.models import Command, Device
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.schemas import CommandCreate, CommandOut
+from cloud.app.schemas import CommandCreate, CommandOut, translate_command_for_gateway
 
 router = APIRouter(prefix="/api", tags=["commands"])
 
@@ -23,10 +25,19 @@ async def create_command(
     body: CommandCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    # Verify device exists
+    # Verify device exists and get its type for command translation
     result = await db.execute(select(Device).where(Device.id == device_id))
-    if result.scalar_one_or_none() is None:
+    device = result.scalar_one_or_none()
+    if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
+
+    # Translate user-friendly format to gateway wire format
+    try:
+        mqtt_op, mqtt_target = translate_command_for_gateway(
+            device.device_type, body.op, body.target
+        )
+    except (ValueError, ValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     command_id = uuid4().hex
     timeout_ms = body.timeout_ms or 5000
@@ -36,8 +47,8 @@ async def create_command(
     cmd = Command(
         id=command_id,
         device_id=device_id,
-        op=body.op,
-        target=body.target,
+        op=mqtt_op,
+        target=mqtt_target,
         status="accepted",
         timeout_ms=timeout_ms,
         expires_at=expires_at,
@@ -50,9 +61,9 @@ async def create_command(
     mqtt_service.publish_command(
         command_id=command_id,
         device_id=device_id,
-        op=body.op,
-        target=body.target,
-        timeout_ms=body.timeout_ms,
+        op=mqtt_op,
+        target=mqtt_target,
+        timeout_ms=timeout_ms,
     )
 
     return cmd
