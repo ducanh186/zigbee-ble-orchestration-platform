@@ -10,6 +10,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>  // TEMP DEBUG - REMOVE AFTER BUGFIX: getenv
+
+/* TEMP DEBUG - REMOVE AFTER BUGFIX */
+static bool telDbg(void) {
+  static int cached = -1;
+  if (cached < 0) {
+    const char *v = getenv("SB_DEBUG_VERBOSE");
+    cached = (v && *v && *v != '0') ? 1 : 0;
+  }
+  return cached != 0;
+}
+/* Published by light_ctrl.c; 0 if never toggled locally. */
+extern uint32_t gLightLastLocalToggleMs;
+/* TEMP DEBUG end */
 
 // ===== Cached light level for enriching reported state =====
 // Updated when we receive Level Control cluster reports.
@@ -48,6 +62,23 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
           (unsigned)sender,
           onOff ? "on" : "off"
         );
+
+        /* TEMP DEBUG - REMOVE AFTER BUGFIX
+         * Snap-back visibility: time since last local toggle dispatch.
+         * Expected healthy pattern after a local toggle:
+         *   one report ~50-300 ms after toggle with flipped state.
+         * Snap-back pattern:
+         *   two reports within ~200 ms; second one flips back. */
+        if (telDbg()) {
+          uint32_t nowMs = msTick();
+          uint32_t sinceToggle =
+              gLightLastLocalToggleMs ? (nowMs - gLightLastLocalToggleMs) : 0u;
+          emberAfCorePrintln("@DBG ONOFF_REPORT node=0x%04X state=%s "
+                             "tick_ms=%u since_local_toggle_ms=%u",
+                             (unsigned)sender, onOff ? "on" : "off",
+                             (unsigned)nowMs, (unsigned)sinceToggle);
+        }
+        /* TEMP DEBUG end */
 
         // Publish state change over MQTT (Phase 3.1: include level)
         {
@@ -176,6 +207,34 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
           || cmd->commandId == ZCL_TOGGLE_COMMAND_ID)) {
 
     EmberNodeId sender = cmd->source;
+
+    /* TEMP DEBUG - REMOVE AFTER BUGFIX
+     * Detect rapid duplicates from the same switch to test BUG 2 hypothesis
+     * (switch RF-retransmits or double-emits when toggled fast). This only
+     * observes; the 500 ms rule_engine cooldown is what actually filters. */
+    if (telDbg()) {
+      static EmberNodeId sLastSrc = 0xFFFF;
+      static uint8_t     sLastCmd = 0xFF;
+      static uint32_t    sLastMs  = 0;
+      static uint8_t     sLastSeq = 0xFF;
+      uint32_t nowMs = msTick();
+      uint32_t elapsed = (sLastMs == 0) ? 0u : (nowMs - sLastMs);
+      uint8_t  seq = cmd->seqNum;
+      bool sameFrame = (sender == sLastSrc
+                        && cmd->commandId == sLastCmd
+                        && seq == sLastSeq);
+      if (sLastMs != 0 && elapsed < 200u) {
+        emberAfCorePrintln("@DBG SWITCH_FAST src=0x%04X cmd=0x%02X seq=%u "
+                           "elapsed_ms=%u same_seq=%d",
+                           (unsigned)sender, cmd->commandId, (unsigned)seq,
+                           (unsigned)elapsed, sameFrame ? 1 : 0);
+      }
+      sLastSrc = sender;
+      sLastCmd = cmd->commandId;
+      sLastMs  = nowMs;
+      sLastSeq = seq;
+    }
+    /* TEMP DEBUG end */
 
     // Distinguish switch from light: a switch sends On/Off commands TO us
     // (client-side), whereas a light sends attribute REPORTS (handled above).

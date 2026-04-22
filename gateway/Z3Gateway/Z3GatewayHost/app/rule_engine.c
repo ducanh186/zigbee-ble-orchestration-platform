@@ -26,8 +26,20 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>  // TEMP DEBUG - REMOVE AFTER BUGFIX: getenv
 
 #include "af.h"
+
+/* TEMP DEBUG - REMOVE AFTER BUGFIX */
+static bool ruleDbg(void) {
+  static int cached = -1;
+  if (cached < 0) {
+    const char *v = getenv("SB_DEBUG_VERBOSE");
+    cached = (v && *v && *v != '0') ? 1 : 0;
+  }
+  return cached != 0;
+}
+/* TEMP DEBUG end */
 
 // ===== Binding configuration (Phase 4.1) =====
 // V1: compiled-in bindings.  Each entry maps a switch device_id (eui64)
@@ -66,16 +78,33 @@ void ruleEngineInit(void)
   memset(s_cooldown, 0, sizeof(s_cooldown));
   s_bindingCount = 0;
 
-  // ---- V1 default bindings ----
-  // These can be overridden by a future config-load mechanism.
-  // For now, any switch event triggers toggle on the registered light.
-  // We use "*" as a wildcard meaning "any switch".
-  strncpy(s_bindings[0].switch_id, "*", sizeof(s_bindings[0].switch_id) - 1);
-  strncpy(s_bindings[0].target_light_id, "*", sizeof(s_bindings[0].target_light_id) - 1);
-  s_bindingCount = 1;
+  // Switch -> light binding is AUTHORITATIVELY handled by Zigbee direct
+  // binding (switch client -> light server, configured at commissioning).
+  // The gateway must only OBSERVE switch events and publish them upstream;
+  // it must NOT relay the toggle in parallel, otherwise the gateway's
+  // ZCL Toggle races the direct-bind Toggle and state flips back ("snap
+  // back" BUG 2).
+  //
+  // We keep the rule engine skeleton so future non-binding automations
+  // (e.g. motion -> light) can be added here without re-plumbing
+  // telemetry_rx -> rule_engine wiring.
+  //
+  // Opt-in override (for deployments WITHOUT direct binding):
+  //   SB_RULES_SWITCH_TO_LIGHT=1  -> install the wildcard switch -> light
+  //                                 binding (legacy Phase-4 behavior).
+  const char *env = getenv("SB_RULES_SWITCH_TO_LIGHT");
+  bool relay = (env && *env && *env != '0');
+  if (relay) {
+    strncpy(s_bindings[0].switch_id, "*", sizeof(s_bindings[0].switch_id) - 1);
+    strncpy(s_bindings[0].target_light_id, "*", sizeof(s_bindings[0].target_light_id) - 1);
+    s_bindingCount = 1;
+  }
 
-  appLogLog("RULE", "init", "\"bindings\":%d", s_bindingCount);
-  emberAfCorePrintln("RULE: engine init, %d binding(s)", s_bindingCount);
+  appLogLog("RULE", "init",
+            "\"bindings\":%d,\"switch_to_light_relay\":%s",
+            s_bindingCount, relay ? "true" : "false");
+  emberAfCorePrintln("RULE: engine init, %d binding(s), switch->light relay %s",
+                     s_bindingCount, relay ? "ENABLED" : "disabled (direct binding)");
 }
 
 void ruleEngineOnSwitchEvent(const char *switchDeviceId)
@@ -83,6 +112,13 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
   if (!switchDeviceId || !switchDeviceId[0]) return;
 
   uint32_t now = msTick();
+
+  /* TEMP DEBUG - REMOVE AFTER BUGFIX: entry marker with tick */
+  if (ruleDbg()) {
+    emberAfCorePrintln("@DBG RULE entry switch=%s tick_ms=%u",
+                       switchDeviceId, (unsigned)now);
+  }
+  /* TEMP DEBUG end */
 
   for (int i = 0; i < s_bindingCount; i++) {
     SwitchBinding_t *b = &s_bindings[i];
@@ -95,10 +131,19 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
     // Anti-loop cooldown check (Phase 4.3)
     CooldownEntry_t *cd = &s_cooldown[i];
     if (cd->switch_id[0] && strcmp(cd->switch_id, switchDeviceId) == 0) {
-      if ((int32_t)(now - cd->lastTriggerTick) < (int32_t)RULE_COOLDOWN_MS) {
+      uint32_t elapsed = now - cd->lastTriggerTick;
+      if ((int32_t)elapsed < (int32_t)RULE_COOLDOWN_MS) {
         appLogLog("RULE", "cooldown",
                   "\"switch\":\"%s\",\"elapsed_ms\":%u",
-                  switchDeviceId, (unsigned)(now - cd->lastTriggerTick));
+                  switchDeviceId, (unsigned)elapsed);
+        /* TEMP DEBUG - REMOVE AFTER BUGFIX */
+        if (ruleDbg()) {
+          emberAfCorePrintln("@DBG RULE cooldown_hit switch=%s elapsed_ms=%u "
+                             "threshold_ms=%u",
+                             switchDeviceId, (unsigned)elapsed,
+                             (unsigned)RULE_COOLDOWN_MS);
+        }
+        /* TEMP DEBUG end */
         return;
       }
     }
@@ -120,6 +165,18 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
 
     // Phase 4.2: Use lightCtrlLocalToggle (no command tracking, no command_reply).
     // This is the LOCAL AUTOMATION path, separate from the cloud command path.
+    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
+    uint32_t preMs = msTick();
+    /* TEMP DEBUG end */
     lightCtrlLocalToggle();
+    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
+    if (ruleDbg()) {
+      emberAfCorePrintln("@DBG RULE dispatch_done switch=%s pre_ms=%u "
+                         "post_ms=%u dt_ms=%u",
+                         switchDeviceId, (unsigned)preMs,
+                         (unsigned)msTick(),
+                         (unsigned)(msTick() - preMs));
+    }
+    /* TEMP DEBUG end */
   }
 }
