@@ -16,23 +16,8 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
-#include <unistd.h>  // isatty (TEMP DEBUG - REMOVE AFTER BUGFIX)
 
 #include "af.h"  // emberAfCorePrintln
-
-/* TEMP DEBUG - REMOVE AFTER BUGFIX
- * Single gate for verbose MQTT/local-path tracing. Enable via:
- *   SB_DEBUG_VERBOSE=1
- * Default OFF. Cached on first call. */
-static bool dbgVerbose(void) {
-  static int cached = -1;
-  if (cached < 0) {
-    const char *v = getenv("SB_DEBUG_VERBOSE");
-    cached = (v && *v && *v != '0') ? 1 : 0;
-  }
-  return cached != 0;
-}
-/* TEMP DEBUG end */
 
 // ===== Broker connection defaults =====
 // Overridable at runtime via environment variables:
@@ -186,12 +171,6 @@ int appMqttPublish(const char *topicSuffix, const char *payload,
 static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
 {
   (void)userdata;
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-  if (dbgVerbose()) {
-    emberAfCorePrintln("@DBG MQTT onConnect rc=%d text=\"%s\"",
-                       rc, mosquitto_connack_string(rc));
-  }
-  /* TEMP DEBUG end */
   if (rc != 0) {
     emberAfCorePrintln("MQTT: connect failed rc=%d", rc);
     appLogLog("mqtt", "conn_fail", "rc=%d", rc);
@@ -220,20 +199,6 @@ static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
   }
 }
 
-/* TEMP DEBUG - REMOVE AFTER BUGFIX
- * Fires once the SUBACK for our subscribe is received from the broker. */
-static void onSubscribe(struct mosquitto *mosq, void *userdata,
-                        int mid, int qos_count, const int *granted_qos)
-{
-  (void)mosq; (void)userdata;
-  if (!dbgVerbose()) return;
-  for (int i = 0; i < qos_count; i++) {
-    emberAfCorePrintln("@DBG MQTT SUBACK mid=%d idx=%d granted_qos=%d",
-                       mid, i, granted_qos[i]);
-  }
-}
-/* TEMP DEBUG end */
-
 static void onDisconnect(struct mosquitto *mosq, void *userdata, int rc)
 {
   (void)mosq;
@@ -241,10 +206,7 @@ static void onDisconnect(struct mosquitto *mosq, void *userdata, int rc)
   if (rc == 0) {
     emberAfCorePrintln("MQTT: clean disconnect");
   } else {
-    /* TEMP DEBUG - REMOVE AFTER BUGFIX: include strerror text */
-    emberAfCorePrintln("MQTT: unexpected disconnect rc=%d text=\"%s\"",
-                       rc, mosquitto_strerror(rc));
-    /* TEMP DEBUG end */
+    emberAfCorePrintln("MQTT: unexpected disconnect rc=%d", rc);
     appLogLog("mqtt", "disconnected", "rc=%d", rc);
   }
 }
@@ -258,23 +220,8 @@ static void onMessage(struct mosquitto *mosq, void *userdata,
 
   emberAfCorePrintln("MQTT: rx [%s] (%d bytes)", msg->topic, msg->payloadlen);
 
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX: payload preview (first 180 bytes). */
-  if (dbgVerbose()) {
-    char preview[200];
-    int n = msg->payloadlen;
-    if (n >= (int)sizeof(preview)) n = (int)sizeof(preview) - 1;
-    if (n > 0) memcpy(preview, msg->payload, (size_t)n);
-    preview[n > 0 ? n : 0] = '\0';
-    emberAfCorePrintln("@DBG MQTT rx_preview qos=%d retain=%d body=%s",
-                       msg->qos, msg->retain, preview);
-  }
-  /* TEMP DEBUG end */
-
   if (!mqttQueuePush(msg->topic, msg->payload, msg->payloadlen, msg->qos)) {
     emberAfCorePrintln("MQTT: cmd queue full, dropped");
-    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-    appLogLog("mqtt", "queue_full", "\"topic\":\"%s\"", msg->topic);
-    /* TEMP DEBUG end */
   }
 }
 
@@ -283,14 +230,7 @@ static void onLog(struct mosquitto *mosq, void *userdata, int level, const char 
   (void)mosq;
   (void)userdata;
   (void)level;
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX
-   * Gated to reduce stdout pressure (BUG 1 hypothesis: TTY-attached stdout
-   * line-buffers every print and can stall the mosquitto thread). Original
-   * behavior: always print. */
-  if (dbgVerbose()) {
-    emberAfCorePrintln("MQTT-lib: %s", str);
-  }
-  /* TEMP DEBUG end */
+  emberAfCorePrintln("MQTT-lib: %s", str);
 }
 
 //----------------------------------------------------------------------
@@ -334,19 +274,7 @@ void appMqttInit(void)
   mosquitto_disconnect_callback_set(sMosq, onDisconnect);
   mosquitto_message_callback_set(sMosq, onMessage);
   mosquitto_log_callback_set(sMosq, onLog);
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX: wire SUBACK callback */
-  mosquitto_subscribe_callback_set(sMosq, onSubscribe);
-  /* TEMP DEBUG end */
   mosquitto_reconnect_delay_set(sMosq, MQTT_RECONN_MIN, MQTT_RECONN_MAX, true);
-
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX
-   * Detect whether stdio is attached to a TTY. Helps diagnose BUG 1
-   * ("opening the gateway terminal breaks control"). */
-  if (dbgVerbose()) {
-    emberAfCorePrintln("@DBG IO stdin_tty=%d stdout_tty=%d stderr_tty=%d",
-                       isatty(0), isatty(1), isatty(2));
-  }
-  /* TEMP DEBUG end */
 
   // Authenticate with broker
   mosquitto_username_pw_set(sMosq, sMqttUsername, sMqttPassword);
@@ -408,23 +336,6 @@ int appMqttPublish(const char *topicSuffix, const char *payload,
 void appMqttTick(void)
 {
   MqttQEntry_t entry;
-
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX: ~3-second tick heartbeat so we can
-   * tell from logs whether the main loop is still running (BUG 1). */
-  if (dbgVerbose()) {
-    static uint32_t s_lastHbMs = 0;
-    extern uint32_t msTick(void);
-    uint32_t now = msTick();
-    if (s_lastHbMs == 0 || (now - s_lastHbMs) >= 3000) {
-      s_lastHbMs = now;
-      pthread_mutex_lock(&sCmdQ.lock);
-      uint8_t depth = (uint8_t)((sCmdQ.head + MQTT_Q_SIZE - sCmdQ.tail) % MQTT_Q_SIZE);
-      pthread_mutex_unlock(&sCmdQ.lock);
-      emberAfCorePrintln("@DBG TICK mqtt_q_depth=%u tick_ms=%u",
-                         (unsigned)depth, (unsigned)now);
-    }
-  }
-  /* TEMP DEBUG end */
 
   // Drain up to 4 messages per tick to avoid starving the main loop
   for (int i = 0; i < 4; i++) {

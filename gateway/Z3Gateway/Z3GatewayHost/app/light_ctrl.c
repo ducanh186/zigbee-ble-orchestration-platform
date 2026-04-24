@@ -7,22 +7,6 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>  // TEMP DEBUG - REMOVE AFTER BUGFIX: getenv
-
-/* TEMP DEBUG - REMOVE AFTER BUGFIX */
-static bool lightDbg(void) {
-  static int cached = -1;
-  if (cached < 0) {
-    const char *v = getenv("SB_DEBUG_VERBOSE");
-    cached = (v && *v && *v != '0') ? 1 : 0;
-  }
-  return cached != 0;
-}
-
-/* Exposed to telemetry_rx to detect snap-back (BUG 2).
- * 0 == never toggled locally. */
-uint32_t gLightLastLocalToggleMs = 0;
-/* TEMP DEBUG end */
 
 // --- Single in-flight tracker for v1 ---
 typedef struct {
@@ -309,15 +293,6 @@ void lightCtrlLocalToggle(void)
     appLogLog("LIGHT", "local_toggle_sent",
               "\"node_id\":\"0x%04X\",\"ep\":%u",
               (unsigned)resolved.nodeId, (unsigned)resolved.endpoint);
-    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-    gLightLastLocalToggleMs = msTick();
-    if (lightDbg()) {
-      emberAfCorePrintln("@DBG LIGHT local_toggle_sent node=0x%04X ep=%u "
-                         "tick_ms=%u",
-                         (unsigned)resolved.nodeId, (unsigned)resolved.endpoint,
-                         (unsigned)gLightLastLocalToggleMs);
-    }
-    /* TEMP DEBUG end */
   }
 }
 

@@ -26,20 +26,9 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>  // TEMP DEBUG - REMOVE AFTER BUGFIX: getenv
+#include <stdlib.h>
 
 #include "af.h"
-
-/* TEMP DEBUG - REMOVE AFTER BUGFIX */
-static bool ruleDbg(void) {
-  static int cached = -1;
-  if (cached < 0) {
-    const char *v = getenv("SB_DEBUG_VERBOSE");
-    cached = (v && *v && *v != '0') ? 1 : 0;
-  }
-  return cached != 0;
-}
-/* TEMP DEBUG end */
 
 // ===== Binding configuration (Phase 4.1) =====
 // V1: compiled-in bindings.  Each entry maps a switch device_id (eui64)
@@ -113,13 +102,6 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
 
   uint32_t now = msTick();
 
-  /* TEMP DEBUG - REMOVE AFTER BUGFIX: entry marker with tick */
-  if (ruleDbg()) {
-    emberAfCorePrintln("@DBG RULE entry switch=%s tick_ms=%u",
-                       switchDeviceId, (unsigned)now);
-  }
-  /* TEMP DEBUG end */
-
   for (int i = 0; i < s_bindingCount; i++) {
     SwitchBinding_t *b = &s_bindings[i];
 
@@ -136,14 +118,6 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
         appLogLog("RULE", "cooldown",
                   "\"switch\":\"%s\",\"elapsed_ms\":%u",
                   switchDeviceId, (unsigned)elapsed);
-        /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-        if (ruleDbg()) {
-          emberAfCorePrintln("@DBG RULE cooldown_hit switch=%s elapsed_ms=%u "
-                             "threshold_ms=%u",
-                             switchDeviceId, (unsigned)elapsed,
-                             (unsigned)RULE_COOLDOWN_MS);
-        }
-        /* TEMP DEBUG end */
         return;
       }
     }
@@ -165,18 +139,6 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
 
     // Phase 4.2: Use lightCtrlLocalToggle (no command tracking, no command_reply).
     // This is the LOCAL AUTOMATION path, separate from the cloud command path.
-    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-    uint32_t preMs = msTick();
-    /* TEMP DEBUG end */
     lightCtrlLocalToggle();
-    /* TEMP DEBUG - REMOVE AFTER BUGFIX */
-    if (ruleDbg()) {
-      emberAfCorePrintln("@DBG RULE dispatch_done switch=%s pre_ms=%u "
-                         "post_ms=%u dt_ms=%u",
-                         switchDeviceId, (unsigned)preMs,
-                         (unsigned)msTick(),
-                         (unsigned)(msTick() - preMs));
-    }
-    /* TEMP DEBUG end */
   }
 }
