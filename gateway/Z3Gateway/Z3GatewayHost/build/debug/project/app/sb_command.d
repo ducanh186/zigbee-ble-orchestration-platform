@@ -1,4 +1,5 @@
-build/debug/project/app/valve_ctrl.o: app/valve_ctrl.c app/valve_ctrl.h \
+build/debug/project/app/sb_command.o: app/sb_command.c app/sb_command.h \
+ app/app_utils.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/platform-header.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/emlib/inc/em_core.h \
@@ -94,10 +95,9 @@ build/debug/project/app/valve_ctrl.o: app/valve_ctrl.c app/valve_ctrl.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/service-function/sl_service_function.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h \
  /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h \
- /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h \
- app/device_monitor.h app/app_config.h app/app_state.h app/app_utils.h \
- app/app_log.h
-app/valve_ctrl.h:
+ /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h
+app/sb_command.h:
+app/app_utils.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/include/af.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/service/legacy_hal/inc/platform-header.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/platform/emlib/inc/em_core.h:
@@ -198,8 +198,3 @@ autogen/zap-enabled-incoming-commands.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/zcl-debug-print.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/framework/util/client-api.h:
 /home/phu/SimplicityStudio/SDKs/gecko_sdk/protocol/zigbee/app/util/serial/sl_zigbee_command_interpreter.h:
-app/device_monitor.h:
-app/app_config.h:
-app/app_state.h:
-app/app_utils.h:
-app/app_log.h:

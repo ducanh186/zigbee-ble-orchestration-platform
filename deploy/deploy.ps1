@@ -89,22 +89,45 @@ Write-Host "=== Deploying to $EC2_HOST ($REMOTE_DIR) ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "--- [1/6] Packing project files ---" -ForegroundColor Yellow
 
-$TempZip = Join-Path $env:TEMP "iot-platform-deploy.tar.gz"
+$TempName = "iot-platform-deploy.tar.gz"
+$TempZip = Join-Path $env:TEMP $TempName
 
-# Use tar (available on Windows 10+) to pack, excluding unnecessary files
+# Pack project into $env:TEMP using stdout redirection so tar never
+# sees a Windows drive-letter path (GNU tar on Git/MSYS treats "C:..."
+# as a remote host and fails with "Cannot connect to C: resolve failed").
 Push-Location $ProjectDir
-tar -czf $TempZip `
-    --exclude='.git' `
-    --exclude='__pycache__' `
+# Relative output path keeps BSD tar happy too.
+tar -czf "$TempZip" `
+    --exclude='./.git' `
+    --exclude='./__pycache__' `
     --exclude='*.pyc' `
-    --exclude='.env' `
-    --exclude='.env.deploy' `
-    --exclude='cloud.db' `
-    --exclude='ota-files' `
-    --exclude='node_modules' `
-    --exclude='.claude' `
+    --exclude='./.env' `
+    --exclude='./.env.deploy' `
+    --exclude='./cloud.db' `
+    --exclude='./ota-files' `
+    --exclude='./node_modules' `
+    --exclude='./.claude' `
+    --exclude='./gecko_sdk' `
+    --exclude='./build' `
+    --exclude='./autogen' `
+    --exclude='./artifact' `
     .
+$tarExit = $LASTEXITCODE
 Pop-Location
+
+if ($tarExit -ne 0 -or -not (Test-Path $TempZip)) {
+    # Fallback: stream tar to stdout and pipe into the file from PowerShell,
+    # which sidesteps any Unix-tool path parsing.
+    Write-Host "tar direct write failed (exit=$tarExit); retrying via stdout pipe..." -ForegroundColor Yellow
+    Push-Location $ProjectDir
+    & cmd /c "tar -czf - --exclude=./.git --exclude=./__pycache__ --exclude=*.pyc --exclude=./.env --exclude=./.env.deploy --exclude=./cloud.db --exclude=./ota-files --exclude=./node_modules --exclude=./.claude --exclude=./gecko_sdk --exclude=./build --exclude=./autogen --exclude=./artifact . > `"$TempZip`""
+    Pop-Location
+}
+
+if (-not (Test-Path $TempZip)) {
+    Write-Host "ERROR: Could not create $TempZip. Ensure 'tar' is available in PATH." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "Packed project: $([math]::Round((Get-Item $TempZip).Length / 1KB)) KB"
 

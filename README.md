@@ -5,15 +5,19 @@ Nền tảng quản lý thiết bị IoT Zigbee/BLE cho tòa nhà thông minh, x
 ## Kiến trúc
 
 ```
-Flutter App ──HTTP──▶ Cloud API (FastAPI :8000) ◄──▶ Mosquitto (:1883) ◄──MQTT──▶ Gateway Bridge ◄──IPC──▶ Z3Gateway ◄──EZSP/ASH──▶ EFR32 NCP ◄──Zigbee──▶ End Devices
-                           │ SQLite
-                           ▼
-                        cloud.db
+Flutter App ──HTTP──▶ Cloud API (FastAPI :8000) ◄──▶ Mosquitto (:1883) ◄──MQTT──▶ Z3Gateway C ◄──EZSP/ASH──▶ EFR32 NCP ◄──Zigbee──▶ End Devices
+                           │ PostgreSQL                                     │
+                           ▼                                                ├─ MQTT client (direct)
+                        sb_cloud DB                                         ├─ command lifecycle
+                                                                            ├─ device registry
+                                                                            └─ local automation
 ```
+
+Z3Gateway C là **single process** trên Ubuntu host — chạy trực tiếp MQTT client, command management, local automation, và Zigbee EZSP/ASH handling. Không có IPC socket hay bridge process riêng.
 
 | Thành phần | Mô tả | Trạng thái |
 |---|---|---|
-| **Gateway Bridge** (`gateway/`) | Cầu nối MQTT ↔ IPC, chạy trên Linux cạnh coordinator Zigbee | Done |
+| **Z3Gateway C** (`gateway/`) | Single-process gateway: MQTT client + Zigbee + command + automation, chạy trên Linux | In progress |
 | **Cloud Backend** (`cloud/`) | FastAPI REST API + MQTT subscriber, quản lý device/state/command | Done |
 | **MQTT Broker** (`mqtt/`) | Mosquitto broker config + Docker Compose | Done |
 | **Deploy Scripts** (`deploy/`) | Auto deploy lên AWS EC2 từ Windows (PowerShell) | Done |
@@ -21,12 +25,13 @@ Flutter App ──HTTP──▶ Cloud API (FastAPI :8000) ◄──▶ Mosquitto
 ## Cấu trúc repository
 
 ```
-gateway/          Gateway MQTT ↔ IPC bridge (Python, Linux runtime)
+gateway/          Z3Gateway C source — single process (MQTT + Zigbee + automation)
 cloud/            Cloud backend — FastAPI REST API + MQTT subscriber (Python)
 mqtt/             Local Mosquitto broker configuration
 deploy/           EC2 deployment scripts (PowerShell) + docker-compose
 docs/             Architecture contracts, sprint plan, implementation plans
-end_devices/      End device firmware (placeholder)
+end_devices/      End device firmware (Simplicity Studio projects)
+artifact/         Pre-built firmware binaries (.s37)
 mobile_app/       Mobile app code (placeholder)
 ```
 
@@ -47,18 +52,15 @@ python -m cloud.app.seed          # Seed sample data
 python -m cloud                   # API server → http://localhost:8000/docs
 ```
 
-### 3. Gateway Bridge
+### 3. Z3Gateway C
 
-```bash
-pip install -r gateway/requirements.txt
-cp gateway/.env.example gateway/.env
-python -m gateway
-```
+Z3Gateway C chạy trên Ubuntu host với NCP radio qua serial/UART.
+Xem [docs/plan.md](docs/plan.md) cho build/run instructions.
 
 ### 4. Tests
 
 ```bash
-pytest gateway/tests/ -v
+pytest cloud/tests/ -v
 ```
 
 ## Deploy lên EC2
@@ -96,7 +98,7 @@ Chi tiết: xem [SUMMARY.md](SUMMARY.md)
 | [SUMMARY.md](SUMMARY.md) | Tổng kết toàn bộ dự án (hướng dẫn chi tiết, API reference, DB schema, MQTT) |
 | [CLAUDE.md](CLAUDE.md) | Hướng dẫn cho AI assistant (kiến trúc, contracts, dev commands) |
 | [docs/MQTT_CONTRACT.md](docs/MQTT_CONTRACT.md) | MQTT topic tree, envelope, QoS, retain |
-| [docs/UART_FRAME_FORMAT.md](docs/UART_FRAME_FORMAT.md) | IPC boundary (NDJSON over Unix socket) |
+| [docs/UART_FRAME_FORMAT.md](docs/UART_FRAME_FORMAT.md) | Native boundary + application architecture |
 | [docs/OTA_CAMPAIGN_CONTRACT.md](docs/OTA_CAMPAIGN_CONTRACT.md) | OTA artifact staging workflow |
 | [docs/CLOUD_IMPLEMENTATION_PLAN.md](docs/CLOUD_IMPLEMENTATION_PLAN.md) | Cloud DB schema + API design |
 

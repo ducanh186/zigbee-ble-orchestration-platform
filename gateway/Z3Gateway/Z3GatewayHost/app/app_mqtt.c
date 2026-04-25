@@ -12,23 +12,32 @@
 #include <mosquitto.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
 
 #include "af.h"  // emberAfCorePrintln
 
-// ===== Broker connection =====
-#define MQTT_CLIENT_ID   "z3gw-host"
-#define MQTT_HOST        "98.83.4.87"
-#define MQTT_PORT        1883
-#define MQTT_KEEPALIVE   60
-#define MQTT_USERNAME    "gateway"
-#define MQTT_PASSWORD    "gateway123"
+// ===== Broker connection defaults =====
+// Overridable at runtime via environment variables:
+//   SB_MQTT_HOST, SB_MQTT_PORT, SB_MQTT_USERNAME, SB_MQTT_PASSWORD
+#define MQTT_CLIENT_ID        "z3gw-host"
+#define MQTT_HOST_DEFAULT     "98.83.4.87"
+#define MQTT_PORT_DEFAULT     1883
+#define MQTT_KEEPALIVE        60
+#define MQTT_USERNAME_DEFAULT "gateway"
+#define MQTT_PASSWORD_DEFAULT "gateway123"
 
 // Reconnect: 1 s initial, 30 s max, exponential backoff
 #define MQTT_RECONN_MIN  1
 #define MQTT_RECONN_MAX  30
+
+// Runtime broker config (resolved once in appMqttInit from env)
+static const char *sMqttHost     = MQTT_HOST_DEFAULT;
+static int         sMqttPort     = MQTT_PORT_DEFAULT;
+static const char *sMqttUsername = MQTT_USERNAME_DEFAULT;
+static const char *sMqttPassword = MQTT_PASSWORD_DEFAULT;
 
 // ===== Topic contract (sb/v1 namespace) =====
 #define MQTT_TENANT  "hust"
@@ -168,8 +177,8 @@ static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
     return;
   }
 
-  emberAfCorePrintln("MQTT: connected to %s:%d", MQTT_HOST, MQTT_PORT);
-  appLogLog("mqtt", "connected", "broker=%s:%d", MQTT_HOST, MQTT_PORT);
+  emberAfCorePrintln("MQTT: connected to %s:%d", sMqttHost, sMqttPort);
+  appLogLog("mqtt", "connected", "\"broker\":\"%s\",\"port\":%d", sMqttHost, sMqttPort);
 
   // Publish gateway/online (counterpart to LWT)
   char env[512];
@@ -181,8 +190,12 @@ static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
                MQTT_PREFIX "/commands/+/request", 1);
   if (sr != MOSQ_ERR_SUCCESS) {
     emberAfCorePrintln("MQTT: subscribe failed: %s", mosquitto_strerror(sr));
+    appLogLog("mqtt", "sub_fail", "\"rc\":%d,\"text\":\"%s\"",
+              sr, mosquitto_strerror(sr));
   } else {
     emberAfCorePrintln("MQTT: subscribed to " MQTT_PREFIX "/commands/+/request");
+    appLogLog("mqtt", "subscribed",
+              "\"topic\":\"" MQTT_PREFIX "/commands/+/request\",\"qos\":1");
   }
 }
 
@@ -217,7 +230,6 @@ static void onLog(struct mosquitto *mosq, void *userdata, int level, const char 
   (void)mosq;
   (void)userdata;
   (void)level;
-  // Route mosquitto internal logs through framework debug output
   emberAfCorePrintln("MQTT-lib: %s", str);
 }
 
@@ -228,6 +240,23 @@ static void onLog(struct mosquitto *mosq, void *userdata, int level, const char 
 void appMqttInit(void)
 {
   int ret;
+
+  // Resolve broker config from environment (SB_MQTT_* matches cloud convention)
+  const char *envHost = getenv("SB_MQTT_HOST");
+  if (envHost && envHost[0]) sMqttHost = envHost;
+
+  const char *envPort = getenv("SB_MQTT_PORT");
+  if (envPort && envPort[0]) sMqttPort = atoi(envPort);
+  if (sMqttPort <= 0) sMqttPort = MQTT_PORT_DEFAULT;
+
+  const char *envUser = getenv("SB_MQTT_USERNAME");
+  if (envUser && envUser[0]) sMqttUsername = envUser;
+
+  const char *envPass = getenv("SB_MQTT_PASSWORD");
+  if (envPass && envPass[0]) sMqttPassword = envPass;
+
+  emberAfCorePrintln("MQTT: config host=%s port=%d user=%s",
+                     sMqttHost, sMqttPort, sMqttUsername);
 
   ret = mosquitto_lib_init();
   if (ret != MOSQ_ERR_SUCCESS) {
@@ -248,7 +277,7 @@ void appMqttInit(void)
   mosquitto_reconnect_delay_set(sMosq, MQTT_RECONN_MIN, MQTT_RECONN_MAX, true);
 
   // Authenticate with broker
-  mosquitto_username_pw_set(sMosq, MQTT_USERNAME, MQTT_PASSWORD);
+  mosquitto_username_pw_set(sMosq, sMqttUsername, sMqttPassword);
 
   // Initialize inbound command queue
   mqttQueueInit();
@@ -271,7 +300,7 @@ void appMqttStart(void)
     return;
   }
 
-  ret = mosquitto_connect_async(sMosq, MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE);
+  ret = mosquitto_connect_async(sMosq, sMqttHost, sMqttPort, MQTT_KEEPALIVE);
   if (ret != MOSQ_ERR_SUCCESS) {
     emberAfCorePrintln("MQTT: connect_async failed: %s", mosquitto_strerror(ret));
     return;
@@ -283,7 +312,7 @@ void appMqttStart(void)
     return;
   }
 
-  emberAfCorePrintln("MQTT: connecting to %s:%d ...", MQTT_HOST, MQTT_PORT);
+  emberAfCorePrintln("MQTT: connecting to %s:%d ...", sMqttHost, sMqttPort);
 }
 
 int appMqttPublish(const char *topicSuffix, const char *payload,
@@ -315,37 +344,125 @@ void appMqttTick(void)
     emberAfCorePrintln("MQTT: processing [%s]", entry.topic);
     appLogLog("mqtt", "rx_process", "topic=%s", entry.topic);
 
-    // Route payload to cmdHandleLine.
-    // For bring-up the payload is sent as bare {"id":N,"op":"..."}.
-    // Prepend "@CMD " to match cmdHandleLine's expected format.
-    char cmdBuf[MQTT_Q_PAYLOAD_MAX + 8];
-    snprintf(cmdBuf, sizeof(cmdBuf), "@CMD %s", entry.payload);
-    cmdHandleLine(cmdBuf);
+    // Route to the sb/v1 command handler: parser -> dispatcher -> device module.
+    // (Legacy `@CMD`-over-stdio remains available via `cmdHandleLine` for CLI.)
+    cmdHandleMqttPayload(entry.topic, entry.payload);
   }
 }
 
 void appMqttPublishDeviceReported(uint16_t nodeId, const char *eui64Str,
                                   const char *deviceType, const char *powerState)
 {
+  // Delegate to full version with level=0 for backward compat
+  appMqttPublishDeviceReportedFull(nodeId, eui64Str, deviceType, powerState, 0);
+}
+
+void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
+                                      const char *deviceType, const char *powerState,
+                                      uint8_t level)
+{
   if (!sMosq) return;
 
-  // Build inner payload JSON
-  char inner[256];
+  // Build inner payload JSON (Phase 3.1: include level for light)
+  char inner[320];
   snprintf(inner, sizeof(inner),
     "\"device_id\":\"%s\","
     "\"device_type\":\"%s\","
     "\"eui64\":\"%s\","
     "\"nwk_addr\":\"0x%04X\","
-    "\"state\":{\"power\":\"%s\",\"reachable\":true}",
-    eui64Str, deviceType, eui64Str, (unsigned)nodeId, powerState);
+    "\"state\":{\"power\":\"%s\",\"level\":%u,\"reachable\":true}",
+    eui64Str, deviceType, eui64Str, (unsigned)nodeId, powerState,
+    (unsigned)level);
+
+  // Wrap in sb.v1 envelope
+  char envelope[640];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // Topic: devices/{device_type}/{eui64}/reported
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/reported",
+           deviceType, eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
+                               const char *deviceType, const char *eventName)
+{
+  if (!sMosq) return;
+
+  // Build inner payload JSON per DEVICE_CAPABILITY_MATRIX switch event
+  char inner[256];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"%s\","
+    "\"event\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\"",
+    eui64Str, deviceType, eventName, eui64Str, (unsigned)nodeId);
 
   // Wrap in sb.v1 envelope
   char envelope[512];
   buildEnvelope(envelope, sizeof(envelope), inner);
 
-  // Topic: devices/{device_type}/{eui64}/reported
+  // Topic: devices/{device_type}/{eui64}/event  (QoS 1, no retain per contract)
   char topicSuffix[120];
-  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/reported", deviceType, eui64Str);
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/event",
+           deviceType, eui64Str);
 
-  appMqttPublish(topicSuffix, envelope, 1, true);
+  appMqttPublish(topicSuffix, envelope, 1, false);
+}
+
+void appMqttPublishCommandReply(const char *command_id,
+                                const char *device_id,
+                                const char *status,
+                                const char *reason)
+{
+  if (!sMosq || !command_id || !*command_id || !status) return;
+
+  // Per MQTT_CONTRACT: correlation_id on reply == command_id.
+  // Payload always carries: command_id, device_id, status, reason.
+  // Any of device_id/reason may be NULL -> emitted as JSON null.
+  char ts[32];
+  iso8601Now(ts, sizeof(ts));
+  uint32_t id = ++sMsgId;
+
+  // Build device_id field (quoted or null)
+  char devField[96];
+  if (device_id && *device_id) {
+    snprintf(devField, sizeof(devField), "\"%s\"", device_id);
+  } else {
+    snprintf(devField, sizeof(devField), "null");
+  }
+
+  // Build reason field (quoted or null)
+  char reasonField[96];
+  if (reason && *reason) {
+    snprintf(reasonField, sizeof(reasonField), "\"%s\"", reason);
+  } else {
+    snprintf(reasonField, sizeof(reasonField), "null");
+  }
+
+  char envelope[512];
+  snprintf(envelope, sizeof(envelope),
+    "{\"schema\":\"sb.v1\","
+     "\"msg_id\":\"%lu\","
+     "\"ts\":\"%s\","
+     "\"tenant_id\":\"" MQTT_TENANT "\","
+     "\"site_id\":\"" MQTT_SITE "\","
+     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"source\":\"gateway\","
+     "\"correlation_id\":\"%s\","
+     "\"payload\":{\"command_id\":\"%s\","
+                  "\"device_id\":%s,"
+                  "\"status\":\"%s\","
+                  "\"reason\":%s}}",
+    (unsigned long)id, ts, command_id,
+    command_id, devField, status, reasonField);
+
+  char topicSuffix[96];
+  snprintf(topicSuffix, sizeof(topicSuffix), "commands/%s/reply", command_id);
+
+  // QoS 1, retain=false (per MQTT_CONTRACT.md)
+  appMqttPublish(topicSuffix, envelope, 1, false);
 }

@@ -7,12 +7,32 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
+from cloud.app.schemas import validate_event_payload, validate_reported_payload
 
 logger = logging.getLogger(__name__)
 
 
+def _now_ms() -> int:
+    return int(datetime.now(UTC).timestamp() * 1000)
+
+
+def _ts_ms_to_naive_utc(ts: object) -> datetime:
+    """Parse MQTT envelope `ts` (epoch ms) into a naive UTC datetime for DB.
+
+    Accepts int/float ms. If `ts` is missing or unparseable, falls back to now.
+    """
+    try:
+        if isinstance(ts, (int, float)):
+            return datetime.fromtimestamp(int(ts) / 1000.0, tz=UTC).replace(
+                tzinfo=None
+            )
+    except (ValueError, OSError, OverflowError):
+        pass
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class MQTTService:
-    """MQTT client service that bridges the cloud backend to the gateway broker.
+    """MQTT client service that connects the cloud backend to the gateway broker.
 
     Subscribes to device reported state, events, command replies, and gateway
     online status.  Provides ``publish_command`` for sending command requests.
@@ -64,12 +84,15 @@ class MQTTService:
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         logger.info("MQTT connected with rc=%s", rc)
+        # Demo deployment uses QoS 0 for all topics (see docs/MQTT_CONTRACT.md
+        # "Retain và QoS" → "Demo vs production"). Production must raise to
+        # the per-topic QoS defined in that table.
         prefix = self.topic_prefix
-        client.subscribe(f"{prefix}/devices/+/+/reported", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/event", qos=1)
-        client.subscribe(f"{prefix}/commands/+/reply", qos=1)
-        client.subscribe(f"{prefix}/gateway/online", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/reported", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/event", qos=0)
+        client.subscribe(f"{prefix}/commands/+/reply", qos=0)
+        client.subscribe(f"{prefix}/gateway/online", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
@@ -106,6 +129,16 @@ class MQTTService:
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
 
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_reported_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Reported payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            # Still persist raw data but log the warning
+            validated = inner
+
         async def _write():
             if not self._db_session_factory:
                 return
@@ -134,9 +167,7 @@ class MQTTService:
                 state_row = DeviceState(
                     device_id=device_id,
                     state=inner.get("state", inner),
-                    reported_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    reported_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(state_row)
                 await session.commit()
@@ -145,32 +176,59 @@ class MQTTService:
         self._run_async(_write)
 
     def _handle_event(self, topic: str, envelope: dict) -> None:
-        """Handle device event -- insert event row."""
+        """Handle device event -- auto-register device + insert event row."""
         parts = topic.split("/")
         # Topic: sb/v1/{t}/{s}/{g}/devices/{device_type}/{device_id}/event
         devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
+
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_event_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Event payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            validated = inner
 
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Event
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
 
             async with self._db_session_factory() as session:
+                # Auto-register device if not yet known (Phase 3.3)
+                result = await session.execute(
+                    select(Device).where(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                if not device:
+                    device = Device(
+                        id=device_id,
+                        device_type=validated.get("device_type", device_type),
+                        eui64=validated.get("eui64"),
+                        name=device_id,
+                        is_online=True,
+                    )
+                    session.add(device)
+                    logger.info("Auto-registered device %s (type=%s) from event",
+                                device_id, device_type)
+
                 event = Event(
                     device_id=device_id,
-                    event_type=inner.get(
-                        "event", inner.get("event_type", "unknown")
+                    event_type=validated.get(
+                        "event", validated.get("event_type", "unknown")
                     ),
-                    payload=inner,
-                    occurred_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    payload=validated,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(event)
                 await session.commit()
-                logger.info("Saved event for %s", device_id)
+                logger.info("Saved event for %s (type=%s, event=%s)",
+                            device_id, device_type, event.event_type)
 
         self._run_async(_write)
 
@@ -225,12 +283,13 @@ class MQTTService:
         envelope = {
             "schema": "sb.v1",
             "msg_id": uuid4().hex,
-            "ts": datetime.now(UTC).replace(microsecond=0).isoformat(),
+            "ts": _now_ms(),
             "tenant_id": s.tenant_id,
             "site_id": s.site_id,
             "gateway_id": s.gateway_id,
             "source": "cloud",
-            "correlation_id": command_id,
+            # Optional per contract; format is "cmd_" + command_id.
+            "correlation_id": f"cmd_{command_id}",
             "payload": {
                 "device_id": device_id,
                 "op": op,
@@ -238,7 +297,8 @@ class MQTTService:
                 "timeout_ms": timeout_ms,
             },
         }
-        self.client.publish(topic, json.dumps(envelope), qos=1)
+        # Demo: QoS 0. Production: QoS 1 per docs/MQTT_CONTRACT.md.
+        self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published command %s for %s", command_id, device_id)
 
     # ------------------------------------------------------------------
