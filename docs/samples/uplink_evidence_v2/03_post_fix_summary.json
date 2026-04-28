@@ -1,0 +1,418 @@
+{
+  "captured_at": "2026-04-28T15:05:21.516732+07:00",
+  "label": "POST_FIX_v2 — physical reset+rejoin + stale retained pre-injected",
+  "verdict": "PASS — both devices ZDO-classified correctly, stale retained slots cleared, switch toggle events flow through with type=switch end-to-end",
+  "broker_retained_state": {
+    "0000000000000057": {
+      "light": "absent",
+      "switch": "PRESENT",
+      "motion": "absent",
+      "unknown": "absent"
+    },
+    "000000000000004F": {
+      "light": "PRESENT",
+      "switch": "absent",
+      "motion": "absent",
+      "unknown": "absent"
+    }
+  },
+  "cloud_db_devices_real": [
+    {
+      "id": "light-00124b0001aa22bb",
+      "device_type": "light",
+      "eui64": "00124b0001aa22bb",
+      "room_id": null,
+      "name": "light-00124b0001aa22bb",
+      "is_online": true,
+      "created_at": "16:54 04/24/2026",
+      "updated_at": "16:54 04/24/2026"
+    },
+    {
+      "id": "switch-00124b0002cc33dd",
+      "device_type": "switch",
+      "eui64": "00124b0002cc33dd",
+      "room_id": null,
+      "name": "switch-00124b0002cc33dd",
+      "is_online": true,
+      "created_at": "16:54 04/24/2026",
+      "updated_at": "16:54 04/24/2026"
+    },
+    {
+      "id": "light-00124b0003ee44ff",
+      "device_type": "light",
+      "eui64": "00124b0003ee44ff",
+      "room_id": null,
+      "name": "light-00124b0003ee44ff",
+      "is_online": true,
+      "created_at": "16:59 04/24/2026",
+      "updated_at": "16:59 04/24/2026"
+    },
+    {
+      "id": "000000000000004F",
+      "device_type": "light",
+      "eui64": "000000000000004F",
+      "room_id": null,
+      "name": "000000000000004F",
+      "is_online": true,
+      "created_at": "06:48 04/27/2026",
+      "updated_at": "06:48 04/27/2026"
+    },
+    {
+      "id": "0000000000000057",
+      "device_type": "switch",
+      "eui64": "0000000000000057",
+      "room_id": null,
+      "name": "0000000000000057",
+      "is_online": true,
+      "created_at": "06:46 04/27/2026",
+      "updated_at": "07:22 04/28/2026"
+    }
+  ],
+  "cloud_db_per_device": {
+    "0000000000000057": {
+      "device": {
+        "id": "0000000000000057",
+        "device_type": "switch",
+        "eui64": "0000000000000057",
+        "room_id": null,
+        "name": "0000000000000057",
+        "is_online": true,
+        "created_at": "06:46 04/27/2026",
+        "updated_at": "07:22 04/28/2026"
+      },
+      "state": {
+        "_note": "404 /api/devices/0000000000000057/state"
+      }
+    },
+    "000000000000004F": {
+      "device": {
+        "id": "000000000000004F",
+        "device_type": "light",
+        "eui64": "000000000000004F",
+        "room_id": null,
+        "name": "000000000000004F",
+        "is_online": true,
+        "created_at": "06:48 04/27/2026",
+        "updated_at": "06:48 04/27/2026"
+      },
+      "state": {
+        "id": 26,
+        "device_id": "000000000000004F",
+        "state": {
+          "level": 0,
+          "power": "off",
+          "reachable": true
+        },
+        "reported_at": "08:02 04/28/2026"
+      }
+    }
+  },
+  "mqtt_capture_per_eui_timeline": {
+    "0000000000000057": [
+      {
+        "ts": "2026-04-28T15:00:43+0700",
+        "topic_type": "switch",
+        "topic_kind": "registry",
+        "msg_id": "5",
+        "device_type_in_payload": "switch",
+        "event": null,
+        "nwk_addr": "0x7DB8"
+      },
+      {
+        "ts": "2026-04-28T15:01:02+0700",
+        "topic_type": "light",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:02+0700",
+        "topic_type": "motion",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:02+0700",
+        "topic_type": "unknown",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:02+0700",
+        "topic_type": "switch",
+        "topic_kind": "registry",
+        "msg_id": "63",
+        "device_type_in_payload": "switch",
+        "event": null,
+        "nwk_addr": "0x7DB8"
+      },
+      {
+        "ts": "2026-04-28T15:02:08+0700",
+        "topic_type": "switch",
+        "topic_kind": "event",
+        "msg_id": "66",
+        "device_type_in_payload": "switch",
+        "event": "toggle",
+        "nwk_addr": "0x7DB8"
+      },
+      {
+        "ts": "2026-04-28T15:02:09+0700",
+        "topic_type": "switch",
+        "topic_kind": "event",
+        "msg_id": "68",
+        "device_type_in_payload": "switch",
+        "event": "toggle",
+        "nwk_addr": "0x7DB8"
+      },
+      {
+        "ts": "2026-04-28T15:02:09+0700",
+        "topic_type": "switch",
+        "topic_kind": "event",
+        "msg_id": "69",
+        "device_type_in_payload": "switch",
+        "event": "toggle",
+        "nwk_addr": "0x7DB8"
+      },
+      {
+        "ts": "2026-04-28T15:02:10+0700",
+        "topic_type": "switch",
+        "topic_kind": "event",
+        "msg_id": "71",
+        "device_type_in_payload": "switch",
+        "event": "toggle",
+        "nwk_addr": "0x7DB8"
+      }
+    ],
+    "000000000000004F": [
+      {
+        "ts": "2026-04-28T15:00:43+0700",
+        "topic_type": "light",
+        "topic_kind": "reported",
+        "msg_id": "94",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x0AE8"
+      },
+      {
+        "ts": "2026-04-28T15:00:43+0700",
+        "topic_type": "light",
+        "topic_kind": "registry",
+        "msg_id": "6",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x912D"
+      },
+      {
+        "ts": "2026-04-28T15:00:48+0700",
+        "topic_type": "switch",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:00:48+0700",
+        "topic_type": "motion",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:00:48+0700",
+        "topic_type": "unknown",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:00:48+0700",
+        "topic_type": "light",
+        "topic_kind": "registry",
+        "msg_id": "61",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x912D"
+      },
+      {
+        "ts": "2026-04-28T15:01:00+0700",
+        "topic_type": "switch",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:00+0700",
+        "topic_type": "motion",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:00+0700",
+        "topic_type": "unknown",
+        "topic_kind": "registry",
+        "marker": "RETAIN_CLEAR (empty payload)"
+      },
+      {
+        "ts": "2026-04-28T15:01:00+0700",
+        "topic_type": "light",
+        "topic_kind": "registry",
+        "msg_id": "62",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x912D"
+      },
+      {
+        "ts": "2026-04-28T15:02:08+0700",
+        "topic_type": "light",
+        "topic_kind": "reported",
+        "msg_id": "67",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x912D"
+      },
+      {
+        "ts": "2026-04-28T15:02:09+0700",
+        "topic_type": "light",
+        "topic_kind": "reported",
+        "msg_id": "70",
+        "device_type_in_payload": "light",
+        "event": null,
+        "nwk_addr": "0x912D"
+      }
+    ]
+  },
+  "cloud_db_recent_events_per_eui": {
+    "0000000000000057": [
+      {
+        "id": 256,
+        "device_id": "0000000000000057",
+        "event_type": "toggle",
+        "payload": {
+          "eui64": "0000000000000057",
+          "event": "toggle",
+          "nwk_addr": "0x7DB8",
+          "device_id": "0000000000000057",
+          "device_type": "switch"
+        },
+        "occurred_at": "08:02 04/28/2026"
+      },
+      {
+        "id": 255,
+        "device_id": "0000000000000057",
+        "event_type": "toggle",
+        "payload": {
+          "eui64": "0000000000000057",
+          "event": "toggle",
+          "nwk_addr": "0x7DB8",
+          "device_id": "0000000000000057",
+          "device_type": "switch"
+        },
+        "occurred_at": "08:02 04/28/2026"
+      },
+      {
+        "id": 254,
+        "device_id": "0000000000000057",
+        "event_type": "toggle",
+        "payload": {
+          "eui64": "0000000000000057",
+          "event": "toggle",
+          "nwk_addr": "0x7DB8",
+          "device_id": "0000000000000057",
+          "device_type": "switch"
+        },
+        "occurred_at": "08:02 04/28/2026"
+      },
+      {
+        "id": 253,
+        "device_id": "0000000000000057",
+        "event_type": "toggle",
+        "payload": {
+          "eui64": "0000000000000057",
+          "event": "toggle",
+          "nwk_addr": "0x7DB8",
+          "device_id": "0000000000000057",
+          "device_type": "switch"
+        },
+        "occurred_at": "08:02 04/28/2026"
+      },
+      {
+        "id": 250,
+        "device_id": "0000000000000057",
+        "event_type": "device_registry",
+        "payload": {
+          "eui64": "0000000000000057",
+          "model": null,
+          "clusters": [
+            "0x0006",
+            "0x0001"
+          ],
+          "endpoint": 1,
+          "nwk_addr": "0x7DB8",
+          "device_id": "0000000000000057",
+          "endpoints": [
+            1
+          ],
+          "joined_at": 1777363262992,
+          "device_type": "switch",
+          "manufacturer": null,
+          "metadata_source": "gateway_mvp_inferred"
+        },
+        "occurred_at": "08:01 04/28/2026"
+      }
+    ],
+    "000000000000004F": [
+      {
+        "id": 249,
+        "device_id": "000000000000004F",
+        "event_type": "device_registry",
+        "payload": {
+          "eui64": "000000000000004F",
+          "model": null,
+          "clusters": [
+            "0x0006",
+            "0x0008"
+          ],
+          "endpoint": 1,
+          "nwk_addr": "0x912D",
+          "device_id": "000000000000004F",
+          "endpoints": [
+            1
+          ],
+          "joined_at": 1777363260657,
+          "device_type": "light",
+          "manufacturer": null,
+          "metadata_source": "gateway_mvp_inferred"
+        },
+        "occurred_at": "08:01 04/28/2026"
+      },
+      {
+        "id": 248,
+        "device_id": "000000000000004F",
+        "event_type": "device_registry",
+        "payload": {
+          "eui64": "000000000000004F",
+          "model": null,
+          "clusters": [
+            "0x0006",
+            "0x0008"
+          ],
+          "endpoint": 1,
+          "nwk_addr": "0x912D",
+          "device_id": "000000000000004F",
+          "endpoints": [
+            1
+          ],
+          "joined_at": 1777363248111,
+          "device_type": "light",
+          "manufacturer": null,
+          "metadata_source": "gateway_mvp_inferred"
+        },
+        "occurred_at": "08:00 04/28/2026"
+      }
+    ]
+  },
+  "expected_invariants_pass": [
+    "broker[0057] retained ONLY 'switch'",
+    "broker[004F] retained ONLY 'light'",
+    "cloud DB device_type[0057] == 'switch'",
+    "cloud DB device_type[004F] == 'light'",
+    "MQTT capture shows 3x retain-clear (light/motion/unknown) for 0057 before correct switch registry pub",
+    "cloud_log: zero 'Error processing' lines after cloud restart",
+    "gateway/health reports devices=2 (multi-device registry)",
+    "switch toggle events end up at devices/switch/0057/event with payload.device_type=switch"
+  ]
+}

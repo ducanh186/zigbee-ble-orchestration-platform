@@ -1,11 +1,12 @@
 #ifndef DEVICE_REGISTRY_H
 #define DEVICE_REGISTRY_H
 
-// Device registry: maps logical device_id -> Zigbee coordinates.
+// Device registry: maps logical device_id (EUI64 big-endian hex) to Zigbee
+// coordinates (nodeId, endpoint, classified device_type).
 //
-// v1 supports a single controllable device (paired via `deviceRegistryPair`
-// from CLI or future MQTT provisioning path). Future phases will add a
-// multi-device lookup table keyed by device_id.
+// Multi-device store with a fixed-size slot array.  Devices are inserted by
+// `deviceRegistryUpsert` once their type has been classified by ZDO discovery
+// (see device_discovery.c).  TC-join itself does not write here directly.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,22 +16,35 @@
 extern "C" {
 #endif
 
+#define DEVICE_REGISTRY_MAX 8
+
 typedef struct {
   EmberNodeId nodeId;
   uint8_t     endpoint;
-  char        device_type[32]; // inferred, e.g. "light"
+  char        device_type[16]; // "light"|"switch"|"motion"|"unknown"
 } device_resolved_t;
 
 // Resolve a logical device_id into Zigbee coordinates.
-// Returns true if the device is known and usable; false otherwise.
+//   device_id == "*"            -> first slot whose type is "light"
+//   device_id == EUI64 hex (BE) -> exact match (case-insensitive)
+// Returns true if a usable entry was found.
 bool deviceRegistryResolve(const char *device_id, device_resolved_t *out);
 
-// Register the single controllable device.
-// Returns false if eui64Str is malformed.
-bool deviceRegistryPair(const char *eui64Str, EmberNodeId nodeId,
-                        uint8_t dstEp);
+// Insert or replace an entry keyed by EUI64 (big-endian hex).
+// Returns false if the table is full or eui64Str is malformed.
+bool deviceRegistryUpsert(const char *eui64Str, EmberNodeId nodeId,
+                          uint8_t dstEp, const char *device_type);
 
-// Getters for log/info output.
+// Update the nodeId for an existing entry (rejoin path).  Returns false if
+// the EUI64 is unknown.
+bool deviceRegistryUpdateNodeId(const char *eui64Str, EmberNodeId nodeId);
+
+// Number of populated slots.
+uint32_t deviceRegistryCount(void);
+
+// Compatibility getters (return data of the FIRST populated slot).  These
+// stay for app_log.c / health publishing where a single representative
+// device_id is fine.
 bool        deviceRegistryIsKnown(void);
 EmberNodeId deviceRegistryGetNodeId(void);
 uint8_t     deviceRegistryGetDstEp(void);

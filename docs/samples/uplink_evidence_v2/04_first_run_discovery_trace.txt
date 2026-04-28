@@ -1,0 +1,51 @@
+First-run ZDO discovery trace observed at 14:21-14:22 (2026-04-28) when the
+fixed gateway came up against a network that already had two paired devices.
+This is the gateway-side @LOG trace and accompanying MQTT-publish lines from
+/tmp/z3gw.log of that run, captured by Claude Code while the gateway log was
+still live (the log was subsequently rotated on restart).
+
+----- 0000000000000057 (real role: switch, was misclassified as "light" before fix) -----
+@LOG {"tag":"DD","event":"restart","node_id":"0x7DB8","uptime":30u}
+@LOG {"tag":"DD","event":"start","node_id":"0x7DB8","eui64":"0000000000000057","uptime":30u}
+@LOG {"tag":"DD","event":"active_eps_ok","node_id":"0x7DB8","count":2,"uptime":32u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x7DB8","ep":1,"in":3,"out":4,"profile":"0x0104","device":"0x0104","uptime":32u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x7DB8","ep":2,"in":2,"out":1,"profile":"0x0104","device":"0x0810","uptime":32u}
+@LOG {"tag":"DD","event":"classify","node_id":"0x7DB8","eui64":"0000000000000057","type":"switch","in_onoff":false,"out_onoff":true,"in_level":false,"in_occ":false,"uptime":32u}
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/light/0000000000000057/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/0000000000000057/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/0000000000000057/registry]
+(then) MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/registry] (407 bytes)
+
+Decisive bits:
+  in_onoff = false  (no OnOff server)
+  out_onoff = true  (OnOff client present -> switch role)
+  ep1 device_id = 0x0104 in profile 0x0104 (HA color dimmer switch)
+
+----- 000000000000004F (real role: light) -----
+@LOG {"tag":"DD","event":"start","node_id":"0x912D","eui64":"000000000000004F","uptime":32u}
+@LOG {"tag":"DD","event":"restart","node_id":"0x912D","uptime":35u}
+@LOG {"tag":"DD","event":"start","node_id":"0x912D","eui64":"000000000000004F","uptime":35u}
+@LOG {"tag":"DD","event":"active_eps_ok","node_id":"0x912D","count":3,"uptime":37u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":1,"in":7,"out":2,"profile":"0x0104","device":"0x0101","uptime":37u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":2,"in":8,"out":1,"profile":"0x0104","device":"0x010D","uptime":37u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":242,"in":0,"out":1,"profile":"0xA1E0","device":"0x0061","uptime":37u}
+@LOG {"tag":"DD","event":"classify","node_id":"0x912D","eui64":"000000000000004F","type":"light","in_onoff":true,"out_onoff":false,"in_level":true,"in_occ":false,"uptime":37u}
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/000000000000004F/registry]
+(then) MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry] (406 bytes)
+
+Decisive bits:
+  in_onoff = true   (OnOff server -> light role)
+  in_level = true   (Level Control server -> dimmable light)
+  out_onoff = false (no client-side OnOff -> not a switch)
+  ep1 device_id = 0x0101 in profile 0x0104 (HA dimmable light)
+  ep242 = green-power endpoint (profile 0xA1E0) - ignored by classifier
+
+Both classifications match the user's authoritative role labels:
+  0000000000000057 -> switch  (matches user)
+  000000000000004F -> light   (matches user)
+
+The "restart" event lines come from device_discovery.c when a slot was
+already in use for the same node_id (rejoin storm); the slot is reset and
+the request re-issued.  This is documented benign behavior, not a fault.

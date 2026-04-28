@@ -56,13 +56,19 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
             char euiStr[20];
             eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
 
-            // v1 auto-register: if no device paired yet, register on
-            // first attribute report (covers already-joined devices).
-            if (!deviceRegistryIsKnown()) {
-              deviceRegistryPair(euiStr, sender, 1);
+            // Telemetry-driven fallback registration: if THIS EUI is not
+            // yet in the registry, register it as "light" (evidence-based:
+            // a server-side OnOff attribute report only comes from a light).
+            // Then clear any stale retained registry slots under other
+            // device_types and publish the authoritative one.
+            device_resolved_t resolved;
+            if (!deviceRegistryResolve(euiStr, &resolved)) {
+              deviceRegistryUpsert(euiStr, sender, 1, "light");
+              appMqttClearRetainedRegistry(euiStr, "light");
+              appMqttPublishDeviceRegistry(sender, euiStr, "light");
               appLogLog("REG", "auto_paired",
                 "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
-                "\"trigger\":\"attr_report\"",
+                "\"trigger\":\"attr_report\",\"type\":\"light\"",
                 euiStr, (unsigned)sender);
             }
 

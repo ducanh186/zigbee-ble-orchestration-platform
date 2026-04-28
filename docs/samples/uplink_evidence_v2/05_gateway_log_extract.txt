@@ -1,0 +1,64 @@
+===== gateway @LOG DD trace + retain-clear + registry pubs =====
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":409u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":409u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":409u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":2,"decision":3,"uptime":410u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":2,"decision":3,"uptime":411u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":2,"decision":3,"uptime":412u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":2,"decision":3,"uptime":412u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":1,"decision":0,"uptime":1714u}
+@LOG {"tag":"DD","event":"start","node_id":"0x7DB8","eui64":"0000000000000057","uptime":1714u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":1,"decision":0,"uptime":1716u}
+@LOG {"tag":"DD","event":"start","node_id":"0x912D","eui64":"000000000000004F","uptime":1716u}
+@LOG {"tag":"DD","event":"active_eps_ok","node_id":"0x912D","count":3,"uptime":1716u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":1,"in":7,"out":2,"profile":"0x0104","device":"0x0101","uptime":1716u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":2,"in":8,"out":1,"profile":"0x0104","device":"0x010D","uptime":1716u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":242,"in":0,"out":1,"profile":"0xA1E0","device":"0x0061","uptime":1716u}
+@LOG {"tag":"DD","event":"classify","node_id":"0x912D","eui64":"000000000000004F","type":"light","in_onoff":true,"out_onoff":false,"in_level":true,"in_occ":false,","uptime":1716u}
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/000000000000004F/registry]
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry] (407 bytes)
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":1,"decision":0,"uptime":1725u}
+@LOG {"tag":"DD","event":"start","node_id":"0x912D","eui64":"000000000000004F","uptime":1725u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":1,"decision":0,"uptime":1726u}
+@LOG {"tag":"DD","event":"restart","node_id":"0x7DB8","uptime":1726u}
+@LOG {"tag":"DD","event":"start","node_id":"0x7DB8","eui64":"0000000000000057","uptime":1726u}
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x912D","status":1,"decision":0,"uptime":1729u}
+@LOG {"tag":"DD","event":"restart","node_id":"0x912D","uptime":1729u}
+@LOG {"tag":"DD","event":"start","node_id":"0x912D","eui64":"000000000000004F","uptime":1729u}
+@LOG {"tag":"DD","event":"active_eps_ok","node_id":"0x912D","count":3,"uptime":1729u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":1,"in":7,"out":2,"profile":"0x0104","device":"0x0101","uptime":1729u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":2,"in":8,"out":1,"profile":"0x0104","device":"0x010D","uptime":1729u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x912D","ep":242,"in":0,"out":1,"profile":"0xA1E0","device":"0x0061","uptime":1729u}
+@LOG {"tag":"DD","event":"classify","node_id":"0x912D","eui64":"000000000000004F","type":"light","in_onoff":true,"out_onoff":false,"in_level":true,"in_occ":false,","uptime":1729u}
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/000000000000004F/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/000000000000004F/registry]
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry] (407 bytes)
+@LOG {"tag":"NET","event":"tc_join","node_id":"0x7DB8","status":1,"decision":0,"uptime":1729u}
+@LOG {"tag":"DD","event":"restart","node_id":"0x7DB8","uptime":1729u}
+@LOG {"tag":"DD","event":"start","node_id":"0x7DB8","eui64":"0000000000000057","uptime":1729u}
+@LOG {"tag":"DD","event":"active_eps_ok","node_id":"0x7DB8","count":2,"uptime":1731u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x7DB8","ep":1,"in":3,"out":4,"profile":"0x0104","device":"0x0104","uptime":1731u}
+@LOG {"tag":"DD","event":"ep_clusters","node_id":"0x7DB8","ep":2,"in":2,"out":1,"profile":"0x0104","device":"0x0810","uptime":1731u}
+@LOG {"tag":"DD","event":"classify","node_id":"0x7DB8","eui64":"0000000000000057","type":"switch","in_onoff":false,"out_onoff":true,"in_level":false,"in_occ":false,"uptime":1731u}
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/light/0000000000000057/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/0000000000000057/registry]
+MQTT: cleared retained [sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/0000000000000057/registry]
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/registry] (408 bytes)
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event] (265 bytes)
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event] (265 bytes)
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event] (265 bytes)
+MQTT: pub [sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event] (265 bytes)
+
+===== switch toggle events from telemetry path =====
+SWITCH: toggle event from 0x7DB8 (0000000000000057) cmd=0x02
+SWITCH: toggle event from 0x7DB8 (0000000000000057) cmd=0x02
+SWITCH: toggle event from 0x7DB8 (0000000000000057) cmd=0x02
+SWITCH: toggle event from 0x7DB8 (0000000000000057) cmd=0x02

@@ -1106,6 +1106,13 @@ $(OUTPUT_DIR)/project/app/device_registry.o: app/device_registry.c
 CDEPS += $(OUTPUT_DIR)/project/app/device_registry.d
 OBJS += $(OUTPUT_DIR)/project/app/device_registry.o
 
+$(OUTPUT_DIR)/project/app/device_discovery.o: app/device_discovery.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/device_discovery.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/device_discovery.c
+CDEPS += $(OUTPUT_DIR)/project/app/device_discovery.d
+OBJS += $(OUTPUT_DIR)/project/app/device_discovery.o
+
 $(OUTPUT_DIR)/project/app/device_dispatch.o: app/device_dispatch.c
 	@$(POSIX_TOOL_PATH)echo 'Building app/device_dispatch.c'
 	@$(POSIX_TOOL_PATH)mkdir -p $(@D)

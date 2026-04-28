@@ -91,13 +91,23 @@ class MQTTService:
         client.subscribe(f"{prefix}/devices/+/+/reported", qos=0)
         client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=0)
         client.subscribe(f"{prefix}/devices/+/+/event", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/registry", qos=0)
         client.subscribe(f"{prefix}/commands/+/reply", qos=0)
         client.subscribe(f"{prefix}/gateway/online", qos=0)
+        client.subscribe(f"{prefix}/gateway/health", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
         try:
             logger.info("MQTT rx: %s (%d bytes)", msg.topic, len(msg.payload))
+            # An empty retained payload is the broker-level "clear retained"
+            # marker (gateway uses this to drop stale registry slots after
+            # ZDO re-classification).  Nothing to parse, nothing to persist.
+            if len(msg.payload) == 0:
+                logger.debug(
+                    "Empty payload on %s (retain-clear) -- skipping", msg.topic,
+                )
+                return
             payload = json.loads(msg.payload.decode("utf-8"))
             topic: str = msg.topic
 
@@ -107,10 +117,14 @@ class MQTTService:
                 self._handle_reported(topic, payload)
             elif "/devices/" in topic and topic.endswith("/event"):
                 self._handle_event(topic, payload)
+            elif "/devices/" in topic and topic.endswith("/registry"):
+                self._handle_registry(topic, payload)
             elif "/commands/" in topic and topic.endswith("/reply"):
                 self._handle_command_reply(topic, payload)
             elif topic.endswith("/gateway/online"):
                 self._handle_gateway_online(payload)
+            elif topic.endswith("/gateway/health"):
+                self._handle_gateway_health(payload)
             else:
                 logger.debug("Unhandled topic: %s", topic)
         except Exception:
@@ -264,6 +278,100 @@ class MQTTService:
         inner = envelope.get("payload", {})
         status = inner.get("value", "unknown")
         logger.info("Gateway status: %s", status)
+
+    def _handle_registry(self, topic: str, envelope: dict) -> None:
+        """Handle retained device registry snapshot -- upsert device + log event.
+
+        Topic: .../devices/{device_type}/{device_id}/registry
+        Payload carries the gateway's view of the device (eui64, endpoints,
+        inferred clusters, metadata_source). Used for first-time device
+        discovery on cloud reconnect.
+        """
+        parts = topic.split("/")
+        devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
+        device_id = parts[devices_idx + 2]
+        inner = envelope.get("payload", {})
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
+
+            async with self._db_session_factory() as session:
+                result = await session.execute(
+                    select(Device).where(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                if not device:
+                    device = Device(
+                        id=device_id,
+                        device_type=inner.get("device_type", device_type),
+                        eui64=inner.get("eui64"),
+                        name=device_id,
+                        is_online=True,
+                    )
+                    session.add(device)
+                    logger.info(
+                        "Registered device %s (type=%s) from registry",
+                        device_id, device_type,
+                    )
+                else:
+                    if inner.get("eui64"):
+                        device.eui64 = inner["eui64"]
+                    new_type = inner.get("device_type")
+                    if new_type and new_type != device.device_type:
+                        logger.warning(
+                            "Registry type change for %s: %s -> %s "
+                            "(gateway re-classified)",
+                            device_id, device.device_type, new_type,
+                        )
+                        device.device_type = new_type
+
+                event = Event(
+                    device_id=device_id,
+                    event_type="device_registry",
+                    payload=inner,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                )
+                session.add(event)
+                await session.commit()
+                logger.info("Saved device_registry event for %s", device_id)
+
+        self._run_async(_write)
+
+    def _handle_gateway_health(self, envelope: dict) -> None:
+        """Persist a gateway health snapshot as an unattached event.
+
+        Device_id is null because health belongs to the gateway itself,
+        not any one device. occurred_at is the envelope ts.
+        """
+        inner = envelope.get("payload", {})
+        logger.info(
+            "Gateway health: uptime=%s ms, mqtt=%s, devices=%s, net=%s",
+            inner.get("uptime_ms"),
+            inner.get("mqtt_connected"),
+            inner.get("known_device_count"),
+            inner.get("network_state"),
+        )
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Event
+
+            async with self._db_session_factory() as session:
+                event = Event(
+                    device_id=None,
+                    event_type="gateway_health",
+                    payload=inner,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                )
+                session.add(event)
+                await session.commit()
+
+        self._run_async(_write)
 
     # ------------------------------------------------------------------
     # Publishing

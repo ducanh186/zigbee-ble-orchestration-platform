@@ -1,0 +1,45 @@
+2026-04-28 14:23:45,279 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/reported (298 bytes)
+2026-04-28 14:23:45,286 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry (406 bytes)
+2026-04-28 14:23:45,287 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/registry (407 bytes)
+2026-04-28 14:23:45,542 INFO cloud.app.mqtt_client: Saved device_registry event for 000000000000004F
+2026-04-28 14:23:45,543 INFO cloud.app.mqtt_client: Saved device_registry event for 0000000000000057
+2026-04-28 14:23:45,543 INFO cloud.app.mqtt_client: Saved reported state for 000000000000004F
+INFO:     127.0.0.1:33174 - "GET /api/devices/0000000000000057 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33178 - "GET /api/devices/000000000000004F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37024 - "GET /api/devices/0000000000000057 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37026 - "GET /api/devices/0000000000000057/state HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:37036 - "GET /api/devices/000000000000004F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37038 - "GET /api/devices/000000000000004F/state HTTP/1.1" 200 OK
+2026-04-28 15:00:48,112 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/000000000000004F/registry (0 bytes)
+2026-04-28 15:00:48,113 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/000000000000004F/registry (0 bytes)
+2026-04-28 15:00:48,113 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/000000000000004F/registry (0 bytes)
+2026-04-28 15:00:48,113 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry (407 bytes)
+2026-04-28 15:00:48,131 INFO cloud.app.mqtt_client: Saved device_registry event for 000000000000004F
+2026-04-28 15:01:00,658 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/000000000000004F/registry (0 bytes)
+2026-04-28 15:01:00,658 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/000000000000004F/registry (0 bytes)
+2026-04-28 15:01:00,658 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/000000000000004F/registry (0 bytes)
+2026-04-28 15:01:00,658 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/registry (407 bytes)
+2026-04-28 15:01:00,675 INFO cloud.app.mqtt_client: Saved device_registry event for 000000000000004F
+2026-04-28 15:01:02,993 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/0000000000000057/registry (0 bytes)
+2026-04-28 15:01:02,994 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/0000000000000057/registry (0 bytes)
+2026-04-28 15:01:02,994 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/unknown/0000000000000057/registry (0 bytes)
+2026-04-28 15:01:02,994 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/registry (408 bytes)
+2026-04-28 15:01:03,022 INFO cloud.app.mqtt_client: Saved device_registry event for 0000000000000057
+2026-04-28 15:02:08,693 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event (265 bytes)
+2026-04-28 15:02:08,714 INFO cloud.app.mqtt_client: Saved event for 0000000000000057 (type=switch, event=toggle)
+2026-04-28 15:02:08,848 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/reported (297 bytes)
+2026-04-28 15:02:08,877 INFO cloud.app.mqtt_client: Saved reported state for 000000000000004F
+2026-04-28 15:02:09,288 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event (265 bytes)
+2026-04-28 15:02:09,305 INFO cloud.app.mqtt_client: Saved event for 0000000000000057 (type=switch, event=toggle)
+2026-04-28 15:02:09,698 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event (265 bytes)
+2026-04-28 15:02:09,714 INFO cloud.app.mqtt_client: Saved event for 0000000000000057 (type=switch, event=toggle)
+2026-04-28 15:02:09,798 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/reported (297 bytes)
+2026-04-28 15:02:09,806 INFO cloud.app.mqtt_client: Saved reported state for 000000000000004F
+2026-04-28 15:02:10,048 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/switch/0000000000000057/event (265 bytes)
+2026-04-28 15:02:10,064 INFO cloud.app.mqtt_client: Saved event for 0000000000000057 (type=switch, event=toggle)
+2026-04-28 15:02:10,738 INFO cloud.app.mqtt_client: MQTT rx: sb/v1/hust/lab01/gw-ubuntu-01/devices/light/000000000000004F/reported (298 bytes)
+2026-04-28 15:02:10,756 INFO cloud.app.mqtt_client: Saved reported state for 000000000000004F
+INFO:     127.0.0.1:49118 - "GET /api/devices/0000000000000057 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49124 - "GET /api/devices/0000000000000057/state HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49130 - "GET /api/devices/000000000000004F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49132 - "GET /api/devices/000000000000004F/state HTTP/1.1" 200 OK
