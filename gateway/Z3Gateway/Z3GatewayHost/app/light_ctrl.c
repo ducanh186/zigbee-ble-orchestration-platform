@@ -268,8 +268,8 @@ void lightCtrlLocalToggle(void)
 {
   // Resolve the registered (paired) device
   device_resolved_t resolved;
-  if (!deviceRegistryResolve("*", &resolved)) {
-    appLogLog("LIGHT", "local_toggle_skip", "\"reason\":\"no_paired_device\"");
+  if (!deviceRegistryResolveByType("*", "light", &resolved)) {
+    appLogLog("LIGHT", "local_toggle_skip", "\"reason\":\"no_light_found\"");
     return;
   }
 
@@ -294,6 +294,61 @@ void lightCtrlLocalToggle(void)
               "\"node_id\":\"0x%04X\",\"ep\":%u",
               (unsigned)resolved.nodeId, (unsigned)resolved.endpoint);
   }
+}
+
+static bool lightCtrlLocalSetPower(const char *device_id, bool wantOn)
+{
+  const char *target = (device_id && device_id[0]) ? device_id : "*";
+
+  device_resolved_t resolved;
+  if (!deviceRegistryResolveByType(target, "light", &resolved)) {
+    appLogLog("LIGHT", "local_set_skip",
+              "\"target\":\"%s\",\"action\":\"%s\",\"reason\":\"no_light_found\"",
+              target, wantOn ? "on" : "off");
+    return false;
+  }
+
+  // Don't interfere with an active cloud command.
+  if (s_track.active) {
+    appLogLog("LIGHT", "local_set_skip",
+              "\"target\":\"%s\",\"action\":\"%s\",\"reason\":\"command_in_flight\"",
+              target, wantOn ? "on" : "off");
+    return false;
+  }
+
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    appLogLog("LIGHT", "local_set_skip",
+              "\"target\":\"%s\",\"action\":\"%s\",\"reason\":\"not_joined\"",
+              target, wantOn ? "on" : "off");
+    return false;
+  }
+
+  EmberStatus st = lightSendOnOff(wantOn, resolved.endpoint, resolved.nodeId);
+  if (st != EMBER_SUCCESS) {
+    appLogLog("LIGHT", "local_set_fail",
+              "\"target\":\"%s\",\"action\":\"%s\",\"node_id\":\"0x%04X\","
+              "\"ep\":%u,\"zstatus\":\"0x%02X\"",
+              target, wantOn ? "on" : "off", (unsigned)resolved.nodeId,
+              (unsigned)resolved.endpoint, (unsigned)st);
+    return false;
+  }
+
+  appLogLog("LIGHT", "local_set_sent",
+            "\"target\":\"%s\",\"device_id\":\"%s\",\"action\":\"%s\","
+            "\"node_id\":\"0x%04X\",\"ep\":%u",
+            target, resolved.eui64, wantOn ? "on" : "off",
+            (unsigned)resolved.nodeId, (unsigned)resolved.endpoint);
+  return true;
+}
+
+bool lightCtrlSetOn(const char *device_id)
+{
+  return lightCtrlLocalSetPower(device_id, true);
+}
+
+bool lightCtrlSetOff(const char *device_id)
+{
+  return lightCtrlLocalSetPower(device_id, false);
 }
 
 // -------------------------------------------------------------------

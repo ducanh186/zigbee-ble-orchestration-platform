@@ -65,21 +65,24 @@ void deviceMonitorOnJoin(EmberNodeId nodeId, EmberEUI64 eui64)
 }
 
 // Send ZDO Bind Request to the device:
-// "Create a binding on YOUR side (Light) for On/Off cluster -> gateway"
-static bool deviceMonitorSendBindRequest(EmberNodeId nodeId, EmberEUI64 deviceEui64, uint8_t deviceEp)
+// "Create a binding on YOUR side for cluster -> gateway"
+static bool deviceMonitorSendBindRequest(EmberNodeId nodeId,
+                                         EmberEUI64 deviceEui64,
+                                         uint8_t deviceEp,
+                                         EmberAfClusterId clusterId)
 {
   // Gateway's own EUI64 - copy to mutable array for emberBindRequest
   EmberEUI64 gatewayEui;
   memcpy(gatewayEui, emberGetEui64(), EUI64_SIZE);
 
   // ZDO Bind Request: tell the Light to add a binding entry
-  // Source = Light's EUI64, endpoint, cluster
+  // Source = device's EUI64, endpoint, cluster
   // Destination = Gateway's EUI64, endpoint
   EmberStatus st = emberBindRequest(
     nodeId,              // target node to send the ZDO Bind Request to
-    deviceEui64,         // source EUI64 in the binding (the Light itself)
-    deviceEp,            // source endpoint (Light's ep)
-    ZCL_ON_OFF_CLUSTER_ID, // cluster
+    deviceEui64,         // source EUI64 in the binding (the device itself)
+    deviceEp,            // source endpoint
+    clusterId,           // cluster
     UNICAST_BINDING,     // binding type
     gatewayEui,          // destination EUI64 (gateway)
     0,                   // group (unused for unicast)
@@ -88,26 +91,32 @@ static bool deviceMonitorSendBindRequest(EmberNodeId nodeId, EmberEUI64 deviceEu
   );
 
   appLogLog("MON", "bind_req_sent",
-    "\"node_id\":\"0x%04X\",\"ep\":%u,\"cluster\":\"0x0006\",\"zstatus\":\"0x%02X\"",
-    (unsigned)nodeId, (unsigned)deviceEp, (unsigned)st);
+    "\"node_id\":\"0x%04X\",\"ep\":%u,\"cluster\":\"0x%04X\","
+    "\"zstatus\":\"0x%02X\"",
+    (unsigned)nodeId, (unsigned)deviceEp, (unsigned)clusterId, (unsigned)st);
 
   return (st == EMBER_SUCCESS);
 }
 
-bool deviceMonitorConfigureReporting(EmberNodeId nodeId, uint8_t dstEp)
+static bool deviceMonitorConfigureReportingForCluster(EmberNodeId nodeId,
+                                                      uint8_t dstEp,
+                                                      EmberAfClusterId clusterId,
+                                                      EmberAfAttributeId attrId,
+                                                      uint8_t dataType)
 {
-  uint8_t payload[] = {
-    0x00,       // direction: 0x00 = server reports to client
-    0x00, 0x00, // attribute ID: 0x0000 (On/Off) little-endian
-    0x10,       // data type: ZCL_BOOLEAN_ATTRIBUTE_TYPE
-    0x01, 0x00, // min reporting interval: 1 second (little-endian)
-    0x2C, 0x01, // max reporting interval: 300 seconds (little-endian) = 5 min
-    // no reportable change field for boolean type
-  };
+  uint8_t payload[8];
+  payload[0] = 0x00; // direction: server reports to client
+  payload[1] = (uint8_t)(attrId & 0xFFu);
+  payload[2] = (uint8_t)((attrId >> 8) & 0xFFu);
+  payload[3] = dataType;
+  payload[4] = 0x01;
+  payload[5] = 0x00; // min reporting interval: 1 second
+  payload[6] = 0x2C;
+  payload[7] = 0x01; // max reporting interval: 300 seconds
 
   emberAfFillExternalBuffer(
     (ZCL_GLOBAL_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
-    ZCL_ON_OFF_CLUSTER_ID,
+    clusterId,
     ZCL_CONFIGURE_REPORTING_COMMAND_ID,
     "b",
     payload,
@@ -119,10 +128,20 @@ bool deviceMonitorConfigureReporting(EmberNodeId nodeId, uint8_t dstEp)
   EmberStatus st = emberAfSendCommandUnicast(EMBER_OUTGOING_DIRECT, nodeId);
 
   appLogLog("MON", "cfg_report_sent",
-    "\"node_id\":\"0x%04X\",\"ep\":%u,\"cluster\":\"0x0006\",\"zstatus\":\"0x%02X\"",
-    (unsigned)nodeId, (unsigned)dstEp, (unsigned)st);
+    "\"node_id\":\"0x%04X\",\"ep\":%u,\"cluster\":\"0x%04X\","
+    "\"attr\":\"0x%04X\",\"zstatus\":\"0x%02X\"",
+    (unsigned)nodeId, (unsigned)dstEp, (unsigned)clusterId,
+    (unsigned)attrId, (unsigned)st);
 
   return (st == EMBER_SUCCESS);
+}
+
+bool deviceMonitorConfigureReporting(EmberNodeId nodeId, uint8_t dstEp)
+{
+  return deviceMonitorConfigureReportingForCluster(nodeId, dstEp,
+                                                   ZCL_ON_OFF_CLUSTER_ID,
+                                                   ZCL_ON_OFF_ATTRIBUTE_ID,
+                                                   ZCL_BOOLEAN_ATTRIBUTE_TYPE);
 }
 
 void deviceMonitorTick(void)
@@ -137,16 +156,23 @@ void deviceMonitorTick(void)
     switch (g_pending[i].state) {
       case DEV_STATE_WAIT_BIND:
         if (elapsed >= BIND_DELAY_MS) {
-          // Step 1: Send ZDO Bind Request
-          deviceMonitorSendBindRequest(g_pending[i].nodeId, g_pending[i].eui64, 1);
+          // Step 1: Send ZDO Bind Requests for known report-producing clusters.
+          deviceMonitorSendBindRequest(g_pending[i].nodeId, g_pending[i].eui64,
+                                       1, ZCL_ON_OFF_CLUSTER_ID);
+          deviceMonitorSendBindRequest(g_pending[i].nodeId, g_pending[i].eui64,
+                                       1, ZCL_OCCUPANCY_SENSING_CLUSTER_ID);
           g_pending[i].state = DEV_STATE_WAIT_REPORT;
         }
         break;
 
       case DEV_STATE_WAIT_REPORT:
         if (elapsed >= REPORT_DELAY_MS) {
-          // Step 2: Send Configure Reporting
+          // Step 2: Send Configure Reporting for light On/Off and PIR occupancy.
           deviceMonitorConfigureReporting(g_pending[i].nodeId, 1);
+          deviceMonitorConfigureReportingForCluster(g_pending[i].nodeId, 1,
+                                                    ZCL_OCCUPANCY_SENSING_CLUSTER_ID,
+                                                    ZCL_OCCUPANCY_ATTRIBUTE_ID,
+                                                    ZCL_BITMAP8_ATTRIBUTE_TYPE);
           g_pending[i].state = DEV_STATE_DONE;
           g_pending[i].active = false;
         }

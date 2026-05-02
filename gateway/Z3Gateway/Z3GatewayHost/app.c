@@ -195,6 +195,7 @@ void emberAfMainTickCallback(void)
   deviceMonitorTick();
   appMqttTick();
   lightCtrlTick();
+  ruleEngineTick();
 }
 
 //----------------------

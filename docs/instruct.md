@@ -560,19 +560,61 @@ Z3Switch battery report, và bất cứ occupancy sensor report nào. Tất cả
 
 ### H.4 Motion → light occupancy automation
 
-*current repo gap.* Không có rule automation nào ở gateway
-(`rule_engine.c`) hay ở cloud. Scaffold rule engine vẫn giữ trong
-gateway (§B / §G) để sau này thêm rule tại cùng entry point. Những gì
-**đang** hoạt động hôm nay:
+Mặc định rule này **tắt**. Bật trên process gateway bằng environment:
 
-- Firmware occupancy sensor (khi đã flash) sẽ gửi
-  `occupancy → occupied/unoccupied` dưới dạng ZCL attribute report.
-- Gateway sẽ publish report đó đến
-  `sb/v1/.../devices/occupancy_sensor/<eui64>/reported` qua đường
-  telemetry chung — *verify in local environment*: xác nhận bằng cách
-  đi qua trước sensor và xem MQTT trace.
+```bash
+export SB_RULES_MOTION_TO_LIGHT=1
+export SB_RULES_MOTION_SENSOR_ID=*
+export SB_RULES_MOTION_LIGHT_ID=*
+export SB_RULES_MOTION_OFF_DELAY_MS=30000
+```
 
-Hành động theo report đó (bật đèn) CHƯA implement.
+Firmware note: `Z3_Occupancy_Sensor.slcp` now includes
+`zigbee_reporting`. If generated Simplicity Studio files are stale, open
+the project in Simplicity Studio v5 with Gecko SDK 4.5.0 and regenerate
+before building/flashing.
+
+Luồng chuẩn:
+
+1. Z3_Occupancy_Sensor ghi Zigbee Occupancy Sensing server attribute
+   `0x0406/0x0000`: `0x01` khi có chuyển động, `0x00` khi clear.
+2. Gateway bind/configure-reporting cluster `0x0406`, parse attribute
+   report, và publish:
+
+```text
+sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/<eui64>/reported
+```
+
+Payload `payload.state` kỳ vọng:
+
+```json
+{"occupancy":"occupied","reachable":true}
+```
+
+hoặc:
+
+```json
+{"occupancy":"unoccupied","reachable":true}
+```
+
+3. Khi `occupied`, gateway hủy timer off đang chờ và gửi local ZCL On
+   đến target light.
+4. Khi `unoccupied`, gateway đặt timer. Hết
+   `SB_RULES_MOTION_OFF_DELAY_MS` mới gửi local ZCL Off.
+5. Nếu `occupied` xuất hiện lại trước deadline, timer off cũ bị hủy.
+
+Log cần thấy trong `/tmp/z3gw.log`:
+
+- `MOTION report_parsed`
+- `MQTT motion_reported`
+- `RULE motion_on_sent`
+- `RULE motion_off_timer_scheduled`
+- `RULE motion_off_action` và `RULE motion_off_sent`
+- `RULE motion_off_timer_canceled` khi re-occupied trước deadline
+
+Nếu đang có cloud command in-flight, local action bị skip để không chen
+vào command lifecycle; log sẽ có `LIGHT local_set_skip` với
+`reason:"command_in_flight"`.
 
 ### H.5 Hiển thị command reply lifecycle
 
@@ -717,9 +759,20 @@ RULE: engine init, 0 binding(s), switch->light relay disabled (direct binding)
 
 ### Motion automation không kích hoạt
 
-Repo hiện tại không implement. Xem §H.4. Nếu bạn tưởng nó đã hoạt động
-trước đây, rất có thể đó là do rule wildcard cũ routing các ZCL traffic
-không liên quan vào `lightCtrlLocalToggle` — mà giờ đã bị tắt.
+Xem §H.4. Checklist nhanh:
+
+- `env | grep SB_RULES_MOTION_TO_LIGHT` trong shell start gateway phải
+  hiện `SB_RULES_MOTION_TO_LIGHT=1`; unset hoặc giá trị khác `1` nghĩa
+  là rule tắt.
+- `/tmp/z3gw.log` khi start phải có `RULE motion_init` với
+  `enabled:true`.
+- Nếu không có MQTT `devices/motion/<eui64>/reported`, kiểm tra log
+  `MON bind_req_sent` / `MON cfg_report_sent` cho cluster `0x0406`.
+- Nếu có motion report nhưng không bật đèn, kiểm tra registry đã học
+  light chưa (`devices/light/<eui64>/reported` hoặc log `REG updated`
+  type `light`).
+- Nếu log có `LIGHT local_set_skip reason:"command_in_flight"`, cloud
+  command đang chạy; local automation đã skip đúng thiết kế.
 
 ### Tin nhắn MQTT retained cũ gây nhầm lẫn
 

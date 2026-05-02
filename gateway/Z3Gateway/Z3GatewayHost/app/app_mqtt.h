@@ -37,6 +37,13 @@ void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
                                       const char *deviceType, const char *powerState,
                                       uint8_t level);
 
+// Publish motion reported state.
+// occupancy: "occupied" or "unoccupied".
+// batteryPercent: set to 0..100 when hasBattery=true.
+void appMqttPublishMotionReported(uint16_t nodeId, const char *eui64Str,
+                                  const char *occupancy,
+                                  bool hasBattery, uint8_t batteryPercent);
+
 // Publish a device event (e.g. switch toggle).
 // Per MQTT_CONTRACT: devices/{device_type}/{device_id}/event (QoS1, no retain).
 // eventName: e.g. "toggle"

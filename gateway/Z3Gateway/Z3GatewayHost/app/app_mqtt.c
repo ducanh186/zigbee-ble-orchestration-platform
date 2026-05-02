@@ -386,6 +386,41 @@ void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
   appMqttPublish(topicSuffix, envelope, 1, true);
 }
 
+void appMqttPublishMotionReported(uint16_t nodeId, const char *eui64Str,
+                                  const char *occupancy,
+                                  bool hasBattery, uint8_t batteryPercent)
+{
+  if (!sMosq || !eui64Str || !occupancy) return;
+
+  char stateExtra[40] = "";
+  if (hasBattery) {
+    if (batteryPercent > 100u) batteryPercent = 100u;
+    snprintf(stateExtra, sizeof(stateExtra), ",\"battery\":%u",
+             (unsigned)batteryPercent);
+  }
+
+  char inner[360];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"motion\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"state\":{\"occupancy\":\"%s\",\"reachable\":true%s}",
+    eui64Str, eui64Str, (unsigned)nodeId, occupancy, stateExtra);
+
+  char envelope[700];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/motion/%s/reported",
+           eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, true);
+  appLogLog("MQTT", "motion_reported",
+            "\"device_id\":\"%s\",\"occupancy\":\"%s\"",
+            eui64Str, occupancy);
+}
+
 void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
                                const char *deviceType, const char *eventName)
 {

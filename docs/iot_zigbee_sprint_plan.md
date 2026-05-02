@@ -264,7 +264,7 @@ home/{home_id}/device/{device_id}/event      # Gateway → Cloud (join/leave/err
     {
       "name": "occupancy_light_on",
       "trigger": {
-        "device_type": "occupancy_sensor",
+        "device_type": "motion",
         "attribute": "occupied",
         "condition": "equals",
         "value": true
@@ -278,7 +278,7 @@ home/{home_id}/device/{device_id}/event      # Gateway → Cloud (join/leave/err
     {
       "name": "vacancy_light_off",
       "trigger": {
-        "device_type": "occupancy_sensor",
+        "device_type": "motion",
         "attribute": "occupied",
         "condition": "equals",
         "value": false

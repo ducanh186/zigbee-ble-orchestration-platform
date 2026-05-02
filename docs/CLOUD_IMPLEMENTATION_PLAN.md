@@ -53,7 +53,7 @@ users
 
 devices
   id            TEXT PK (device_id, e.g. "light-01")
-  device_type   TEXT NOT NULL (light, occupancy_sensor, switch, etc.)
+  device_type   TEXT NOT NULL (light, motion, switch, etc.)
   eui64         TEXT
   room_id       TEXT FK -> rooms.id NULLABLE
   name          TEXT
@@ -150,7 +150,7 @@ Command:     accepted | queued | sent | executed | failed | timeout
 Home: "HUST Lab" (id: home-01)
   Room: "Lab 01" (id: room-01)
     Device: light-01 (light)
-    Device: pir-01 (occupancy_sensor)
+    Device: pir-01 (motion)
   Room: "Lab 02" (id: room-02)
     Device: light-02 (light)
 User: admin (home_id: home-01)

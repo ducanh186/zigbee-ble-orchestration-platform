@@ -161,6 +161,8 @@ class MQTTService:
                     session.add(device)
                 else:
                     device.is_online = True
+                    if inner.get("device_type"):
+                        device.device_type = inner["device_type"]
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
 
