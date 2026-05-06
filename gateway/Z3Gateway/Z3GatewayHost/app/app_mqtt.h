@@ -67,6 +67,13 @@ void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
                                  uint32_t knownDeviceCount,
                                  const char *networkState);
 
+// Publish a gateway-level event on topic `gateway/event` (QoS 1, no retain).
+// Per MQTT_CONTRACT: envelope is sb.v1; payload contains {"event":"<name>", ...}.
+// `eventName` MUST be non-empty (e.g. "permit_join_opened").
+// `extraJson` may be NULL or empty; when non-empty it is appended as raw JSON
+// fields (without surrounding braces) -- caller must format it correctly.
+void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson);
+
 // Publish a command_reply message on topic commands/{command_id}/reply.
 // Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).
 // `device_id` may be NULL/empty (e.g. parse_fail before we extracted it);

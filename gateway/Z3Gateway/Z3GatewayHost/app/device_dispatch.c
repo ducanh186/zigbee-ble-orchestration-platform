@@ -4,7 +4,9 @@
 #include "device_registry.h"
 #include "light_ctrl.h"
 #include "switch_logic.h"
+#include "net_mgr.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>  // strcasecmp
 
@@ -26,11 +28,70 @@ static const char* inferTypeFromCluster(const char *cluster_id)
   return NULL;
 }
 
+// Handle gateway-scoped commands (no device target).
+// Lifecycle: accepted -> queued -> sent -> executed | failed.
+// "queued" and "sent" coalesce here -- the open/close are synchronous SDK
+// calls, there is no separate queueing step.
+static bool dispatchGatewayOp(const sb_command_t *cmd)
+{
+  // device_id is NULL/empty for gateway ops -- pass NULL to the reply helper
+  // so it emits JSON null rather than an empty string.
+  const char *devId = (cmd->device_id[0] != '\0') ? cmd->device_id : NULL;
+
+  appMqttPublishCommandReply(cmd->command_id, devId, "accepted", NULL);
+  appLogLog("DISPATCH", "accepted_gw",
+            "\"command_id\":\"%s\",\"op\":\"%s\"",
+            cmd->command_id, cmd->op);
+
+  appMqttPublishCommandReply(cmd->command_id, devId, "queued", NULL);
+  appMqttPublishCommandReply(cmd->command_id, devId, "sent", NULL);
+
+  EmberStatus st;
+  if (strcmp(cmd->op, "gateway.open_network") == 0) {
+    int dur = (cmd->duration_sec > 0) ? cmd->duration_sec : 180;
+    st = netMgrOpenForJoin((uint16_t)dur);
+  } else if (strcmp(cmd->op, "gateway.close_network") == 0) {
+    st = netMgrCloseJoin();
+  } else {
+    appMqttPublishCommandReply(cmd->command_id, devId,
+                               "failed", "unsupported_op");
+    appLogLog("DISPATCH", "reject",
+              "\"command_id\":\"%s\",\"reason\":\"unsupported_op\",\"op\":\"%s\"",
+              cmd->command_id, cmd->op);
+    return false;
+  }
+
+  if (st == EMBER_SUCCESS) {
+    appMqttPublishCommandReply(cmd->command_id, devId, "executed", NULL);
+    return true;
+  }
+
+  // Map common failures to short, machine-friendly reasons.
+  const char *reason;
+  char reasonBuf[40];
+  if (st == EMBER_NOT_JOINED) {
+    reason = "not_formed";
+  } else {
+    snprintf(reasonBuf, sizeof(reasonBuf), "zstatus:0x%02X", (unsigned)st);
+    reason = reasonBuf;
+  }
+  appMqttPublishCommandReply(cmd->command_id, devId, "failed", reason);
+  appLogLog("DISPATCH", "gw_failed",
+            "\"command_id\":\"%s\",\"op\":\"%s\",\"zstatus\":\"0x%02X\"",
+            cmd->command_id, cmd->op, (unsigned)st);
+  return false;
+}
+
 bool deviceDispatch(const sb_command_t *cmd)
 {
   if (!cmd) return false;
 
-  // v1 only supports op="device.command" over the MQTT path
+  // Gateway-scoped op? No device involved.
+  if (sbCommandIsGatewayOp(cmd->op)) {
+    return dispatchGatewayOp(cmd);
+  }
+
+  // v1 only supports op="device.command" over the MQTT device path
   if (strcmp(cmd->op, "device.command") != 0) {
     appMqttPublishCommandReply(cmd->command_id, cmd->device_id,
                                "failed", "unsupported_op");

@@ -28,14 +28,23 @@ typedef struct {
   char device_type[32];     // optional: payload.device_type ("light"/"switch"/"motion")
 
   // Op and target
-  char op[32];              // e.g. "device.command"
+  char op[32];              // e.g. "device.command", "gateway.open_network"
   int  endpoint;            // payload.target.endpoint (0 if absent)
   char cluster_id[16];      // payload.target.cluster_id (string form, e.g. "0x0006")
   char command[32];         // payload.target.command (e.g. "on", "off")
 
+  // Gateway-targeted ops only
+  // (parsed from payload.target.duration_sec; 0 means absent)
+  int  duration_sec;
+
   // Optional
   uint32_t timeout_ms;      // default 5000 if absent
 } sb_command_t;
+
+// Helper: returns true when the op targets the gateway itself
+// (e.g. "gateway.open_network", "gateway.close_network").  Such ops do not
+// require a device_id in the payload.
+bool sbCommandIsGatewayOp(const char *op);
 
 // Extract {command_id} out of a topic like ".../commands/{cmd}/request".
 // Returns true on success.

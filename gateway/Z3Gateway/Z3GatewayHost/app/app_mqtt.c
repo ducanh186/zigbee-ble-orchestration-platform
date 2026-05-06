@@ -538,6 +538,25 @@ void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
   appMqttPublish("gateway/health", envelope, 1, true);
 }
 
+void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson)
+{
+  if (!sMosq || !eventName || !*eventName) return;
+
+  char inner[320];
+  if (extraJson && *extraJson) {
+    snprintf(inner, sizeof(inner),
+             "\"event\":\"%s\",%s", eventName, extraJson);
+  } else {
+    snprintf(inner, sizeof(inner), "\"event\":\"%s\"", eventName);
+  }
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // QoS 1, retain=false (per MQTT_CONTRACT.md events row).
+  appMqttPublish("gateway/event", envelope, 1, false);
+}
+
 void appMqttPublishCommandReply(const char *command_id,
                                 const char *device_id,
                                 const char *status,

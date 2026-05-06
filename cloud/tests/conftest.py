@@ -53,6 +53,23 @@ class FakeMQTTPublisher:
             }
         )
 
+    def publish_gateway_command(
+        self,
+        command_id: str,
+        op: str,
+        target: dict,
+        timeout_ms: int | None = 5000,
+    ) -> None:
+        self.published.append(
+            {
+                "command_id": command_id,
+                "device_id": None,
+                "op": op,
+                "target": target,
+                "timeout_ms": timeout_ms,
+            }
+        )
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -69,6 +86,10 @@ async def db_session_factory(monkeypatch):
     # Patch cloud.app.database so routers and workers use this engine
     import cloud.app.database as dbmod
     from cloud.app.database import Base
+    # Ensure all model classes are registered on Base.metadata before
+    # create_all -- otherwise running a test file in isolation may miss
+    # tables that only get loaded transitively by other files.
+    import cloud.app.models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -90,9 +111,11 @@ async def fake_mqtt(monkeypatch):
     fake = FakeMQTTPublisher()
     import cloud.app.mqtt_client as mqttmod
     import cloud.app.routers.commands as cmdmod
+    import cloud.app.routers.gateways as gwmod
 
     monkeypatch.setattr(mqttmod, "mqtt_service", fake)
     monkeypatch.setattr(cmdmod, "mqtt_service", fake)
+    monkeypatch.setattr(gwmod, "mqtt_service", fake)
     yield fake
 
 

@@ -95,6 +95,7 @@ class MQTTService:
         client.subscribe(f"{prefix}/commands/+/reply", qos=0)
         client.subscribe(f"{prefix}/gateway/online", qos=0)
         client.subscribe(f"{prefix}/gateway/health", qos=0)
+        client.subscribe(f"{prefix}/gateway/event", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
@@ -125,6 +126,8 @@ class MQTTService:
                 self._handle_gateway_online(payload)
             elif topic.endswith("/gateway/health"):
                 self._handle_gateway_health(payload)
+            elif topic.endswith("/gateway/event"):
+                self._handle_gateway_event(payload)
             else:
                 logger.debug("Unhandled topic: %s", topic)
         except Exception:
@@ -341,6 +344,17 @@ class MQTTService:
 
         self._run_async(_write)
 
+    def _handle_gateway_event(self, envelope: dict) -> None:
+        """Log gateway lifecycle events (e.g. permit_join_opened/closed/failed).
+
+        v1: log only.  Persistence into the events table is intentionally
+        deferred until we agree how to model gateway-level events without a
+        device_id.
+        """
+        inner = envelope.get("payload", {})
+        event = inner.get("event", "unknown")
+        logger.info("Gateway event: %s payload=%s", event, inner)
+
     def _handle_gateway_health(self, envelope: dict) -> None:
         """Persist a gateway health snapshot as an unattached event.
 
@@ -408,6 +422,40 @@ class MQTTService:
         # Demo: QoS 0. Production: QoS 1 per docs/MQTT_CONTRACT.md.
         self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published command %s for %s", command_id, device_id)
+
+    def publish_gateway_command(
+        self,
+        command_id: str,
+        op: str,
+        target: dict,
+        timeout_ms: int | None = 5000,
+    ) -> None:
+        """Publish a gateway-targeted command request envelope to MQTT.
+
+        Same topic shape as ``publish_command`` (``commands/{id}/request``) but
+        the payload omits ``device_id`` because there is no device target
+        (e.g. ``op=gateway.open_network``).  Gateway parser is responsible for
+        accepting payload without ``device_id`` when ``op`` is gateway-scoped.
+        """
+        s = self.settings
+        topic = f"{self.topic_prefix}/commands/{command_id}/request"
+        envelope = {
+            "schema": "sb.v1",
+            "msg_id": uuid4().hex,
+            "ts": _now_ms(),
+            "tenant_id": s.tenant_id,
+            "site_id": s.site_id,
+            "gateway_id": s.gateway_id,
+            "source": "cloud",
+            "correlation_id": f"cmd_{command_id}",
+            "payload": {
+                "op": op,
+                "target": target,
+                "timeout_ms": timeout_ms,
+            },
+        }
+        self.client.publish(topic, json.dumps(envelope), qos=0)
+        logger.info("Published gateway command %s op=%s", command_id, op)
 
     # ------------------------------------------------------------------
     # Internal helpers
