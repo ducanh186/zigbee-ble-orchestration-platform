@@ -21,6 +21,9 @@ source:
 - {path: main.c}
 - {path: app.c}
 - {path: app/pir_sensor.c}
+- {path: app/buttons.c}
+- {path: app/net_mgr.c}
+- {path: autogen/sl_simple_button_instances.c}
 sdk: {id: gecko_sdk, version: 4.5.0}
 toolchain_settings: []
 component:
@@ -30,6 +33,8 @@ component:
 - instance: [example]
   id: cli
 - {id: iostream_recommended_stream}
+- instance: [btn0]
+  id: simple_button
 - instance: [led0]
   id: simple_led
 - {id: emlib_adc}
@@ -39,6 +44,7 @@ component:
 - {id: zigbee_debug_print}
 - {id: zigbee_network_steering}
 - {id: zigbee_pro_stack}
+- {id: zigbee_reporting}
 - {id: zigbee_scan_dispatch}
 - {id: zigbee_source_route}
 - {id: zigbee_update_tc_link_key}
@@ -70,4 +76,3 @@ configuration:
 ui_hints:
   highlight:
   - {path: readme.html}
-

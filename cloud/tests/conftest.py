@@ -149,3 +149,25 @@ async def seed_switch(db_session_factory):
         )
         await s.commit()
     return "switch-01"
+
+
+@pytest_asyncio.fixture
+async def seed_motion(db_session_factory):
+    from cloud.app.models import Device, Home, Room
+
+    async with db_session_factory() as s:
+        from sqlalchemy import select
+        if not (await s.execute(select(Home).where(Home.id == "home-1"))).scalar():
+            s.add(Home(id="home-1", name="Test Home"))
+            s.add(Room(id="room-1", home_id="home-1", name="Living"))
+        s.add(
+            Device(
+                id="pir-01",
+                device_type="motion",
+                room_id="room-1",
+                name="PIR Sensor",
+                is_online=True,
+            )
+        )
+        await s.commit()
+    return "pir-01"

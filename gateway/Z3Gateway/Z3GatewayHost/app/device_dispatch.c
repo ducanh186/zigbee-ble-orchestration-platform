@@ -40,17 +40,22 @@ bool deviceDispatch(const sb_command_t *cmd)
     return false;
   }
 
-  // Resolve device_type, in priority order (per MQTT_CONTRACT: payload hint only):
-  //   1. registry lookup by device_id       -- authoritative
+  // Resolve device_type, in priority order:
+  //   1. exact registry lookup by EUI64     -- authoritative
   //   2. payload.device_type                -- optional hint from cloud
   //   3. cluster_id inference (0x0006/0008) -- last-resort heuristic
+  // Non-exact registry fallback is intentionally not used for type selection:
+  // it exists only so legacy logical ids like "light-01" can still resolve to
+  // the first known light after the command has been routed.
   // This lets a minimal request { device_id, op, target, timeout_ms } succeed.
   char typeBuf[32] = {0};
   const char *type = NULL;
 
   device_resolved_t resolved;
   bool haveResolved = deviceRegistryResolve(cmd->device_id, &resolved);
-  if (haveResolved && resolved.device_type[0]) {
+  if (haveResolved && resolved.exact_match
+      && resolved.device_type[0]
+      && !sameType(resolved.device_type, "unknown")) {
     strncpy(typeBuf, resolved.device_type, sizeof(typeBuf) - 1);
     type = typeBuf;
   } else if (cmd->device_type[0]) {

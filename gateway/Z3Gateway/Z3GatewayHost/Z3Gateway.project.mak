@@ -3,16 +3,16 @@
 # Makefile Version 21                                              #
 ####################################################################
 
-BASE_SDK_PATH = /home/phu/SimplicityStudio/SDKs/gecko_sdk
-BASE_PKG_PATH = /home/phu/.silabs/slt/installs
+BASE_SDK_PATH = /home/al/SimplicityStudio/SDKs/gecko_sdk
+BASE_PKG_PATH = /home/al/.silabs/slt/installs
 UNAME:=$(shell $(POSIX_TOOL_PATH)uname -s | $(POSIX_TOOL_PATH)sed -e 's/^\(CYGWIN\).*/\1/' | $(POSIX_TOOL_PATH)sed -e 's/^\(MINGW\).*/\1/')
 ifeq ($(UNAME),MINGW)
 # Translate "C:/super" into "/C/super" for MinGW make.
 SDK_PATH := /$(shell $(POSIX_TOOL_PATH)echo $(BASE_SDK_PATH) | sed s/://)
 PKG_PATH := /$(shell $(POSIX_TOOL_PATH)echo $(BASE_PKG_PATH) | sed s/://)
 endif
-SDK_PATH ?= $(BASE_SDK_PATH)
-PKG_PATH ?= $(BASE_PKG_PATH)
+SDK_PATH := $(BASE_SDK_PATH)
+PKG_PATH := $(BASE_PKG_PATH)
 COPIED_SDK_PATH ?= gecko_sdk_4.5.0
 
 # This uses the explicit build rules below

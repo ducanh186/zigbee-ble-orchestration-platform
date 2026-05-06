@@ -17,6 +17,7 @@
 
 #include "app/framework/include/af.h"
 #include "app/pir_sensor.h"
+#include "app/net_mgr.h"
 
 /** @brief Complete network steering.
  *
@@ -45,8 +46,10 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
 
 void emberAfStackStatusCallback(EmberStatus status)
 {
+  netMgrOnStackStatus(status);
+
   if (status == EMBER_NETWORK_UP) {
-    /* PIR MVP: no Zigbee reporting yet */
+    sl_zigbee_app_debug_println("PIR: network up, occupancy reporting can be configured by gateway");
   }
 }
 

@@ -27,6 +27,22 @@ static char     g_pendingSrc[8] = "uart";
 
 static bool     g_networkOpen = false;
 static uint32_t g_openTick = 0;
+static bool     g_pendingOpenJoin = false;
+
+static void openNetworkForJoin(void)
+{
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
+  appLogLog("NET", "open_join", "\"zstatus\":\"0x%02X\"", (unsigned)st);
+  if (st == EMBER_SUCCESS) {
+    g_networkOpen = true;
+    g_openTick = msTick();
+    g_pendingOpenJoin = false;
+  }
+#else
+  g_pendingOpenJoin = false;
+#endif
+}
 
 static bool startNetworkForm(uint16_t panId, int8_t txPwrDbm, uint8_t ch, const char *src)
 {
@@ -76,6 +92,10 @@ bool netMgrRequestForm(NetCfg_t cfg, const char *src, bool force)
 void netMgrTick(void)
 {
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  if (g_pendingOpenJoin && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    openNetworkForJoin();
+  }
+
   if (g_networkOpen && (msTick() - g_openTick >= OPEN_JOIN_MS)) {
     EmberStatus st = emberAfPluginNetworkCreatorSecurityCloseNetwork();
     appLogLog("NET", "close_join", "\"zstatus\":\"0x%02X\",\"after_ms\":%u", (unsigned)st, (unsigned)OPEN_JOIN_MS);
@@ -92,10 +112,7 @@ void emberAfPluginNetworkCreatorCompleteCallback(const EmberNetworkParameters *n
   appLogLog("NET", "formed", "\"pan_id\":\"0x%04X\",\"ch\":%u", (unsigned)network->panId, (unsigned)network->radioChannel);
 
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
-  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
-  appLogLog("NET", "open_join", "\"zstatus\":\"0x%02X\"", (unsigned)st);
-  g_networkOpen = true;
-  g_openTick = msTick();
+  g_pendingOpenJoin = true;
 #endif
 
   appLogEmitHeartbeat();
@@ -108,6 +125,9 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   if (status == EMBER_NETWORK_UP) {
     appLogEmitHeartbeat();
+    if (g_pendingOpenJoin) {
+      openNetworkForJoin();
+    }
   } else if (status == EMBER_NETWORK_DOWN) {
     appLogEmitHeartbeat();
   }

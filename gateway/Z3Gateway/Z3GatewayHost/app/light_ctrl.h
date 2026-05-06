@@ -38,6 +38,12 @@ bool lightCtrlHandleCommand(const sb_command_t *cmd);
 // update when the light sends its attribute report back.
 void lightCtrlLocalToggle(void);
 
+// Local explicit ON/OFF for gateway-driven automation.
+// Returns false when no light can be resolved, network is down, or a cloud
+// command is currently in flight.
+bool lightCtrlSetOn(const char *device_id);
+bool lightCtrlSetOff(const char *device_id);
+
 #ifdef __cplusplus
 }
 #endif
