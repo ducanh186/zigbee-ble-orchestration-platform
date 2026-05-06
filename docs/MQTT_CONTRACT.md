@@ -237,6 +237,41 @@ Payload:
 }
 ```
 
+### Sự kiện motion occupancy changed
+
+Gateway publish event này khi trạng thái occupancy của motion sensor đổi
+từ giá trị trước đó. Reported state vẫn nằm ở
+`devices/motion/{id}/reported`; event dùng để cloud lưu lịch sử.
+
+Topic:
+
+```text
+sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/00124b0001aa22cc/event
+```
+
+Payload:
+
+```json
+{
+  "schema": "sb.v1",
+  "msg_id": "b1c2d3e4f5a6478899aabbccddeeff00",
+  "ts": 1776064565000,
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "gateway",
+  "payload": {
+    "device_id": "00124b0001aa22cc",
+    "device_type": "motion",
+    "event": "occupancy_changed",
+    "occupancy": "occupied",
+    "eui64": "00124b0001aa22cc",
+    "nwk_addr": "0x4F2A",
+    "raw": "0x01"
+  }
+}
+```
+
 ### Gửi lệnh (command request)
 
 Topic:

@@ -256,9 +256,44 @@ class TestValidateEventPayload:
         result = validate_event_payload("switch", inner)
         assert result is None
 
+    def test_motion_occupancy_changed_valid(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "occupancy_changed",
+            "occupancy": "occupied",
+            "eui64": "00124b0001aa22cc",
+            "nwk_addr": "0x4F2A",
+            "raw": "0x01",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is not None
+        assert result["event"] == "occupancy_changed"
+        assert result["occupancy"] == "occupied"
+
+    def test_motion_invalid_event_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "motion_seen",
+            "occupancy": "occupied",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is None
+
+    def test_motion_invalid_occupancy_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "occupancy_changed",
+            "occupancy": "motion",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is None
+
     def test_unknown_type_passthrough(self):
         inner = {"device_id": "x", "event": "something"}
-        result = validate_event_payload("motion", inner)
+        result = validate_event_payload("lock", inner)
         assert result == inner
 
 

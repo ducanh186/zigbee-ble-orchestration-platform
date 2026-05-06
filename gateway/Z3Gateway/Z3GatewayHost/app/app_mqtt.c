@@ -10,6 +10,7 @@
 #include "cmd_handler.h"
 
 #include <mosquitto.h>
+#include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,28 +72,24 @@ static uint32_t          sMsgId = 0;
 // Helpers
 //----------------------------------------------------------------------
 
-static void iso8601Now(char *buf, size_t len)
+static uint64_t epochMillisNow(void)
 {
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  struct tm tm;
-  gmtime_r(&tv.tv_sec, &tm);
-  int n = (int)strftime(buf, len, "%Y-%m-%dT%H:%M:%S", &tm);
-  snprintf(buf + n, len - (size_t)n, ".%03dZ", (int)(tv.tv_usec / 1000));
+  return ((uint64_t)tv.tv_sec * 1000u) + ((uint64_t)tv.tv_usec / 1000u);
 }
 
 // Build a minimal sb.v1 envelope.  Caller supplies the inner payload JSON
 // (without outer braces).  Result written to buf.
 static int buildEnvelope(char *buf, size_t len, const char *innerPayloadJson)
 {
-  char ts[32];
-  iso8601Now(ts, sizeof(ts));
+  uint64_t ts = epochMillisNow();
   uint32_t id = ++sMsgId;
 
   return snprintf(buf, len,
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
-     "\"ts\":\"%s\","
+     "\"ts\":%" PRIu64 ","
      "\"tenant_id\":\"" MQTT_TENANT "\","
      "\"site_id\":\"" MQTT_SITE "\","
      "\"gateway_id\":\"" MQTT_GW_ID "\","
@@ -421,6 +418,35 @@ void appMqttPublishMotionReported(uint16_t nodeId, const char *eui64Str,
             eui64Str, occupancy);
 }
 
+void appMqttPublishMotionEvent(uint16_t nodeId, const char *eui64Str,
+                               const char *occupancy, uint8_t raw)
+{
+  if (!sMosq || !eui64Str || !occupancy) return;
+
+  char inner[360];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"motion\","
+    "\"event\":\"occupancy_changed\","
+    "\"occupancy\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"raw\":\"0x%02X\"",
+    eui64Str, occupancy, eui64Str, (unsigned)nodeId, (unsigned)raw);
+
+  char envelope[700];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/motion/%s/event",
+           eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, false);
+  appLogLog("MQTT", "motion_event",
+            "\"device_id\":\"%s\",\"occupancy\":\"%s\",\"raw\":\"0x%02X\"",
+            eui64Str, occupancy, (unsigned)raw);
+}
+
 void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
                                const char *deviceType, const char *eventName)
 {
@@ -458,8 +484,7 @@ void appMqttPublishCommandReply(const char *command_id,
   // Per MQTT_CONTRACT: correlation_id on reply == command_id.
   // Payload always carries: command_id, device_id, status, reason.
   // Any of device_id/reason may be NULL -> emitted as JSON null.
-  char ts[32];
-  iso8601Now(ts, sizeof(ts));
+  uint64_t ts = epochMillisNow();
   uint32_t id = ++sMsgId;
 
   // Build device_id field (quoted or null)
@@ -482,7 +507,7 @@ void appMqttPublishCommandReply(const char *command_id,
   snprintf(envelope, sizeof(envelope),
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
-     "\"ts\":\"%s\","
+     "\"ts\":%" PRIu64 ","
      "\"tenant_id\":\"" MQTT_TENANT "\","
      "\"site_id\":\"" MQTT_SITE "\","
      "\"gateway_id\":\"" MQTT_GW_ID "\","
