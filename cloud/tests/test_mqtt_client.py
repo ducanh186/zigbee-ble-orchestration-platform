@@ -1,0 +1,150 @@
+"""Tests for MQTT ingestion side effects."""
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+
+@pytest.mark.asyncio
+async def test_handle_motion_event_auto_registers_and_persists():
+    from cloud.app.database import Base
+    from cloud.app.models import Device, Event
+    from cloud.app.mqtt_client import MQTTService
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    db_session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+
+    device_id = "00124b0001aa22cc"
+    topic = f"sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/{device_id}/event"
+    service._handle_event(
+        topic,
+        {
+            "schema": "sb.v1",
+            "msg_id": "motion-event-1",
+            "ts": 1776064500000,
+            "tenant_id": "hust",
+            "site_id": "lab01",
+            "gateway_id": "gw-ubuntu-01",
+            "source": "gateway",
+            "payload": {
+                "device_id": device_id,
+                "device_type": "motion",
+                "event": "occupancy_changed",
+                "occupancy": "occupied",
+                "eui64": device_id,
+                "nwk_addr": "0x4F2A",
+                "raw": "0x01",
+            },
+        },
+    )
+    await tasks[0]
+
+    deadline = asyncio.get_running_loop().time() + 1.0
+    event = None
+    device = None
+    while asyncio.get_running_loop().time() < deadline:
+        async with db_session_factory() as session:
+            event = (
+                await session.execute(select(Event).where(Event.device_id == device_id))
+            ).scalar_one_or_none()
+            device = await session.get(Device, device_id)
+        if event and device:
+            break
+        await asyncio.sleep(0.01)
+
+    assert device is not None
+    assert device.device_type == "motion"
+    assert event is not None
+    assert event.event_type == "occupancy_changed"
+    assert event.payload["occupancy"] == "occupied"
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_command_reply_does_not_regress_terminal_status():
+    from cloud.app.database import Base
+    from cloud.app.models import Command, Device, Home, Room
+    from cloud.app.mqtt_client import MQTTService
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    db_session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+
+    async with db_session_factory() as session:
+        session.add(Home(id="home-1", name="Test Home"))
+        session.add(Room(id="room-1", home_id="home-1", name="Living"))
+        session.add(
+            Device(
+                id="light-01",
+                device_type="light",
+                room_id="room-1",
+                name="Main Light",
+            )
+        )
+        session.add(
+            Command(
+                id="cmd-1",
+                device_id="light-01",
+                op="device.command",
+                target={"command": "off"},
+                status="accepted",
+                timeout_ms=5000,
+            )
+        )
+        await session.commit()
+
+    topic = "sb/v1/hust/lab01/gw-ubuntu-01/commands/cmd-1/reply"
+    service._handle_command_reply(
+        topic,
+        {
+            "payload": {
+                "status": "executed",
+            },
+        },
+    )
+    service._handle_command_reply(
+        topic,
+        {
+            "payload": {
+                "status": "sent",
+            },
+        },
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as session:
+        command = await session.get(Command, "cmd-1")
+
+    assert command is not None
+    assert command.status == "executed"
+
+    await engine.dispose()
