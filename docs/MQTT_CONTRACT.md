@@ -76,7 +76,26 @@ command; khoá chính luôn là `command_id` lấy từ topic
 sb/v1/{tenant}/{site}/{gateway}/gateway/online
 sb/v1/{tenant}/{site}/{gateway}/gateway/health
 sb/v1/{tenant}/{site}/{gateway}/gateway/log
+sb/v1/{tenant}/{site}/{gateway}/gateway/event
 ```
+
+`gateway/event` mang sự kiện cấp gateway (không gắn device cụ thể), ví dụ
+khi cửa permit-join mở/đóng. Payload có dạng:
+
+```json
+{ "event": "<event_name>", "...": "..." }
+```
+
+`event_name` đã định nghĩa:
+
+- `permit_join_opened` — kèm `duration_sec` (1..180), tuỳ chọn `trigger`
+  (`"form"` khi mở tự động sau khi network vừa form xong).
+- `permit_join_closed` — kèm `reason` (`"timeout"` khi auto-close hết
+  duration, `"command"` khi đóng do `gateway.close_network`) và
+  `zstatus` (Ember status hex).
+- `permit_join_failed` — kèm `reason` và `zstatus` khi gọi
+  `gateway.open_network` thất bại ở stack/native (gateway vẫn reply
+  command với `status="failed"`; event chỉ là kênh observability).
 
 ### Thiết bị (Devices)
 
@@ -146,6 +165,7 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 | `gateway/online` | 1 | có | Dùng Last Will and Testament (LWT) |
 | `gateway/health` | 1 | có | |
 | `gateway/log` | 0 | không | |
+| `gateway/event` | 1 | không | Lifecycle gateway-level (e.g. permit_join_*) |
 | `devices/*/*/registry` | 1 | có | |
 | `devices/*/*/reported` | 1 | có | |
 | `devices/*/*/desired` | 1 | có | |
@@ -270,6 +290,48 @@ Payload:
 }
 ```
 
+### Lệnh gateway (commissioning)
+
+Một số `op` không nhắm vào device cụ thể mà tác động lên chính gateway.
+Topic vẫn dùng `commands/{command_id}/request|reply` (cùng lifecycle, cùng
+cloud-side timeout sweeper) nhưng payload **bỏ** trường `device_id`:
+gateway parser chấp nhận thiếu `device_id` chỉ khi `op` bắt đầu bằng
+`gateway.`. Reply của gateway emit `payload.device_id = null`.
+
+Op v1:
+
+| Op | Target | Tác dụng |
+| --- | --- | --- |
+| `gateway.open_network` | `{ "duration_sec": 1..180 }` | Broadcast permit-join (network-creator-security plugin) trong `duration_sec` giây. Gateway tự đóng khi hết thời gian và publish `gateway/event permit_join_closed reason=timeout`. |
+| `gateway.close_network` | `{}` | Đóng permit-join ngay (broadcast permit_duration=0). Publish `gateway/event permit_join_closed reason=command`. |
+
+Ví dụ commissioning open 60s:
+
+```json
+{
+  "schema": "sb.v1",
+  "msg_id": "c6b8f41353e74b9aa123a25c8e07b106",
+  "ts": 1778049999288,
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "cloud",
+  "correlation_id": "cmd_a18b423b26ef4060b1bdc470802c2160",
+  "payload": {
+    "op": "gateway.open_network",
+    "target": { "duration_sec": 60 },
+    "timeout_ms": 5000
+  }
+}
+```
+
+Reply lifecycle giống device command (`accepted → queued → sent → executed`
+| `failed`); reason map đặc thù gateway:
+
+- `not_formed` — gateway chưa join network nào, không thể mở permit-join
+  (Ember `EMBER_NOT_JOINED`).
+- `zstatus:0xNN` — Ember status hex khác cho các lỗi stack/native khác.
+
 ## Ví dụ wildcard subscription
 
 Topic filter phổ biến cho từng vai trò subscriber. Xem thêm [tài khoản và phân quyền](../mqtt/README.md#tài-khoản).
@@ -297,6 +359,8 @@ sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/telemetry
 sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/event
 sb/v1/hust/lab01/gw-ubuntu-01/commands/+/reply
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/online
+sb/v1/hust/lab01/gw-ubuntu-01/gateway/health
+sb/v1/hust/lab01/gw-ubuntu-01/gateway/event
 ```
 
 ### Gateway (nhận từ cloud)
