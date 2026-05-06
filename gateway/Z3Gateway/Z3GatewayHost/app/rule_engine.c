@@ -61,7 +61,7 @@ static CooldownEntry_t s_cooldown[MAX_BINDINGS];
 
 // ===== Motion -> light rule (disabled by default) =====
 #define MOTION_ID_MAX 24
-#define MOTION_DEFAULT_OFF_DELAY_MS 30000u
+#define MOTION_DEFAULT_OFF_DELAY_MS 10000u
 
 static bool s_motionEnabled = false;
 static char s_motionSensorId[MOTION_ID_MAX] = "*";
