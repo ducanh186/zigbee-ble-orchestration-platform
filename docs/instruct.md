@@ -1027,3 +1027,176 @@ mosquitto_pub -h localhost -u client -P client123 -r -q 1 \
       retained từ session trước không (§I "Tin nhắn MQTT retained cũ").
 - [ ] Dừng bằng `kill "$(cat /tmp/z3gw.pid)"`, chờ `fuser /dev/ttyACM0`
       không in gì nữa, rồi restart.
+
+---
+
+## K. Test EC2 cloud -> local Zigbee
+
+Mục tiêu của phần này:
+
+- Cloud EC2 nhận REST command.
+- Cloud publish MQTT `commands/{id}/request`.
+- Gateway local nhận MQTT command và gửi ZCL On/Off xuống Light node.
+- Occupancy node gửi report; gateway publish `reported` và
+  `event=occupancy_changed` lên cloud.
+
+### K.1 Endpoint cloud thật
+
+Hiện EC2 đang expose:
+
+```bash
+curl http://98.83.4.87:8000/health
+```
+
+Port 80 của `http://98.83.4.87/` không phải API chính trong flow này.
+Dùng base URL:
+
+```text
+http://98.83.4.87:8000
+```
+
+MQTT broker:
+
+```bash
+mosquitto_sub -h 98.83.4.87 -p 1883 -u monitor -P monitor123 \
+  -t '$SYS/broker/uptime' -C 1 -W 3
+```
+
+### K.2 Chạy gateway local trỏ lên EC2 MQTT
+
+Không chạy `make` firmware end-device ở bước này. Dùng binary gateway host
+đã có, hoặc build host gateway thủ công nếu bạn cần.
+
+```bash
+cd /home/al/code/zigbee-ble-orchestration-platform/gateway/Z3Gateway/Z3GatewayHost
+
+pkill -f 'Z3Gateway -p /dev/ttyACM0' || true
+while fuser /dev/ttyACM0 >/dev/null 2>&1; do sleep 1; done
+
+export SB_MQTT_HOST=98.83.4.87
+export SB_MQTT_PORT=1883
+export SB_MQTT_USERNAME=gateway
+export SB_MQTT_PASSWORD=gateway123
+
+export SB_RULES_MOTION_TO_LIGHT=1
+export SB_RULES_MOTION_SENSOR_ID='*'
+export SB_RULES_MOTION_LIGHT_ID='*'
+export SB_RULES_MOTION_OFF_DELAY_MS=10000
+
+./build/debug/Z3Gateway -p /dev/ttyACM0 > /tmp/z3gw.log 2>&1 &
+echo $! > /tmp/z3gw.pid
+```
+
+Theo dõi log gateway:
+
+```bash
+tail -f /tmp/z3gw.log | grep --line-buffered -E \
+  'MQTT|CMD|DISPATCH|LIGHT|MOTION|RULE|occupancy_changed|0x0406|0x0006'
+```
+
+Khi gateway chạy đúng, log phải có:
+
+```text
+MQTT: connected to 98.83.4.87:1883
+MQTT: subscribed to sb/v1/hust/lab01/gw-ubuntu-01/commands/+/request
+```
+
+### K.3 Cho node join và lấy EUI64 thật
+
+Form/open network trên coordinator như phần local Zigbee đã test trước.
+Sau đó cho Light và Occupancy join.
+
+Kiểm tra cloud đã thấy device chưa:
+
+```bash
+curl -s http://98.83.4.87:8000/api/devices/ | python3 -m json.tool
+```
+
+Light ID và Motion ID nên là EUI64 thật, ví dụ:
+
+```text
+SB_LIGHT_ID=0000000000000055
+SB_MOTION_ID=0000000000000053
+```
+
+Với bộ kit hiện tại trong Simplicity Studio:
+
+| Adapter | EUI64 dùng để test |
+|---|---|
+| `Light_55` | `0000000000000055` |
+| `occupancy_53` | `0000000000000053` |
+
+Nếu chưa thấy EUI64 trên cloud:
+
+- Với Light: tạo một report On/Off từ Light, hoặc bấm/test để gateway học
+  `devices/light/<eui64>/reported`.
+- Với Occupancy: kích hoạt PIR để gateway nhận report cluster `0x0406` và
+  publish `devices/motion/<eui64>/reported`.
+
+Xem MQTT trực tiếp:
+
+```bash
+mosquitto_sub -h 98.83.4.87 -p 1883 -u monitor -P monitor123 -v \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/reported' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/event'
+```
+
+### K.4 Chạy smoke test cloud điều khiển đèn
+
+Cài dependency Python trong `/tmp` nếu máy chưa có:
+
+```bash
+python3 -m venv /tmp/zigbee-cloud-venv
+/tmp/zigbee-cloud-venv/bin/pip install -r /home/al/code/zigbee-ble-orchestration-platform/cloud/requirements.txt
+```
+
+Chạy test ON rồi OFF:
+
+```bash
+cd /home/al/code/zigbee-ble-orchestration-platform
+
+export SB_API_URL=http://98.83.4.87:8000
+export SB_MQTT_HOST=98.83.4.87
+export SB_MQTT_PORT=1883
+export SB_MQTT_USERNAME=monitor
+export SB_MQTT_PASSWORD=monitor123
+export SB_LIGHT_ID=0000000000000055
+export SB_MOTION_ID=0000000000000053
+
+/tmp/zigbee-cloud-venv/bin/python -m cloud.scripts.cloud_to_zigbee_smoke
+```
+
+Kết quả pass mong đợi:
+
+```text
+[ok] POST ON command id=...
+[ok] command ... terminal status=executed
+[ok] light state power=on
+[ok] POST OFF command id=...
+[ok] command ... terminal status=executed
+[ok] light state power=off
+CLOUD TO ZIGBEE SMOKE PASSED
+```
+
+Nếu script fail `Device not found`, cloud chưa auto-register EUI64 thật.
+Cho node join và phát report trước, rồi chạy lại.
+
+### K.5 Verify occupancy log lên cloud
+
+Trigger PIR, rồi xem state mới nhất:
+
+```bash
+curl -s "http://98.83.4.87:8000/api/devices/$SB_MOTION_ID/state" | python3 -m json.tool
+```
+
+Xem lịch sử event occupancy:
+
+```bash
+curl -s "http://98.83.4.87:8000/api/events/?device_id=$SB_MOTION_ID&event_type=occupancy_changed&limit=10" \
+  | python3 -m json.tool
+```
+
+Gateway publish event chỉ khi occupancy đổi trạng thái. Nếu bạn trigger PIR
+liên tục mà trạng thái vẫn `occupied`, cloud sẽ thấy `reported` mới nhưng
+không có event `occupancy_changed` mới cho đến khi state đổi sang
+`unoccupied` hoặc ngược lại.
