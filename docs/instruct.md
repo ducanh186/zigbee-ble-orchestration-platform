@@ -428,6 +428,181 @@ echo $! > /tmp/z3gw.pid
 stdout/stderr đều vào file này. Không có systemd unit, không có log
 rotate — file sẽ phình ra đến khi bạn restart process hoặc tự truncate.
 
+### Cách xem log gateway và từng node
+
+Có 3 loại log khi test local:
+
+- **Gateway log**: log của process Linux `Z3Gateway`, nằm ở `/tmp/z3gw.log`
+  nếu start bằng `... > /tmp/z3gw.log 2>&1` hoặc `tee /tmp/z3gw.log`.
+- **Light node log**: log serial/VCOM của board chạy `ZigbeeMinimal_2`.
+- **Occupancy node log**: log serial/VCOM của board chạy
+  `ZigbeeMinimal` / `Z3_Occupancy_Sensor`.
+
+Gateway nói chuyện với coordinator NCP qua `/dev/ttyACM0`. Light và
+Occupancy là board riêng, nên log node thường nằm ở cổng serial khác
+như `/dev/ttyACM1`, `/dev/ttyACM2`, hoặc `/dev/ttyUSB0`. Cắm từng board
+vào rồi xem danh sách:
+
+```bash
+ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+```
+
+Nếu không biết cổng nào mới xuất hiện, chạy lệnh này ngay sau khi cắm
+board:
+
+```bash
+dmesg | tail -30
+```
+
+#### Xem log gateway
+
+Xem toàn bộ log gateway:
+
+```bash
+tail -f /tmp/z3gw.log
+```
+
+Xem gateway form network / mở join / node join:
+
+```bash
+tail -f /tmp/z3gw.log | grep --line-buffered -E 'NET|tc_join|MON'
+```
+
+Xem flow Occupancy -> Gateway -> Light:
+
+```bash
+tail -f /tmp/z3gw.log | grep --line-buffered -E 'MOTION|RULE|LIGHT|0x0406|0x0006|device":"motion|device":"light'
+```
+
+Các dòng quan trọng:
+
+```text
+NET formed                       coordinator đã form Zigbee network
+NET open_join ... zstatus 0x00   coordinator đã mở permit join
+NET tc_join                      có node join/rejoin
+MON bind_req_sent                gateway gửi bind request sau khi node join
+MON cfg_report_sent              gateway cấu hình reporting cho cluster
+MOTION report_parsed             gateway đã nhận report Occupancy
+RULE motion_on_sent              rule đã quyết định bật Light
+RULE motion_off_timer_scheduled  hết motion, bắt đầu đếm delay tắt
+RULE motion_off_sent             đã gửi lệnh tắt Light
+LIGHT local_set_sent             gateway đã gửi ZCL On/Off tới Light
+LIGHT local_set_skip             gateway bỏ qua, xem reason để biết vì sao
+```
+
+Ví dụ lỗi thường gặp:
+
+```text
+LIGHT local_set_skip ... reason":"no_light_found"
+```
+
+Nghĩa là Occupancy đã report, rule đã chạy, nhưng gateway chưa nhận diện
+được node Light. Cho Light join lại hoặc tạo report On/Off từ Light để
+gateway học device type `light`.
+
+#### Xem log Light node
+
+Giả sử Light đang ở `/dev/ttyACM1`:
+
+```bash
+screen /dev/ttyACM1 115200
+```
+
+Nếu chưa có `screen`:
+
+```bash
+sudo apt update
+sudo apt install -y screen
+```
+
+Thoát `screen`:
+
+```text
+Ctrl-A rồi bấm K rồi bấm Y
+```
+
+Log Light cần thấy:
+
+```text
+ZigbeeMinimal_2 init
+NET: steering start st=0x00
+NET: steering complete st=0x00
+NET: stack status=0x90
+LIGHT: ON
+LIGHT: OFF
+```
+
+Ý nghĩa:
+
+- `NET: steering start`: Light bắt đầu tìm coordinator.
+- `NET: steering complete st=0x00`: join thành công.
+- `NET: stack status=0x90`: network up.
+- `LIGHT: ON`: gateway gửi ZCL On, LED1 bật.
+- `LIGHT: OFF`: gateway gửi ZCL Off, LED1 tắt.
+
+Nếu LED0 trên Light nháy liên tục, Light đang ở trạng thái tìm mạng /
+rejoin. Sau khi join ổn định, LED0 phải bật đứng. Nếu LED1 luôn bật,
+xem gateway log có liên tục `LIGHT local_set_sent action":"on"` không;
+nếu có, Occupancy đang báo `occupied` liên tục hoặc rule chưa đến thời
+điểm tắt.
+
+#### Xem log Occupancy node
+
+Giả sử Occupancy đang ở `/dev/ttyACM2`:
+
+```bash
+screen /dev/ttyACM2 115200
+```
+
+Log Occupancy cần thấy:
+
+```text
+NWK Steering: Start: 0x00
+NET: steering start st=0x00
+Join network complete: 0x00
+Occupancy detected
+Occupancy cleared
+```
+
+Nếu thấy:
+
+```text
+Beacons heard: 0
+Join network complete: 0xAB
+```
+
+thì node không nghe thấy coordinator đang mở join. Kiểm tra gateway log
+phải có:
+
+```text
+NET formed
+NET open_join ... zstatus":"0x00"
+```
+
+Sau đó reset node hoặc bấm PB0 để steering lại.
+
+#### Xem log bằng serial terminal khác
+
+Nếu không muốn dùng `screen`, có thể dùng `picocom`:
+
+```bash
+sudo apt install -y picocom
+picocom -b 115200 /dev/ttyACM1
+```
+
+Thoát `picocom`:
+
+```text
+Ctrl-A rồi Ctrl-X
+```
+
+Quy tắc quan trọng: mỗi cổng serial chỉ nên có một chương trình đang mở.
+Nếu không thấy log, kiểm tra process đang giữ cổng:
+
+```bash
+fuser /dev/ttyACM1
+```
+
 ### Inspect gateway đang chạy **mà không** start thêm một cái mới
 
 Lỗi hay gặp: chạy `./Z3Gateway ...` trong terminal mới để "xem nó đang
@@ -566,7 +741,7 @@ Mặc định rule này **tắt**. Bật trên process gateway bằng environmen
 export SB_RULES_MOTION_TO_LIGHT=1
 export SB_RULES_MOTION_SENSOR_ID=*
 export SB_RULES_MOTION_LIGHT_ID=*
-export SB_RULES_MOTION_OFF_DELAY_MS=30000
+export SB_RULES_MOTION_OFF_DELAY_MS=10000
 ```
 
 Firmware note: `Z3_Occupancy_Sensor.slcp` now includes
