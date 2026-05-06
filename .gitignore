@@ -11,6 +11,7 @@ deploy/.env.deploy
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 .vscode/
 .githooks
 .sunlint-cache
