@@ -109,7 +109,12 @@ class Command(Base):
     __tablename__ = "commands"
 
     id = Column(String, primary_key=True)  # command_id uuid
-    device_id = Column(String, ForeignKey("devices.id"), nullable=False)
+    # device_id is nullable for gateway-targeted commands (commissioning, ...).
+    # For target_kind="device" it must be set to an existing devices.id.
+    device_id = Column(String, ForeignKey("devices.id"), nullable=True)
+    target_kind = Column(
+        String, nullable=False, default="device", server_default="device"
+    )
     op = Column(String, nullable=False)
     target = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="accepted")

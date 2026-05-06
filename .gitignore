@@ -13,6 +13,7 @@ deploy/.env.deploy
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 .vscode/
 .githooks
 .sunlint-cache
@@ -26,6 +27,9 @@ __pycache__/
 
 # OTA artifacts
 ota-files/
+
+# Local E2E test artifacts (live MQTT/API captures, not for tracking)
+docs/samples/real/
 
 # Simplicity Studio / EFR32 end device projects
 end_devices/**/GNU ARM*/

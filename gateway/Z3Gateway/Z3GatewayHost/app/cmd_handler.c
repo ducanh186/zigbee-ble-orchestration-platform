@@ -8,6 +8,7 @@
 #include "sb_command.h"
 #include "device_dispatch.h"
 #include "device_registry.h"
+#include "device_discovery.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -77,7 +78,17 @@ void cmdHandleLine(const char *line)
     }
     (void)parseUintField(p, "\"dst_ep\"", &dstEp);
 
-    bool ok = deviceRegistryPair(euiStr, (EmberNodeId)nodeId, (uint8_t)dstEp);
+    // Manual pair from CLI: store as "unknown" and let ZDO discovery
+    // classify properly.  No type guess here.
+    bool ok = deviceRegistryUpsert(euiStr, (EmberNodeId)nodeId,
+                                   (uint8_t)dstEp, "unknown");
+    if (ok) {
+      // Convert ASCII eui to little-endian for discovery API.
+      EmberEUI64 euiLe;
+      if (parseHexEui64(euiStr, euiLe)) {
+        deviceDiscoveryStart((EmberNodeId)nodeId, euiLe);
+      }
+    }
     appLogAck(id, ok, ok ? "device_pair set" : "bad eui64");
     if (ok) appLogInfo();
     return;
