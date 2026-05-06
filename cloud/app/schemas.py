@@ -79,6 +79,18 @@ class SwitchEventPayload(BaseModel):
     nwk_addr: str | None = None
 
 
+class MotionEventPayload(BaseModel):
+    """Inner payload of a motion event MQTT message."""
+
+    device_id: str
+    device_type: Literal["motion"]
+    event: Literal["occupancy_changed"]
+    occupancy: MotionOccupancy
+    eui64: str | None = None
+    nwk_addr: str | None = None
+    raw: str | None = None
+
+
 class MotionReportedPayload(BaseModel):
     """Inner payload of a motion reported MQTT message."""
 
@@ -206,6 +218,8 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "switch":
             return SwitchEventPayload(**inner).model_dump()
+        if device_type == "motion":
+            return MotionEventPayload(**inner).model_dump()
         return inner
     except Exception:
         return None

@@ -10,10 +10,49 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 // ===== Cached light level for enriching reported state =====
 // Updated when we receive Level Control cluster reports.
 static uint8_t s_lastLightLevel = 0;
+
+// ===== Cached motion state for publishing change events only =====
+#define MOTION_STATE_CACHE_MAX 16
+
+typedef struct {
+  bool active;
+  char eui64[20];
+  bool occupied;
+} MotionStateCache_t;
+
+static MotionStateCache_t s_motionStates[MOTION_STATE_CACHE_MAX];
+
+static bool motionStateChanged(const char *eui64Str, bool occupied)
+{
+  if (!eui64Str || !eui64Str[0]) return false;
+
+  int freeIdx = -1;
+  for (int i = 0; i < MOTION_STATE_CACHE_MAX; i++) {
+    if (!s_motionStates[i].active) {
+      if (freeIdx < 0) freeIdx = i;
+      continue;
+    }
+
+    if (strcmp(s_motionStates[i].eui64, eui64Str) == 0) {
+      if (s_motionStates[i].occupied == occupied) return false;
+      s_motionStates[i].occupied = occupied;
+      return true;
+    }
+  }
+
+  int idx = (freeIdx >= 0) ? freeIdx : 0;
+  s_motionStates[idx].active = true;
+  strncpy(s_motionStates[idx].eui64, eui64Str,
+          sizeof(s_motionStates[idx].eui64) - 1);
+  s_motionStates[idx].eui64[sizeof(s_motionStates[idx].eui64) - 1] = '\0';
+  s_motionStates[idx].occupied = occupied;
+  return true;
+}
 
 // ===== This is the correct callback for receiving attribute reports =====
 // The ZCL framework calls this BEFORE emberAfPreCommandReceivedCallback.
@@ -137,6 +176,9 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
                     euiStr, (unsigned)sender, occupancy, (unsigned)raw);
 
           appMqttPublishMotionReported(sender, euiStr, occupancy, false, 0);
+          if (motionStateChanged(euiStr, occupied)) {
+            appMqttPublishMotionEvent(sender, euiStr, occupancy, raw);
+          }
           ruleEngineOnMotionReport(euiStr, occupied);
         } else {
           emberAfCorePrintln("MQTT: skip motion report, EUI64 unknown for 0x%04X",
