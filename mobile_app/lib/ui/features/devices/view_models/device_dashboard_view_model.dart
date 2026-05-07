@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../domain/models/command_result.dart';
 import '../../../../domain/models/command_status.dart';
+import '../../../../domain/models/cloud_status.dart';
 import '../../../../domain/models/device_power.dart';
 import '../../../../domain/models/event_log.dart';
 import '../../../../domain/models/smart_device.dart';
@@ -19,6 +20,9 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   List<EventLog> _events = [];
   bool _isLoading = false;
   String? _errorMessage;
+  CloudStatus _cloudStatus = const CloudStatus.unknown(
+    detail: 'Not checked yet',
+  );
   CommandResult? _lastCommand;
   DevicePower? _lastTarget;
 
@@ -28,6 +32,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   List<EventLog> get events => List.unmodifiable(_events);
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  CloudStatus get cloudStatus => _cloudStatus;
   CommandResult? get lastCommand => _lastCommand;
   DevicePower? get lastTarget => _lastTarget;
 
@@ -53,11 +58,13 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      _cloudStatus = await _repository.fetchCloudStatus();
       final devices = await _repository.fetchDevices();
       final events = await _repository.fetchEvents();
       _devices = devices;
       _events = events;
     } catch (error) {
+      _cloudStatus = CloudStatus.unknown(detail: error.toString());
       _errorMessage =
           'Khong ket noi duoc Cloud API. Kiem tra server hoac mang. $error';
     } finally {

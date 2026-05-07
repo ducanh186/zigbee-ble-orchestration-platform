@@ -4,19 +4,25 @@ Flutter Android app for operator-style Zigbee LIGHT control through the Cloud RE
 
 ## Run
 
-Mock mode is the default so UI work can continue without the backend:
+Cloud API mode is the default:
 
 ```powershell
 flutter run
 ```
 
-Remote Cloud API mode:
+The default API base URL is `http://98.83.4.87:8000`.
+
+Mock mode for UI-only work:
 
 ```powershell
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://10.0.2.2:8000
+flutter run --dart-define=USE_MOCK_API=true
 ```
 
-For a real phone, replace `API_BASE_URL` with the reachable EC2/API host.
+Alternative Cloud API host:
+
+```powershell
+flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://your-host:8000
+```
 
 ## Structure
 

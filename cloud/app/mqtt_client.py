@@ -207,6 +207,36 @@ class MQTTService:
         status = inner.get("value", "unknown")
         logger.info("Gateway status: %s", status)
 
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Event
+
+            payload = {
+                "value": status,
+                "gateway_id": envelope.get(
+                    "gateway_id", self.settings.gateway_id
+                ),
+                "source": envelope.get("source", "gateway"),
+            }
+            for key, value in inner.items():
+                payload.setdefault(key, value)
+
+            async with self._db_session_factory() as session:
+                event = Event(
+                    device_id=None,
+                    event_type="gateway_online",
+                    payload=payload,
+                    occurred_at=datetime.fromisoformat(
+                        envelope.get("ts", datetime.now(UTC).isoformat())
+                    ).replace(tzinfo=None),
+                )
+                session.add(event)
+                await session.commit()
+                logger.info("Saved gateway status event=%s", status)
+
+        self._run_async(_write)
+
     # ------------------------------------------------------------------
     # Publishing
     # ------------------------------------------------------------------

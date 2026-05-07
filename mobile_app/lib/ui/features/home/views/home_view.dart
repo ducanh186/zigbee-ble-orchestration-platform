@@ -9,6 +9,7 @@ import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
+import '../widgets/gateway_status_card.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({required this.onOpenLight, super.key});
@@ -43,7 +44,7 @@ class HomeView extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  _GatewayCard(isOnline: viewModel.errorMessage == null),
+                  GatewayStatusCard(status: viewModel.cloudStatus),
                   const SizedBox(height: 12),
                   _MetricRow(viewModel: viewModel),
                   const SizedBox(height: 18),
@@ -64,62 +65,6 @@ class HomeView extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _GatewayCard extends StatelessWidget {
-  const _GatewayCard({required this.isOnline});
-
-  final bool isOnline;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return AppCard(
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isOnline ? palette.successTint : palette.warningTint,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.router,
-              color: isOnline ? palette.success : palette.warning,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isOnline ? 'Gateway online' : 'Cloud offline',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  'gw-ubuntu-01 - hust/lab01',
-                  style: TextStyle(
-                    color: palette.textSecondary,
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          StatusBadge(
-            label: isOnline ? 'OK' : 'CHECK',
-            tone: isOnline ? BadgeTone.success : BadgeTone.warning,
-          ),
-        ],
-      ),
     );
   }
 }
@@ -267,7 +212,15 @@ class _LightTile extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            StatusBadge.forPower(light.power),
+            Flexible(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: StatusBadge.forPower(light.power),
+                ),
+              ),
+            ),
           ],
         ),
         const Spacer(),

@@ -10,10 +10,10 @@ import 'ui/core/theme/app_theme.dart';
 import 'ui/features/devices/view_models/device_dashboard_view_model.dart';
 import 'ui/features/shell/views/smart_building_shell.dart';
 
-const _useMockApi = bool.fromEnvironment('USE_MOCK_API', defaultValue: true);
+const _useMockApi = bool.fromEnvironment('USE_MOCK_API', defaultValue: false);
 const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:8000',
+  defaultValue: 'http://98.83.4.87:8000',
 );
 
 void main() {

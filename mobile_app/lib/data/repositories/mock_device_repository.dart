@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../domain/models/command_result.dart';
 import '../../domain/models/command_status.dart';
+import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
 import '../../domain/models/smart_device.dart';
@@ -69,6 +70,12 @@ class MockDeviceRepository implements DeviceRepository {
 
   final Map<String, _MockCommand> _commands = {};
   int _nextCommand = 10;
+
+  @override
+  Future<CloudStatus> fetchCloudStatus() async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    return const CloudStatus.mock();
+  }
 
   @override
   Future<List<SmartDevice>> fetchDevices() async {

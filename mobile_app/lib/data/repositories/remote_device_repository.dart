@@ -1,4 +1,5 @@
 import '../../domain/models/command_result.dart';
+import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
 import '../../domain/models/smart_device.dart';
@@ -14,6 +15,78 @@ class RemoteDeviceRepository implements DeviceRepository {
     : _apiClient = apiClient;
 
   final ApiClient _apiClient;
+
+  @override
+  Future<CloudStatus> fetchCloudStatus() async {
+    try {
+      final json = await _apiClient.getJson('/api/events/?limit=50');
+      final events = (json as List).whereType<Map>();
+      for (final rawEvent in events) {
+        final status = _gatewayStatusFromEvent(
+          Map<String, Object?>.from(rawEvent),
+        );
+        if (status != null) {
+          return status;
+        }
+      }
+      return const CloudStatus.unknown(
+        detail: 'No gateway status log found in cloud events',
+      );
+    } catch (error) {
+      return CloudStatus.unknown(
+        detail: 'Cannot read cloud event logs: $error',
+      );
+    }
+  }
+
+  CloudStatus? _gatewayStatusFromEvent(Map<String, Object?> event) {
+    final eventType = event['event_type']?.toString() ?? '';
+    final payloadRaw = event['payload'];
+    final payload = payloadRaw is Map
+        ? Map<String, Object?>.from(payloadRaw)
+        : const <String, Object?>{};
+    final payloadEvent = payload['event']?.toString() ?? '';
+    final source = payload['source']?.toString();
+    final hasGatewayMarker =
+        eventType.startsWith('gateway_') ||
+        payloadEvent.startsWith('gateway_') ||
+        payload.containsKey('gateway_id') ||
+        source == 'gateway' && event['device_id'] == null;
+
+    if (!hasGatewayMarker) {
+      return null;
+    }
+
+    final value = (payload['value'] ?? payload['status'] ?? payload['state'])
+        ?.toString()
+        .toLowerCase();
+    final gatewayId = payload['gateway_id']?.toString();
+    final occurredAt = event['occurred_at']?.toString();
+    final resolvedEventType = eventType.isEmpty ? payloadEvent : eventType;
+
+    if (value == 'online') {
+      return CloudStatus.online(
+        gatewayId: gatewayId,
+        eventType: resolvedEventType,
+        occurredAt: occurredAt,
+      );
+    }
+    if (value == 'offline') {
+      return CloudStatus.offline(
+        detail: 'Gateway reported offline',
+        gatewayId: gatewayId,
+        eventType: resolvedEventType,
+        occurredAt: occurredAt,
+      );
+    }
+
+    return CloudStatus.unknown(
+      detail: value ?? 'Gateway log has no status value',
+      gatewayId: gatewayId,
+      eventType: resolvedEventType,
+      occurredAt: occurredAt,
+    );
+  }
 
   @override
   Future<List<SmartDevice>> fetchDevices() async {

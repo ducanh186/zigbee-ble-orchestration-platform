@@ -11,6 +11,7 @@ deploy/.env.deploy
 *.pem
 # Python
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 .vscode/
