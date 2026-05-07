@@ -1,0 +1,30 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Buttons</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 22px; }
+  .row { gap: 10px; align-items: center; }
+  button { font: 600 14px var(--font-sans); border-radius: var(--radius-button); padding: 10px 16px; border: 1px solid transparent; cursor: pointer; display:inline-flex; align-items:center; gap:8px; }
+  .primary { background: var(--primary); color: var(--primary-on); }
+  .ghost { background: transparent; color: var(--primary); border-color: var(--border); }
+  .danger { background: var(--error); color: #fff; }
+  .disabled { opacity: 0.4; cursor: not-allowed; }
+  .ring { width:14px; height:14px; border-radius:999px; border:2px solid currentColor; border-right-color:transparent; animation: r 0.8s linear infinite; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .pill { padding: 14px 22px; border-radius: 999px; font-size: 16px; }
+</style>
+</head><body>
+<div class="col">
+  <div class="row">
+    <button class="primary">ON</button>
+    <button class="ghost">OFF</button>
+    <button class="primary disabled"><span class="ring"></span>Sending…</button>
+    <button class="danger">Retry</button>
+  </div>
+  <div class="row">
+    <button class="primary pill">ON</button>
+    <button class="ghost pill">OFF</button>
+    <button class="ghost" style="border-color:transparent;color:var(--text-secondary)">Refresh</button>
+  </div>
+</div>
+</body></html>

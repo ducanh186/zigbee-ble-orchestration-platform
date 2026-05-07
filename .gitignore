@@ -3,7 +3,9 @@ z3.pem
 !README.md
 CLAUDE.md
 .claude/
+.codex/
 .github/
+excalidraw.log
 # Deploy secrets
 deploy/.env.deploy
 *.pem
