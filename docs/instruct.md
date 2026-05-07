@@ -403,11 +403,25 @@ Deployment của project này: `tenant_id=hust`, `site_id=lab01`,
 
 ```bash
 cd "$REPO/gateway/Z3Gateway/Z3GatewayHost/build/debug"
-nohup env SB_MQTT_HOST=localhost SB_MQTT_PORT=1883 \
-          SB_MQTT_USERNAME=gateway SB_MQTT_PASSWORD=gateway123 \
-     ./Z3Gateway -p /dev/ttyACM0 -b 115200 > /tmp/z3gw.log 2>&1 &
-echo $! > /tmp/z3gw.pid
+( sleep infinity | env SB_MQTT_HOST=localhost SB_MQTT_PORT=1883 \
+                       SB_MQTT_USERNAME=gateway SB_MQTT_PASSWORD=gateway123 \
+       ./Z3Gateway -p /dev/ttyACM0 -b 115200 > /tmp/z3gw.log 2>&1 ) &
+disown
+echo $(pgrep -fx './Z3Gateway -p /dev/ttyACM0 -b 115200') > /tmp/z3gw.pid
 ```
+
+> **Tại sao `sleep infinity | ...`?** Z3GatewayHost dùng `sl_iostream`
+> + `sl_cli` để nhận CLI input. Nếu chạy bằng `nohup ... &` (stdin =
+> `/dev/null`), helper thread của `sl_iostream` sẽ busy-loop đọc EOF
+> 100% CPU và chặn `emberAfMainTickCallback` — quan sát thấy
+> `MQTT: rx ...commands/{id}/request` xuất hiện trong log nhưng
+> **không bao giờ có** `MQTT: processing` / `CMD parsed` / `DISPATCH`,
+> command timeout ở phía cloud. Cấp một stdin pipe không bao giờ EOF
+> (`sleep infinity | ...`) khiến thread đó block bình thường, main
+> loop tick chạy đúng, queue MQTT được drain. Đừng tự ý đổi sang
+> `nohup ... </dev/null` hoặc `setsid ... </dev/null` — cả hai đều
+> dẫn về cùng triệu chứng.
+
 
 ### Runtime flags / env vars quan trọng
 
@@ -791,7 +805,52 @@ Nếu đang có cloud command in-flight, local action bị skip để không che
 vào command lifecycle; log sẽ có `LIGHT local_set_skip` với
 `reason:"command_in_flight"`.
 
-### H.5 Hiển thị command reply lifecycle
+### H.5 Cloud → gateway commissioning (open / close permit-join)
+
+Cần chạy gì: broker, postgres, cloud, gateway.
+
+Trigger (mở permit-join 60s):
+
+```bash
+curl -s -X POST http://localhost:8000/api/gateways/gw-ubuntu-01/commissioning/open \
+  -H 'Content-Type: application/json' \
+  -d '{"duration_sec":60}'
+```
+
+Đóng ngay trước khi hết hạn (tuỳ chọn):
+
+```bash
+curl -s -X POST http://localhost:8000/api/gateways/gw-ubuntu-01/commissioning/close \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Bằng chứng hoạt động:
+
+- MQTT trace thấy `commands/{id}/request` với `payload.op =
+  "gateway.open_network"`, `target.duration_sec = 60`, **không có**
+  `payload.device_id` (đó là gateway-scoped op).
+- `/tmp/z3gw.log` có `MQTT: rx [...commands/...]`,
+  `CMD parsed op=gateway.open_network device_id=""`,
+  `DISPATCH accepted_gw`, `NET open_join_cmd zstatus=0x00 duration_s=60`.
+- `commands/{id}/reply` qua chuỗi `accepted → queued → sent → executed`.
+  Reply có `payload.device_id = null`.
+- `gateway/event` publish `permit_join_opened` với `duration_sec`.
+- Sau `duration_sec` giây gateway tự đóng, `gateway/event` publish
+  `permit_join_closed reason=timeout zstatus=0x00`. Nếu user gọi close
+  sớm thì reason=`command`.
+- `curl http://localhost:8000/api/commands/<id>` trả `"status":"executed"`,
+  `"target_kind":"gateway"`, `"device_id":null`.
+
+Failure thường gặp:
+
+- `reason=not_formed` — gateway chưa join network nào, không thể mở
+  permit-join. Form network trước (xem `cmd_handler` op `net_form` hoặc
+  CLI `plugin network-creator form`).
+- `duration_sec` cap ở `1..180` (validation pydantic). Vượt ngưỡng
+  trả 422 ở cloud, request không bao giờ chạm gateway.
+
+### H.6 Hiển thị command reply lifecycle
 
 Với mỗi command từ cloud, bạn phải thấy trên `commands/{cmd_id}/reply`
 một chuỗi tăng đơn điệu:

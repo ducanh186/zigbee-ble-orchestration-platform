@@ -69,6 +69,12 @@ static bool findUintExact(const char *json, const char *lookKey, uint32_t *out)
   return true;
 }
 
+bool sbCommandIsGatewayOp(const char *op)
+{
+  // Any op prefixed "gateway." is gateway-scoped (no device target).
+  return (op != NULL && strncmp(op, "gateway.", 8) == 0);
+}
+
 bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
 {
   if (!out) return false;
@@ -86,9 +92,16 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
   (void)findQuotedString(body, "\"correlation_id\":",
                          out->correlation_id, sizeof(out->correlation_id));
 
-  // device_id (required)
-  if (!findQuotedString(body, "\"device_id\":",
-                        out->device_id, sizeof(out->device_id))) {
+  // op (required regardless of target kind) -- parse first so we can decide
+  // whether device_id is mandatory.
+  if (!findQuotedString(body, "\"op\":", out->op, sizeof(out->op))) {
+    return false;
+  }
+
+  // device_id: required for device-targeted ops, optional for gateway ops.
+  bool haveDeviceId = findQuotedString(body, "\"device_id\":",
+                                       out->device_id, sizeof(out->device_id));
+  if (!haveDeviceId && !sbCommandIsGatewayOp(out->op)) {
     return false;
   }
 
@@ -96,12 +109,7 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
   (void)findQuotedString(body, "\"device_type\":",
                          out->device_type, sizeof(out->device_type));
 
-  // op (required for device.command path)
-  if (!findQuotedString(body, "\"op\":", out->op, sizeof(out->op))) {
-    return false;
-  }
-
-  // target.endpoint, target.cluster_id, target.command
+  // target.endpoint, target.cluster_id, target.command  (device ops)
   uint32_t ep = 0;
   if (findUintExact(body, "\"endpoint\":", &ep)) {
     out->endpoint = (int)ep;
@@ -110,6 +118,12 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
                          out->cluster_id, sizeof(out->cluster_id));
   (void)findQuotedString(body, "\"command\":",
                          out->command, sizeof(out->command));
+
+  // target.duration_sec (gateway ops, e.g. open_network)
+  uint32_t dsec = 0;
+  if (findUintExact(body, "\"duration_sec\":", &dsec)) {
+    out->duration_sec = (int)dsec;
+  }
 
   // timeout_ms (optional)
   uint32_t t = 0;

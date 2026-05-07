@@ -55,6 +55,9 @@ EmberNodeId deviceRegistryGetNodeId(void);
 uint8_t     deviceRegistryGetDstEp(void);
 const EmberEUI64 *deviceRegistryGetEuiLe(void);
 
+// Number of populated slots (used by gateway/health publish).
+uint32_t    deviceRegistryCount(void);
+
 #ifdef __cplusplus
 }
 #endif

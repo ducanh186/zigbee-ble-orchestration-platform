@@ -279,6 +279,15 @@ const EmberEUI64 *deviceRegistryGetEuiLe(void)
   return idx >= 0 ? &s_devices[idx].euiLe : &s_nullEui;
 }
 
+uint32_t deviceRegistryCount(void)
+{
+  uint32_t n = 0;
+  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+    if (s_devices[i].active) n++;
+  }
+  return n;
+}
+
 // ===== Trust Center join callback =====
 // Called by the Ember framework when any device joins the network.
 void emberAfTrustCenterJoinCallback(EmberNodeId newNodeId,

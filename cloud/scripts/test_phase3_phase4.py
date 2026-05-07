@@ -55,14 +55,17 @@ def envelope(source: str, payload: dict, correlation_id: str | None = None) -> d
     env = {
         "schema": "sb.v1",
         "msg_id": uuid4().hex,
-        "ts": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "ts": time.time_ns() // 1_000_000,
         "tenant_id": TENANT,
         "site_id": SITE,
         "gateway_id": GATEWAY,
         "source": source,
         "payload": payload,
     }
-    if correlation_id:
+    command_id = payload.get("command_id")
+    if command_id:
+        env["correlation_id"] = f"cmd_{command_id}"
+    elif correlation_id:
         env["correlation_id"] = correlation_id
     return env
 

@@ -33,14 +33,14 @@ CONTRACT_REL = "docs/MQTT_CONTRACT.md"
 
 PROFILES: dict[str, str] = {
     # (path prefix relative to repo root) -> role description
-    "": "Monorepo root. Contains gateway (MQTT<->IPC bridge), cloud (FastAPI + MQTT), mqtt (broker config), deploy (EC2 scripts), docs, end_devices (firmware), mobile_app.",
+    "": "Monorepo root. Contains gateway (native C Z3Gateway with direct MQTT), cloud (FastAPI + MQTT), mqtt (broker config), deploy (EC2 scripts), docs, end_devices (firmware), mobile_app.",
     "cloud": "FastAPI + MQTT subscriber/publisher for cloud-side device management. Async SQLAlchemy 2.0 + asyncpg. Entry: `python -m cloud`.",
     "cloud/app": "FastAPI application package: routers, ORM models, MQTT client, config, database session, Pydantic schemas, seed.",
     "cloud/app/routers": "HTTP endpoint modules: health, devices, events, commands. Each router mounts under /api.",
     "cloud/tests": "Pytest suite for cloud. Use AsyncSession + httpx.AsyncClient. Mock MQTT with FakeMQTTPublisher.",
     "cloud/scripts": "Operational scripts: smoke test, payload samples, data dump helpers.",
-    "gateway": "Gateway bridge: MQTT <-> IPC translator. Python 3.12+, Linux only.",
-    "gateway/tests": "Pytest suite for gateway bridge.",
+    "gateway": "Production gateway implementation: native C single-process Z3Gateway host with direct MQTT; no custom MQTT <-> IPC bridge.",
+    "gateway/tests": "Tests for gateway components and integrations.",
     "gateway/Z3Gateway": "Native Z3Gateway host code (Silicon Labs). SOUTHBOUND BOUNDARY is Ember AF / Z3Gateway C API (emberAfSendCommandUnicast etc.) — NOT custom IPC.",
     "gateway/Z3Gateway/Z3GatewayHost": "Host-side Z3Gateway app: MQTT -> cmd_handler -> device dispatch -> Ember AF.",
     "gateway/Z3Gateway/Z3GatewayHost/app": "C modules. Refactor target: app_mqtt.c, cmd_handler.c (parse+dispatch only), device_registry, device_dispatch, light_ctrl, switch_logic.",

@@ -53,3 +53,13 @@ async def init_db() -> None:
                     "ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP"
                 )
             )
+            await conn.execute(
+                text(
+                    "ALTER TABLE commands "
+                    "ADD COLUMN IF NOT EXISTS target_kind VARCHAR "
+                    "NOT NULL DEFAULT 'device'"
+                )
+            )
+            await conn.execute(
+                text("ALTER TABLE commands ALTER COLUMN device_id DROP NOT NULL")
+            )

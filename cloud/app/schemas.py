@@ -271,7 +271,8 @@ TERMINAL_STATUSES: frozenset[str] = frozenset({"executed", "failed", "timeout"})
 
 class CommandOut(BaseModel):
     id: str
-    device_id: str
+    device_id: str | None
+    target_kind: str
     op: str
     target: dict[str, Any]
     status: str
@@ -286,6 +287,28 @@ class CommandOut(BaseModel):
     @field_serializer("expires_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
+
+
+# ---------------------------------------------------------------------------
+# Gateway commissioning (open / close permit-join)
+# ---------------------------------------------------------------------------
+
+
+class CommissioningOpenBody(BaseModel):
+    """Public body for POST /api/gateways/{id}/commissioning/open.
+
+    `duration_sec` matches the gateway-side wire field exactly so the cloud
+    forwards it untranslated.  Cap at 180 s (= OPEN_JOIN_MS in app_config.h).
+    """
+
+    duration_sec: int = Field(default=180, ge=1, le=180)
+    timeout_ms: int | None = Field(default=5000, ge=100, le=60000)
+
+
+class CommissioningCloseBody(BaseModel):
+    """Public body for POST /api/gateways/{id}/commissioning/close."""
+
+    timeout_ms: int | None = Field(default=5000, ge=100, le=60000)
 
 
 class EventOut(BaseModel):

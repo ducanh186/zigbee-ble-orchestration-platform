@@ -55,6 +55,37 @@ void appMqttPublishMotionEvent(uint16_t nodeId, const char *eui64Str,
 void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
                                const char *deviceType, const char *eventName);
 
+// Publish a retained device registry snapshot on
+// `devices/{device_type}/{eui64Str}/registry` (QoS 1, retained, per MQTT_CONTRACT).
+// Used at pairing time so any subscriber (e.g. cloud) that connects later
+// immediately receives the device's identity and inferred capabilities.
+// clusters/endpoints are MVP-inferred by device_type; metadata_source is set
+// to "gateway_mvp_inferred" so cloud can mark these as provisional.
+void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
+                                  const char *deviceType);
+
+// Clear retained registry snapshots for `eui64Str` under EVERY known
+// device_type EXCEPT `keepType`.  Implemented by publishing an empty payload
+// with retain=1 to each of the OTHER `devices/{type}/{eui64Str}/registry`
+// topics, so the broker drops the retained slot.  Called by the discovery
+// completion path so a corrected classification is the only retained
+// registry the broker holds for a given EUI64.
+void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType);
+
+// Publish a gateway health snapshot on `gateway/health` (QoS 1, retained).
+// uptime_ms: monotonic uptime since appMqttInit, known_device_count: from
+// device_registry, network_state: short string such as "up"|"down"|"unknown".
+void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
+                                 uint32_t knownDeviceCount,
+                                 const char *networkState);
+
+// Publish a gateway-level event on topic `gateway/event` (QoS 1, no retain).
+// Per MQTT_CONTRACT: envelope is sb.v1; payload contains {"event":"<name>", ...}.
+// `eventName` MUST be non-empty (e.g. "permit_join_opened").
+// `extraJson` may be NULL or empty; when non-empty it is appended as raw JSON
+// fields (without surrounding braces) -- caller must format it correctly.
+void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson);
+
 // Publish a command_reply message on topic commands/{command_id}/reply.
 // Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).
 // `device_id` may be NULL/empty (e.g. parse_fail before we extracted it);
