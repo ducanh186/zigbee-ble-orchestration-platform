@@ -27,8 +27,76 @@ void main() {
     await pumpDashboard(tester, useMockApi: true);
 
     expect(find.text('Home'), findsWidgets);
+    expect(find.text('Automation'), findsOneWidget);
+    expect(find.text('Provisioning'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Devices'), findsNothing);
+    expect(find.text('Logs'), findsNothing);
     expect(find.text('QUICK LIGHTS'), findsOneWidget);
     expect(find.text('Lab Light 01'), findsOneWidget);
+  });
+
+  testWidgets('automation and provisioning tabs show placeholders', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Automation Rules'), findsWidgets);
+    expect(find.text('Rule setup placeholder'), findsOneWidget);
+
+    await tester.tap(find.text('Provisioning'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Provisioning'), findsWidgets);
+    expect(find.text('Provisioning placeholder'), findsOneWidget);
+  });
+
+  testWidgets('settings owns devices logs account logout and runtime toggle', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Device inventory'), findsOneWidget);
+    expect(find.text('Cloud logs'), findsOneWidget);
+    expect(find.text('Runtime'), findsOneWidget);
+    expect(find.textContaining('Run remote mode'), findsNothing);
+    expect(find.text('API_BASE_URL'), findsNothing);
+
+    await tester.tap(find.text('Runtime'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('API_BASE_URL'), findsOneWidget);
+
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logout'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Device inventory'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Device inventory'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Devices'), findsWidgets);
+    expect(find.text('Lab Light 01'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cloud logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logs'), findsWidgets);
+    expect(find.text('LIGHT light-01'), findsOneWidget);
   });
 
   testWidgets('does not present mock data as a real gateway status', (
@@ -72,5 +140,11 @@ void main() {
       find.text('No gateway status log found in cloud events'),
       findsOneWidget,
     );
+  });
+
+  test('grey theme uses a neutral blue grey palette', () {
+    expect(AppPalette.grey.background, const Color(0xFFF1F5F9));
+    expect(AppPalette.grey.primary, const Color(0xFF475569));
+    expect(AppPalette.grey.textSecondary, const Color(0xFF64748B));
   });
 }

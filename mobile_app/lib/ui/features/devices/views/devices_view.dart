@@ -10,9 +10,10 @@ import '../../../core/widgets/status_badge.dart';
 import '../view_models/device_dashboard_view_model.dart';
 
 class DevicesView extends StatelessWidget {
-  const DevicesView({required this.onOpenLight, super.key});
+  const DevicesView({required this.onOpenLight, this.onBack, super.key});
 
   final ValueChanged<SmartDevice> onOpenLight;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +24,13 @@ class DevicesView extends StatelessWidget {
             SliverAppBar(
               title: const Text('Devices'),
               pinned: true,
+              leading: onBack == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Back',
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
               actions: [
                 IconButton(
                   tooltip: 'Refresh',

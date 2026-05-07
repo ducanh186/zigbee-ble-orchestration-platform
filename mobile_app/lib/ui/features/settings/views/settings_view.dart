@@ -2,12 +2,68 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app_runtime_config.dart';
+import '../../../../domain/models/smart_device.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
+import '../../devices/views/devices_view.dart';
+import '../../logs/views/logs_view.dart';
 
-class SettingsView extends StatelessWidget {
-  const SettingsView({super.key});
+enum _SettingsSection { overview, devices, logs }
+
+class SettingsView extends StatefulWidget {
+  const SettingsView({required this.onOpenLight, super.key});
+
+  final ValueChanged<SmartDevice> onOpenLight;
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  _SettingsSection _section = _SettingsSection.overview;
+  bool _runtimeExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (_section) {
+      _SettingsSection.overview => _SettingsOverview(
+        runtimeExpanded: _runtimeExpanded,
+        onToggleRuntime: () {
+          setState(() => _runtimeExpanded = !_runtimeExpanded);
+        },
+        onOpenDevices: () {
+          setState(() => _section = _SettingsSection.devices);
+        },
+        onOpenLogs: () {
+          setState(() => _section = _SettingsSection.logs);
+        },
+      ),
+      _SettingsSection.devices => DevicesView(
+        onOpenLight: widget.onOpenLight,
+        onBack: _openOverview,
+      ),
+      _SettingsSection.logs => LogsView(onBack: _openOverview),
+    };
+  }
+
+  void _openOverview() {
+    setState(() => _section = _SettingsSection.overview);
+  }
+}
+
+class _SettingsOverview extends StatelessWidget {
+  const _SettingsOverview({
+    required this.runtimeExpanded,
+    required this.onToggleRuntime,
+    required this.onOpenDevices,
+    required this.onOpenLogs,
+  });
+
+  final bool runtimeExpanded;
+  final VoidCallback onToggleRuntime;
+  final VoidCallback onOpenDevices;
+  final VoidCallback onOpenLogs;
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +78,78 @@ class SettingsView extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           sliver: SliverList.list(
             children: [
+              const SectionTitle(title: 'Operator'),
+              const SizedBox(height: 8),
+              const AppCard(
+                child: _SettingsRow(
+                  icon: Icons.account_circle_outlined,
+                  title: 'Account',
+                  subtitle: 'operator@hust/lab01',
+                ),
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'System'),
+              const SizedBox(height: 8),
+              AppCard(
+                onTap: onToggleRuntime,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SettingsRow(
+                            icon: Icons.memory_outlined,
+                            title: 'Runtime',
+                            subtitle: runtime.useMockApi
+                                ? 'Mock API'
+                                : 'Cloud API',
+                          ),
+                        ),
+                        Icon(
+                          runtimeExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          color: palette.textSecondary,
+                        ),
+                      ],
+                    ),
+                    if (runtimeExpanded) ...[
+                      const SizedBox(height: 14),
+                      Divider(color: palette.border, height: 1),
+                      const SizedBox(height: 14),
+                      _SettingLine(
+                        label: 'API_BASE_URL',
+                        value: runtime.apiBaseUrl,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'Workspace'),
+              const SizedBox(height: 8),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.lightbulb_outline,
+                      title: 'Device inventory',
+                      subtitle: 'Review all cloud devices',
+                      onTap: onOpenDevices,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _SettingsRow(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Cloud logs',
+                      subtitle: 'Inspect event history',
+                      onTap: onOpenLogs,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               const SectionTitle(title: 'Theme mode'),
               const SizedBox(height: 8),
               AppCard(
@@ -53,31 +181,12 @@ class SettingsView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const SectionTitle(title: 'Runtime'),
-              const SizedBox(height: 8),
               AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SettingLine(
-                      label: 'Data source',
-                      value: runtime.useMockApi ? 'Mock API' : 'Cloud API',
-                    ),
-                    const SizedBox(height: 12),
-                    _SettingLine(
-                      label: 'API_BASE_URL',
-                      value: runtime.apiBaseUrl,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Run remote mode with --dart-define=USE_MOCK_API=false and --dart-define=API_BASE_URL=<cloud-host>.',
-                      style: TextStyle(
-                        color: palette.textSecondary,
-                        fontSize: 12,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
+                child: _SettingsRow(
+                  icon: Icons.logout,
+                  iconColor: palette.error,
+                  title: 'Logout',
+                  subtitle: 'Sign out placeholder',
                 ),
               ),
             ],
@@ -85,6 +194,66 @@ class SettingsView extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color? iconColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final content = Padding(
+      padding: onTap == null
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? palette.primary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: palette.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (onTap != null)
+            Icon(Icons.chevron_right, color: palette.textSecondary),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(onTap: onTap, child: content);
   }
 }
 
@@ -101,7 +270,7 @@ class _SettingLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label.toUpperCase(),
+          label,
           style: TextStyle(
             color: palette.textSecondary,
             fontSize: 11,

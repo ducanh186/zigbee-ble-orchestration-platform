@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../domain/models/smart_device.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
-import '../../devices/views/devices_view.dart';
+import '../../automation/views/automation_rules_view.dart';
 import '../../home/views/home_view.dart';
 import '../../light_detail/views/light_detail_view.dart';
-import '../../logs/views/logs_view.dart';
+import '../../provisioning/views/provisioning_view.dart';
 import '../../settings/views/settings_view.dart';
 
 class SmartBuildingShell extends StatefulWidget {
@@ -52,14 +52,14 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
                 label: 'Home',
               ),
               NavigationDestination(
-                icon: Icon(Icons.lightbulb_outline),
-                selectedIcon: Icon(Icons.lightbulb),
-                label: 'Devices',
+                icon: Icon(Icons.rule_outlined),
+                selectedIcon: Icon(Icons.rule),
+                label: 'Automation',
               ),
               NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long),
-                label: 'Logs',
+                icon: Icon(Icons.hub_outlined),
+                selectedIcon: Icon(Icons.hub),
+                label: 'Provisioning',
               ),
               NavigationDestination(
                 icon: Icon(Icons.settings_outlined),
@@ -76,9 +76,9 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
   Widget _buildTabBody() {
     return switch (_tabIndex) {
       0 => HomeView(onOpenLight: _openLight),
-      1 => DevicesView(onOpenLight: _openLight),
-      2 => const LogsView(),
-      _ => const SettingsView(),
+      1 => const AutomationRulesView(),
+      2 => const ProvisioningView(),
+      _ => SettingsView(onOpenLight: _openLight),
     };
   }
 

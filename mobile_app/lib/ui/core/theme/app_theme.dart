@@ -158,21 +158,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
   );
 
   static const grey = AppPalette(
-    background: Color(0xFFE7E9EC),
-    surface: Color(0xFFF1F2F4),
-    surfaceElevated: Color(0xFFFAFBFC),
-    primary: Color(0xFF4B5563),
-    primaryTint: Color(0x1F4B5563),
+    background: Color(0xFFF1F5F9),
+    surface: Color(0xFFFFFFFF),
+    surfaceElevated: Color(0xFFF8FAFC),
+    primary: Color(0xFF475569),
+    primaryTint: Color(0x1F475569),
     primaryOn: Color(0xFFFFFFFF),
-    success: Color(0xFF4F7A5E),
-    successTint: Color(0x1F4F7A5E),
-    warning: Color(0xFF8E7635),
-    warningTint: Color(0x1F8E7635),
-    error: Color(0xFF9C5A5A),
-    errorTint: Color(0x1F9C5A5A),
-    textPrimary: Color(0xFF111418),
-    textSecondary: Color(0xFF5C6470),
-    border: Color(0xFFC8CCD2),
+    success: Color(0xFF16A34A),
+    successTint: Color(0x1F16A34A),
+    warning: Color(0xFFD97706),
+    warningTint: Color(0x1FD97706),
+    error: Color(0xFFDC2626),
+    errorTint: Color(0x1FDC2626),
+    textPrimary: Color(0xFF0F172A),
+    textSecondary: Color(0xFF64748B),
+    border: Color(0xFFE2E8F0),
   );
 
   @override

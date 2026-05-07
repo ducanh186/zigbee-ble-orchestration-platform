@@ -8,7 +8,9 @@ import '../../../core/widgets/error_banner.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 
 class LogsView extends StatelessWidget {
-  const LogsView({super.key});
+  const LogsView({this.onBack, super.key});
+
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +21,13 @@ class LogsView extends StatelessWidget {
             SliverAppBar(
               title: const Text('Logs'),
               pinned: true,
+              leading: onBack == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Back',
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back),
+                    ),
               actions: [
                 IconButton(
                   tooltip: 'Refresh',
