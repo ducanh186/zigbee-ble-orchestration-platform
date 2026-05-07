@@ -1,0 +1,3 @@
+__pycache__/
+.webdev-server.*.log
+.webdev-e2e.*.log
