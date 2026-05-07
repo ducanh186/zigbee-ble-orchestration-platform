@@ -17,6 +17,8 @@ async def _upsert(session, model, pk: str, **kwargs):
     """Insert a row if its primary key does not already exist."""
     existing = await session.get(model, pk)
     if existing is not None:
+        for key, value in kwargs.items():
+            setattr(existing, key, value)
         return existing
     obj = model(id=pk, **kwargs)
     session.add(obj)
@@ -48,7 +50,7 @@ async def seed() -> None:
                 session,
                 Device,
                 "pir-01",
-                device_type="occupancy_sensor",
+                device_type="motion",
                 room_id="room-01",
                 name="PIR Sensor 01",
             )

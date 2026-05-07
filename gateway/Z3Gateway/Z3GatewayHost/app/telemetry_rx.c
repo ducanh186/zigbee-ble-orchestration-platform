@@ -10,10 +10,49 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 // ===== Cached light level for enriching reported state =====
 // Updated when we receive Level Control cluster reports.
 static uint8_t s_lastLightLevel = 0;
+
+// ===== Cached motion state for publishing change events only =====
+#define MOTION_STATE_CACHE_MAX 16
+
+typedef struct {
+  bool active;
+  char eui64[20];
+  bool occupied;
+} MotionStateCache_t;
+
+static MotionStateCache_t s_motionStates[MOTION_STATE_CACHE_MAX];
+
+static bool motionStateChanged(const char *eui64Str, bool occupied)
+{
+  if (!eui64Str || !eui64Str[0]) return false;
+
+  int freeIdx = -1;
+  for (int i = 0; i < MOTION_STATE_CACHE_MAX; i++) {
+    if (!s_motionStates[i].active) {
+      if (freeIdx < 0) freeIdx = i;
+      continue;
+    }
+
+    if (strcmp(s_motionStates[i].eui64, eui64Str) == 0) {
+      if (s_motionStates[i].occupied == occupied) return false;
+      s_motionStates[i].occupied = occupied;
+      return true;
+    }
+  }
+
+  int idx = (freeIdx >= 0) ? freeIdx : 0;
+  s_motionStates[idx].active = true;
+  strncpy(s_motionStates[idx].eui64, eui64Str,
+          sizeof(s_motionStates[idx].eui64) - 1);
+  s_motionStates[idx].eui64[sizeof(s_motionStates[idx].eui64) - 1] = '\0';
+  s_motionStates[idx].occupied = occupied;
+  return true;
+}
 
 // ===== This is the correct callback for receiving attribute reports =====
 // The ZCL framework calls this BEFORE emberAfPreCommandReceivedCallback.
@@ -51,27 +90,9 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
 
         // Publish state change over MQTT (Phase 3.1: include level)
         {
-          EmberEUI64 eui;
-          if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
-            char euiStr[20];
-            eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
-
-            // Telemetry-driven fallback registration: if THIS EUI is not
-            // yet in the registry, register it as "light" (evidence-based:
-            // a server-side OnOff attribute report only comes from a light).
-            // Then clear any stale retained registry slots under other
-            // device_types and publish the authoritative one.
-            device_resolved_t resolved;
-            if (!deviceRegistryResolve(euiStr, &resolved)) {
-              deviceRegistryUpsert(euiStr, sender, 1, "light");
-              appMqttClearRetainedRegistry(euiStr, "light");
-              appMqttPublishDeviceRegistry(sender, euiStr, "light");
-              appLogLog("REG", "auto_paired",
-                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
-                "\"trigger\":\"attr_report\",\"type\":\"light\"",
-                euiStr, (unsigned)sender);
-            }
-
+          char euiStr[20];
+          if (deviceRegistryLearnReport(sender, 1, "light",
+                                        euiStr, sizeof(euiStr))) {
             appMqttPublishDeviceReportedFull(sender, euiStr, "light",
                                              onOff ? "on" : "off",
                                              s_lastLightLevel);
@@ -108,15 +129,60 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
 
         // Publish full reported state with updated level
         {
-          EmberEUI64 eui;
-          if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
-            char euiStr[20];
-            eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+          char euiStr[20];
+          if (deviceRegistryLearnReport(sender, 1, "light",
+                                        euiStr, sizeof(euiStr))) {
             // Infer power from level: level>0 means on
             const char *power = (s_lastLightLevel > 0) ? "on" : "off";
             appMqttPublishDeviceReportedFull(sender, euiStr, "light",
                                              power, s_lastLightLevel);
           }
+        }
+      } else {
+        break;
+      }
+    }
+    return false;
+  }
+
+  // --- Occupancy Sensing Cluster (0x0406) ---
+  if (clusterId == ZCL_OCCUPANCY_SENSING_CLUSTER_ID) {
+    while (i + 3 <= bufLen) {
+      uint16_t attrId = u16le(&buffer[i]);
+      uint8_t type = buffer[i + 2];
+      i += 3;
+
+      // Attribute 0x0000 = Occupancy, type bitmap8 (0x18).
+      if (attrId == ZCL_OCCUPANCY_ATTRIBUTE_ID
+          && type == ZCL_BITMAP8_ATTRIBUTE_TYPE) {
+        if (i + 1 > bufLen) break;
+        uint8_t raw = buffer[i];
+        i += 1;
+
+        bool occupied = ((raw & 0x01u) != 0u);
+        EmberNodeId sender = emberGetSender();
+        const char *occupancy = occupied ? "occupied" : "unoccupied";
+
+        char euiStr[20];
+        if (deviceRegistryLearnReport(sender, 1, "motion",
+                                      euiStr, sizeof(euiStr))) {
+          emberAfCorePrintln(
+            "@DATA {\"device\":\"motion\",\"node_id\":\"0x%04X\","
+            "\"occupancy\":\"%s\",\"raw\":\"0x%02X\",\"source\":\"report\"}",
+            (unsigned)sender, occupancy, (unsigned)raw);
+          appLogLog("MOTION", "report_parsed",
+                    "\"device_id\":\"%s\",\"node_id\":\"0x%04X\","
+                    "\"occupancy\":\"%s\",\"raw\":\"0x%02X\"",
+                    euiStr, (unsigned)sender, occupancy, (unsigned)raw);
+
+          appMqttPublishMotionReported(sender, euiStr, occupancy, false, 0);
+          if (motionStateChanged(euiStr, occupied)) {
+            appMqttPublishMotionEvent(sender, euiStr, occupancy, raw);
+          }
+          ruleEngineOnMotionReport(euiStr, occupied);
+        } else {
+          emberAfCorePrintln("MQTT: skip motion report, EUI64 unknown for 0x%04X",
+                             (unsigned)sender);
         }
       } else {
         break;
@@ -190,6 +256,7 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
     if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
       char euiStr[20];
       eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+      deviceRegistryUpsertLe(eui, sender, 1, "switch");
 
       emberAfCorePrintln("SWITCH: toggle event from 0x%04X (%s) cmd=0x%02X",
                          (unsigned)sender, euiStr, cmd->commandId);

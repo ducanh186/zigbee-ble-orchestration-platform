@@ -23,6 +23,8 @@
 #include "sl_power_manager.h"
 #endif
 #include "app/pir_sensor.h"
+#include "app/buttons.h"
+#include "app/net_mgr.h"
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 #include "sl_system_kernel.h"
 #else
@@ -36,10 +38,13 @@
 void app_init(void)
 {
   pirSensorInit();
+  netMgrInit();
+  buttonsInit();
 }
 
 void app_process_action(void)
 {
+  buttonsTick();
 }
 
 #if defined(__ICCARM__)

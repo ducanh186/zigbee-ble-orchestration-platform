@@ -8,6 +8,18 @@ static bool s_warmedUp = false;
 static bool s_lastDetected = false;
 static sl_zigbee_event_t s_pollEvent;
 
+static void pirWriteOccupancyAttribute(bool detected)
+{
+  uint8_t occupancy = detected ? 0x01u : 0x00u;
+  EmberAfStatus st = emberAfWriteServerAttribute(1,
+                                                 ZCL_OCCUPANCY_SENSING_CLUSTER_ID,
+                                                 ZCL_OCCUPANCY_ATTRIBUTE_ID,
+                                                 &occupancy,
+                                                 ZCL_BITMAP8_ATTRIBUTE_TYPE);
+  sl_zigbee_app_debug_println("PIR: occupancy attr=0x%02X write_status=0x%02X",
+                              occupancy, st);
+}
+
 static void pirPollHandler(sl_zigbee_event_t *event)
 {
   (void)event;
@@ -25,6 +37,7 @@ static void pirPollHandler(sl_zigbee_event_t *event)
   /* Only act + log on state change */
   if (detected != s_lastDetected) {
     s_lastDetected = detected;
+    pirWriteOccupancyAttribute(detected);
     if (detected) {
       sl_led_turn_on(&sl_led_led0);
       sl_zigbee_app_debug_println("PIR: MOTION DETECTED (pin=%u)", pinState);
@@ -43,6 +56,7 @@ void pirSensorInit(void)
   /* Configure PD8 as digital input, no pull-up/pull-down.
    * GPIO clock is already enabled by sl_system_init(). */
   GPIO_PinModeSet(PIR_PORT, PIR_PIN, gpioModeInput, 0);
+  pirWriteOccupancyAttribute(false);
 
   /* Init Zigbee event for polling */
   sl_zigbee_event_init(&s_pollEvent, pirPollHandler);

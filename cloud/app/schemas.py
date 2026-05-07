@@ -43,6 +43,19 @@ class SwitchReportedState(BaseModel):
     battery: int | None = Field(default=None, ge=0, le=100)
 
 
+class MotionOccupancy(str, Enum):
+    occupied = "occupied"
+    unoccupied = "unoccupied"
+
+
+class MotionReportedState(BaseModel):
+    """Validates reported state payload for device_type=motion."""
+
+    occupancy: MotionOccupancy
+    reachable: bool
+    battery: int | None = Field(default=None, ge=0, le=100)
+
+
 class LightReportedPayload(BaseModel):
     """Inner payload of a light reported MQTT message."""
 
@@ -64,6 +77,28 @@ class SwitchEventPayload(BaseModel):
     event: Literal["toggle"]
     eui64: str | None = None
     nwk_addr: str | None = None
+
+
+class MotionEventPayload(BaseModel):
+    """Inner payload of a motion event MQTT message."""
+
+    device_id: str
+    device_type: Literal["motion"]
+    event: Literal["occupancy_changed"]
+    occupancy: MotionOccupancy
+    eui64: str | None = None
+    nwk_addr: str | None = None
+    raw: str | None = None
+
+
+class MotionReportedPayload(BaseModel):
+    """Inner payload of a motion reported MQTT message."""
+
+    device_id: str
+    device_type: Literal["motion"]
+    eui64: str | None = None
+    nwk_addr: str | None = None
+    state: MotionReportedState
 
 
 class LightCommandTarget(BaseModel):
@@ -130,7 +165,10 @@ def translate_command_for_gateway(
     if op == "device.command":
         if device_type == "light":
             LightCommandTarget(**target)  # raises on bad input
-        return op, target
+            return op, target
+        raise ValueError(
+            f"device type '{device_type}' does not accept commands in v1"
+        )
 
     # --- user-friendly translation ---
     if device_type == "light":
@@ -162,6 +200,8 @@ def validate_reported_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "light":
             return LightReportedPayload(**inner).model_dump()
+        if device_type == "motion":
+            return MotionReportedPayload(**inner).model_dump()
         # switch reported is optional but validate if state present
         if device_type == "switch" and "state" in inner:
             SwitchReportedState(**inner.get("state", {}))
@@ -178,6 +218,8 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "switch":
             return SwitchEventPayload(**inner).model_dump()
+        if device_type == "motion":
+            return MotionEventPayload(**inner).model_dump()
         return inner
     except Exception:
         return None

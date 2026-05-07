@@ -7,7 +7,11 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
-from cloud.app.schemas import validate_event_payload, validate_reported_payload
+from cloud.app.schemas import (
+    TERMINAL_STATUSES,
+    validate_event_payload,
+    validate_reported_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +182,8 @@ class MQTTService:
                     session.add(device)
                 else:
                     device.is_online = True
+                    if inner.get("device_type"):
+                        device.device_type = inner["device_type"]
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
 
@@ -260,19 +266,43 @@ class MQTTService:
             if not self._db_session_factory:
                 return
             from cloud.app.models import Command
-            from sqlalchemy import select
+            from sqlalchemy import or_, update
 
             async with self._db_session_factory() as session:
+                new_status = inner.get("status")
+                if not new_status:
+                    return
+
+                terminal_statuses = list(TERMINAL_STATUSES)
+                stmt = update(Command).where(Command.id == command_id)
+                if new_status in TERMINAL_STATUSES:
+                    stmt = stmt.where(
+                        or_(
+                            Command.status.notin_(terminal_statuses),
+                            Command.status == new_status,
+                        )
+                    )
+                else:
+                    stmt = stmt.where(Command.status.notin_(terminal_statuses))
+
                 result = await session.execute(
-                    select(Command).where(Command.id == command_id)
+                    stmt.values(status=new_status, reason=inner.get("reason"))
                 )
-                cmd = result.scalar_one_or_none()
-                if cmd:
-                    cmd.status = inner.get("status", cmd.status)
-                    cmd.reason = inner.get("reason")
-                    await session.commit()
+                await session.commit()
+
+                if result.rowcount:
                     logger.info(
-                        "Updated command %s status=%s", command_id, cmd.status
+                        "Updated command %s status=%s", command_id, new_status
+                    )
+                    return
+
+                current = await session.get(Command, command_id)
+                if current:
+                    logger.info(
+                        "Ignored stale command %s status=%s; current=%s",
+                        command_id,
+                        new_status,
+                        current.status,
                     )
 
         self._run_async(_write)

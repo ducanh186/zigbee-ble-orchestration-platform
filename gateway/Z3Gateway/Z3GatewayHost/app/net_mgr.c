@@ -31,6 +31,32 @@ static uint32_t g_openTick        = 0;
 // Runtime auto-close window: 0 means "use compile-time OPEN_JOIN_MS".
 // netMgrOpenForJoin() overrides this per request.
 static uint32_t g_openDurationMs  = 0;
+// Set true by emberAfPluginNetworkCreatorCompleteCallback when form finishes
+// before NETWORK_UP arrives; consumed in stack-status callback / netMgrTick to
+// open the join window only after the stack confirms it is joined.
+static bool     g_pendingOpenJoin = false;
+
+static void openNetworkForJoin(void)
+{
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
+  appLogLog("NET", "open_join", "\"zstatus\":\"0x%02X\"", (unsigned)st);
+  if (st == EMBER_SUCCESS) {
+    g_networkOpen     = true;
+    g_openTick        = msTick();
+    g_openDurationMs  = OPEN_JOIN_MS;   // default window for form-driven open
+    g_pendingOpenJoin = false;
+
+    char extra[64];
+    snprintf(extra, sizeof(extra),
+             "\"duration_sec\":%u,\"trigger\":\"form\"",
+             (unsigned)(OPEN_JOIN_MS / 1000u));
+    appMqttPublishGatewayEvent("permit_join_opened", extra);
+  }
+#else
+  g_pendingOpenJoin = false;
+#endif
+}
 
 static bool startNetworkForm(uint16_t panId, int8_t txPwrDbm, uint8_t ch, const char *src)
 {
@@ -80,6 +106,12 @@ bool netMgrRequestForm(NetCfg_t cfg, const char *src, bool force)
 void netMgrTick(void)
 {
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  // Stack-status path may not have fired yet by the time the form completes;
+  // fall back to polling so the join window still opens.
+  if (g_pendingOpenJoin && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    openNetworkForJoin();
+  }
+
   uint32_t window = (g_openDurationMs > 0) ? g_openDurationMs : OPEN_JOIN_MS;
   if (g_networkOpen && (msTick() - g_openTick >= window)) {
     EmberStatus st = emberAfPluginNetworkCreatorSecurityCloseNetwork();
@@ -168,20 +200,11 @@ void emberAfPluginNetworkCreatorCompleteCallback(const EmberNetworkParameters *n
   appLogLog("NET", "formed", "\"pan_id\":\"0x%04X\",\"ch\":%u", (unsigned)network->panId, (unsigned)network->radioChannel);
 
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
-  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
-  appLogLog("NET", "open_join_form",
-            "\"zstatus\":\"0x%02X\",\"after\":\"form\"", (unsigned)st);
-  if (st == EMBER_SUCCESS) {
-    g_networkOpen    = true;
-    g_openTick       = msTick();
-    g_openDurationMs = OPEN_JOIN_MS;
-
-    char extra[64];
-    snprintf(extra, sizeof(extra),
-             "\"duration_sec\":%u,\"trigger\":\"form\"",
-             (unsigned)(OPEN_JOIN_MS / 1000u));
-    appMqttPublishGatewayEvent("permit_join_opened", extra);
-  }
+  // Defer opening the join window until the stack confirms NETWORK_UP via
+  // emberAfStackStatusCallback (or netMgrTick polls for it). Calling
+  // emberAfPluginNetworkCreatorSecurityOpenNetwork before NETWORK_UP returns
+  // EMBER_NOT_JOINED on EZSP host builds.
+  g_pendingOpenJoin = true;
 #endif
 
   appLogEmitHeartbeat();
@@ -194,6 +217,9 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   if (status == EMBER_NETWORK_UP) {
     appLogEmitHeartbeat();
+    if (g_pendingOpenJoin) {
+      openNetworkForJoin();
+    }
   } else if (status == EMBER_NETWORK_DOWN) {
     appLogEmitHeartbeat();
   }
