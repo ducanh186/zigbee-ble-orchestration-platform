@@ -1,0 +1,25 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Radii & elevation</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 24px; }
+  .row { gap: 16px; align-items: flex-end; }
+  .tile { width: 130px; height: 90px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font: 500 12px var(--font-mono); color: var(--text-secondary); }
+  .meta { display:block; text-align:center; margin-top: 6px; font: 500 12px var(--font-mono); color: var(--text-secondary); }
+</style>
+</head><body>
+<div>
+  <div class="label" style="margin-bottom:10px">Radius</div>
+  <div class="row">
+    <div><div class="tile" style="border-radius:12px">12px</div><span class="meta">button / input</span></div>
+    <div><div class="tile" style="border-radius:20px">20px</div><span class="meta">card</span></div>
+    <div><div class="tile" style="border-radius:999px">999px</div><span class="meta">pill / chip</span></div>
+  </div>
+  <div class="label" style="margin:18px 0 10px">Elevation</div>
+  <div class="row">
+    <div><div class="tile" style="border-radius:20px;box-shadow:none">elev-0</div><span class="meta">flat</span></div>
+    <div><div class="tile" style="border-radius:20px;box-shadow:0 1px 2px rgb(0 0 0/.04),0 1px 1px rgb(0 0 0/.02)">elev-1</div><span class="meta">card</span></div>
+    <div><div class="tile" style="border-radius:20px;box-shadow:0 8px 24px rgb(0 0 0/.08)">elev-2</div><span class="meta">sheet / modal</span></div>
+  </div>
+</div>
+</body></html>
