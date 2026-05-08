@@ -1,0 +1,362 @@
+"""Tests for Phase 3.4 Pydantic validation schemas."""
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from cloud.app.schemas import (
+    LightCommandTarget,
+    LightReportedPayload,
+    LightReportedState,
+    MotionReportedPayload,
+    MotionReportedState,
+    SwitchEventPayload,
+    SwitchReportedState,
+    translate_command_for_gateway,
+    validate_event_payload,
+    validate_reported_payload,
+)
+
+
+# ---- LightReportedState ----
+
+class TestLightReportedState:
+    def test_valid(self):
+        s = LightReportedState(power="on", level=180, reachable=True)
+        assert s.power.value == "on"
+        assert s.level == 180
+
+    def test_invalid_power(self):
+        with pytest.raises(ValidationError):
+            LightReportedState(power="blink", level=0, reachable=True)
+
+    def test_level_out_of_range(self):
+        with pytest.raises(ValidationError):
+            LightReportedState(power="on", level=300, reachable=True)
+
+    def test_missing_reachable(self):
+        with pytest.raises(ValidationError):
+            LightReportedState(power="on", level=0)
+
+
+# ---- LightReportedPayload ----
+
+class TestLightReportedPayload:
+    def test_valid_full(self):
+        p = LightReportedPayload(
+            device_id="light-01",
+            device_type="light",
+            eui64="00124b0001aa22bb",
+            nwk_addr="0x4F2A",
+            state={"power": "on", "level": 180, "reachable": True},
+        )
+        assert p.device_type == "light"
+        assert p.state.power.value == "on"
+
+    def test_wrong_device_type(self):
+        with pytest.raises(ValidationError):
+            LightReportedPayload(
+                device_id="light-01",
+                device_type="switch",
+                state={"power": "on", "level": 0, "reachable": True},
+            )
+
+
+# ---- SwitchEventPayload ----
+
+class TestSwitchEventPayload:
+    def test_valid(self):
+        p = SwitchEventPayload(
+            device_id="switch-01",
+            device_type="switch",
+            event="toggle",
+            eui64="00124b0001bb33cc",
+        )
+        assert p.event == "toggle"
+
+    def test_wrong_event(self):
+        with pytest.raises(ValidationError):
+            SwitchEventPayload(
+                device_id="switch-01",
+                device_type="switch",
+                event="double_press",
+            )
+
+    def test_wrong_device_type(self):
+        with pytest.raises(ValidationError):
+            SwitchEventPayload(
+                device_id="switch-01",
+                device_type="light",
+                event="toggle",
+            )
+
+
+# ---- SwitchReportedState ----
+
+class TestSwitchReportedState:
+    def test_valid_minimal(self):
+        s = SwitchReportedState(reachable=True)
+        assert s.battery is None
+
+    def test_valid_with_battery(self):
+        s = SwitchReportedState(reachable=True, battery=87)
+        assert s.battery == 87
+
+    def test_battery_out_of_range(self):
+        with pytest.raises(ValidationError):
+            SwitchReportedState(reachable=True, battery=150)
+
+
+# ---- MotionReportedState ----
+
+class TestMotionReportedState:
+    def test_valid_occupied(self):
+        s = MotionReportedState(occupancy="occupied", reachable=True)
+        assert s.occupancy.value == "occupied"
+
+    def test_valid_unoccupied_with_battery(self):
+        s = MotionReportedState(
+            occupancy="unoccupied", reachable=True, battery=85
+        )
+        assert s.battery == 85
+
+    def test_invalid_occupancy(self):
+        with pytest.raises(ValidationError):
+            MotionReportedState(occupancy="motion", reachable=True)
+
+    def test_battery_out_of_range(self):
+        with pytest.raises(ValidationError):
+            MotionReportedState(occupancy="occupied", reachable=True, battery=101)
+
+
+# ---- MotionReportedPayload ----
+
+class TestMotionReportedPayload:
+    def test_valid(self):
+        p = MotionReportedPayload(
+            device_id="00124b0001aa22cc",
+            device_type="motion",
+            eui64="00124b0001aa22cc",
+            nwk_addr="0x4F2A",
+            state={"occupancy": "occupied", "reachable": True},
+        )
+        assert p.device_type == "motion"
+        assert p.state.occupancy.value == "occupied"
+
+    def test_wrong_device_type(self):
+        with pytest.raises(ValidationError):
+            MotionReportedPayload(
+                device_id="pir-01",
+                device_type="occupancy_sensor",
+                state={"occupancy": "occupied", "reachable": True},
+            )
+
+
+# ---- LightCommandTarget ----
+
+class TestLightCommandTarget:
+    def test_valid_on(self):
+        t = LightCommandTarget(endpoint=1, cluster_id="0x0006", command="on")
+        assert t.command == "on"
+
+    def test_valid_off(self):
+        t = LightCommandTarget(endpoint=1, cluster_id="0x0006", command="off")
+        assert t.command == "off"
+
+    def test_valid_set_level(self):
+        t = LightCommandTarget(endpoint=1, cluster_id="0x0008", command="set_level")
+        assert t.command == "set_level"
+
+    def test_invalid_cluster(self):
+        with pytest.raises(ValidationError):
+            LightCommandTarget(endpoint=1, cluster_id="0x0406", command="on")
+
+    def test_wrong_command_for_cluster(self):
+        with pytest.raises(ValidationError):
+            LightCommandTarget(endpoint=1, cluster_id="0x0008", command="on")
+
+
+# ---- validate_reported_payload ----
+
+class TestValidateReportedPayload:
+    def test_light_valid(self):
+        inner = {
+            "device_id": "light-01",
+            "device_type": "light",
+            "state": {"power": "on", "level": 100, "reachable": True},
+        }
+        result = validate_reported_payload("light", inner)
+        assert result is not None
+        assert result["state"]["power"] == "on"
+
+    def test_light_invalid_returns_none(self):
+        inner = {
+            "device_id": "light-01",
+            "device_type": "light",
+            "state": {"power": "blink"},
+        }
+        result = validate_reported_payload("light", inner)
+        assert result is None
+
+    def test_unknown_type_passthrough(self):
+        inner = {"device_id": "x", "something": "else"}
+        result = validate_reported_payload("lock", inner)
+        assert result == inner
+
+    def test_motion_valid(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "eui64": "00124b0001aa22cc",
+            "nwk_addr": "0x4F2A",
+            "state": {"occupancy": "unoccupied", "reachable": True},
+        }
+        result = validate_reported_payload("motion", inner)
+        assert result is not None
+        assert result["state"]["occupancy"] == "unoccupied"
+
+    def test_motion_invalid_occupancy_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "state": {"occupancy": "clear", "reachable": True},
+        }
+        result = validate_reported_payload("motion", inner)
+        assert result is None
+
+    def test_motion_invalid_battery_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "state": {"occupancy": "occupied", "reachable": True, "battery": -1},
+        }
+        result = validate_reported_payload("motion", inner)
+        assert result is None
+
+
+# ---- validate_event_payload ----
+
+class TestValidateEventPayload:
+    def test_switch_valid(self):
+        inner = {
+            "device_id": "switch-01",
+            "device_type": "switch",
+            "event": "toggle",
+        }
+        result = validate_event_payload("switch", inner)
+        assert result is not None
+        assert result["event"] == "toggle"
+
+    def test_switch_invalid_returns_none(self):
+        inner = {
+            "device_id": "switch-01",
+            "device_type": "switch",
+            "event": "invalid_event",
+        }
+        result = validate_event_payload("switch", inner)
+        assert result is None
+
+    def test_motion_occupancy_changed_valid(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "occupancy_changed",
+            "occupancy": "occupied",
+            "eui64": "00124b0001aa22cc",
+            "nwk_addr": "0x4F2A",
+            "raw": "0x01",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is not None
+        assert result["event"] == "occupancy_changed"
+        assert result["occupancy"] == "occupied"
+
+    def test_motion_invalid_event_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "motion_seen",
+            "occupancy": "occupied",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is None
+
+    def test_motion_invalid_occupancy_returns_none(self):
+        inner = {
+            "device_id": "00124b0001aa22cc",
+            "device_type": "motion",
+            "event": "occupancy_changed",
+            "occupancy": "motion",
+        }
+        result = validate_event_payload("motion", inner)
+        assert result is None
+
+    def test_unknown_type_passthrough(self):
+        inner = {"device_id": "x", "event": "something"}
+        result = validate_event_payload("lock", inner)
+        assert result == inner
+
+
+# ---- translate_command_for_gateway ----
+
+class TestTranslateCommandForGateway:
+    def test_raw_passthrough(self):
+        target = {"endpoint": 1, "cluster_id": "0x0006", "command": "on"}
+        op, t = translate_command_for_gateway("light", "device.command", target)
+        assert op == "device.command"
+        assert t is target
+
+    def test_raw_invalid_target_raises(self):
+        with pytest.raises((ValueError, ValidationError)):
+            translate_command_for_gateway(
+                "light", "device.command",
+                {"endpoint": 1, "cluster_id": "0x9999", "command": "on"},
+            )
+
+    def test_user_friendly_power_on(self):
+        op, t = translate_command_for_gateway("light", "set", {"power": "on"})
+        assert op == "device.command"
+        assert t == {"endpoint": 1, "cluster_id": "0x0006", "command": "on"}
+
+    def test_user_friendly_power_off(self):
+        op, t = translate_command_for_gateway("light", "set", {"power": "off"})
+        assert op == "device.command"
+        assert t == {"endpoint": 1, "cluster_id": "0x0006", "command": "off"}
+
+    def test_user_friendly_level(self):
+        op, t = translate_command_for_gateway("light", "set", {"level": 180})
+        assert op == "device.command"
+        assert t == {
+            "endpoint": 1,
+            "cluster_id": "0x0008",
+            "command": "set_level",
+            "level": 180,
+        }
+
+    def test_user_friendly_empty_target_raises(self):
+        with pytest.raises((ValueError, ValidationError)):
+            translate_command_for_gateway("light", "set", {})
+
+    def test_switch_rejects_commands(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway("switch", "set", {"power": "on"})
+
+    def test_switch_raw_rejects_commands(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway(
+                "switch",
+                "device.command",
+                {"endpoint": 1, "cluster_id": "0x0006", "command": "on"},
+            )
+
+    def test_motion_raw_rejects_commands(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway(
+                "motion",
+                "device.command",
+                {"endpoint": 1, "cluster_id": "0x0006", "command": "on"},
+            )
+
+    def test_unknown_type_rejects(self):
+        with pytest.raises(ValueError, match="does not accept commands"):
+            translate_command_for_gateway("motion", "set", {"power": "on"})

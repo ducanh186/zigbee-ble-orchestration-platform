@@ -1,11 +1,13 @@
 z3.pem
-/*.md
-!README.md
+**/*.md
+!**/README.md
 CLAUDE.md
 .claude/
 .codex/
 .github/
 excalidraw.log
+**/build/
+**/.*/
 # Deploy secrets
 deploy/.env.deploy
 *.pem
@@ -14,6 +16,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.pyo
+.venv/
 .vscode/
 .githooks
 .sunlint-cache
@@ -27,6 +30,9 @@ __pycache__/
 
 # OTA artifacts
 ota-files/
+
+# Local E2E test artifacts (live MQTT/API captures, not for tracking)
+docs/samples/real/
 
 # Simplicity Studio / EFR32 end device projects
 end_devices/**/GNU ARM*/

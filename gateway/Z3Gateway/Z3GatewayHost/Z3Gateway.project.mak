@@ -1070,13 +1070,6 @@ $(OUTPUT_DIR)/project/app/net_mgr.o: app/net_mgr.c
 CDEPS += $(OUTPUT_DIR)/project/app/net_mgr.d
 OBJS += $(OUTPUT_DIR)/project/app/net_mgr.o
 
-$(OUTPUT_DIR)/project/app/valve_ctrl.o: app/valve_ctrl.c
-	@$(POSIX_TOOL_PATH)echo 'Building app/valve_ctrl.c'
-	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
-	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/valve_ctrl.c
-CDEPS += $(OUTPUT_DIR)/project/app/valve_ctrl.d
-OBJS += $(OUTPUT_DIR)/project/app/valve_ctrl.o
-
 $(OUTPUT_DIR)/project/app/telemetry_rx.o: app/telemetry_rx.c
 	@$(POSIX_TOOL_PATH)echo 'Building app/telemetry_rx.c'
 	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
@@ -1097,6 +1090,49 @@ $(OUTPUT_DIR)/project/app/device_monitor.o: app/device_monitor.c
 	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/device_monitor.c
 CDEPS += $(OUTPUT_DIR)/project/app/device_monitor.d
 OBJS += $(OUTPUT_DIR)/project/app/device_monitor.o
+
+# --- Phase 1/2 additions: parser, registry, dispatcher, device modules ---
+$(OUTPUT_DIR)/project/app/sb_command.o: app/sb_command.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/sb_command.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/sb_command.c
+CDEPS += $(OUTPUT_DIR)/project/app/sb_command.d
+OBJS += $(OUTPUT_DIR)/project/app/sb_command.o
+
+$(OUTPUT_DIR)/project/app/device_registry.o: app/device_registry.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/device_registry.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/device_registry.c
+CDEPS += $(OUTPUT_DIR)/project/app/device_registry.d
+OBJS += $(OUTPUT_DIR)/project/app/device_registry.o
+
+$(OUTPUT_DIR)/project/app/device_discovery.o: app/device_discovery.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/device_discovery.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/device_discovery.c
+CDEPS += $(OUTPUT_DIR)/project/app/device_discovery.d
+OBJS += $(OUTPUT_DIR)/project/app/device_discovery.o
+
+$(OUTPUT_DIR)/project/app/device_dispatch.o: app/device_dispatch.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/device_dispatch.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/device_dispatch.c
+CDEPS += $(OUTPUT_DIR)/project/app/device_dispatch.d
+OBJS += $(OUTPUT_DIR)/project/app/device_dispatch.o
+
+$(OUTPUT_DIR)/project/app/light_ctrl.o: app/light_ctrl.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/light_ctrl.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/light_ctrl.c
+CDEPS += $(OUTPUT_DIR)/project/app/light_ctrl.d
+OBJS += $(OUTPUT_DIR)/project/app/light_ctrl.o
+
+$(OUTPUT_DIR)/project/app/switch_logic.o: app/switch_logic.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/switch_logic.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/switch_logic.c
+CDEPS += $(OUTPUT_DIR)/project/app/switch_logic.d
+OBJS += $(OUTPUT_DIR)/project/app/switch_logic.o
 
 $(OUTPUT_DIR)/sdk/protocol/zigbee/app/framework/security/af-node.o: $(SDK_PATH)/protocol/zigbee/app/framework/security/af-node.c
 	@$(POSIX_TOOL_PATH)echo 'Building $(SDK_PATH)/protocol/zigbee/app/framework/security/af-node.c'

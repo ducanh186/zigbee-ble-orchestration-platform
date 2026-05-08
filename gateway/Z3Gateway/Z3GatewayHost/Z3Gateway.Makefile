@@ -104,6 +104,13 @@ $(OUTPUT_DIR)/project/app/app_mqtt.o: app/app_mqtt.c
 CDEPS += $(OUTPUT_DIR)/project/app/app_mqtt.d
 OBJS += $(OUTPUT_DIR)/project/app/app_mqtt.o
 
+$(OUTPUT_DIR)/project/app/rule_engine.o: app/rule_engine.c
+	@echo 'Building app/rule_engine.c'
+	@mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/rule_engine.c
+CDEPS += $(OUTPUT_DIR)/project/app/rule_engine.d
+OBJS += $(OUTPUT_DIR)/project/app/rule_engine.o
+
 ####################################################################
 # Rules                                                            #
 ####################################################################

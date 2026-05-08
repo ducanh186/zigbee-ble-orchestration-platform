@@ -1,0 +1,9 @@
+{
+  "op": "device.command",
+  "target": {
+    "endpoint": 1,
+    "cluster_id": "0x0006",
+    "command": "on"
+  },
+  "timeout_ms": 5000
+}

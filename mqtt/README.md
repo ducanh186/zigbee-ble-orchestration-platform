@@ -1,6 +1,6 @@
 # MQTT Broker
 
-Thư mục này chứa cấu hình Mosquitto local cho namespace `sb/v1` của gateway bridge.
+Thư mục này chứa cấu hình Mosquitto local cho namespace `sb/v1` của Z3Gateway.
 
 > **Contract đầy đủ**: xem [docs/MQTT_CONTRACT.md](../docs/MQTT_CONTRACT.md) — bao gồm envelope schema, cây topic, ví dụ payload, wildcard subscription, và quy tắc thiết kế.
 
@@ -64,7 +64,7 @@ Phân quyền chi tiết nằm trong `config/acl.conf`.
 
 | User | Quyền | Mục đích |
 | --- | --- | --- |
-| `gateway` | đọc/ghi toàn bộ namespace | Gateway bridge — publish/subscribe mọi topic |
+| `gateway` | đọc/ghi toàn bộ namespace | Z3Gateway C — publish/subscribe mọi topic |
 | `client` | đọc state/health/log/reply/progress/event; ghi desired/request/manifest | Cloud backend, dashboard, mobile app |
 | `monitor` | chỉ đọc toàn bộ + `$SYS/#` | Giám sát, healthcheck |
 | `bridge` | đọc/ghi toàn bộ namespace | Bridge local ↔ EC2 |

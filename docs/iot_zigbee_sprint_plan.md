@@ -1,4 +1,13 @@
-# IoT Zigbee Smart Building — Sprint Plan
+# IoT Zigbee Smart Building — Sprint Plan (Historical)
+
+> **⚠ HISTORICAL DOCUMENT:** Đây là sprint plan ban đầu. Kiến trúc production hiện tại
+> đã chuyển sang **Z3Gateway C single-process** với **direct MQTT integration** — không
+> còn dùng IPC socket, không còn Python gateway bridge, không còn `@DATA/@CMD/@ACK` UART
+> protocol. Xem [plan.md](./plan.md) cho kiến trúc production hiện hành.
+>
+> Sprint plan này được giữ lại làm tài liệu lịch sử và tham khảo timeline/phân công.
+> Các chi tiết kỹ thuật (UART format, gateway Python modules, IPC bridge) **không** còn
+> là freeze hiện hành.
 
 > **Team:** 2 người | **Kit:** EFR32 (Silicon Labs) | **IDE:** Simplicity Studio (C)  
 > **Cloud:** AWS EC2 (Mosquitto + FastAPI) | **App:** Flutter  
@@ -255,7 +264,7 @@ home/{home_id}/device/{device_id}/event      # Gateway → Cloud (join/leave/err
     {
       "name": "occupancy_light_on",
       "trigger": {
-        "device_type": "occupancy_sensor",
+        "device_type": "motion",
         "attribute": "occupied",
         "condition": "equals",
         "value": true
@@ -269,7 +278,7 @@ home/{home_id}/device/{device_id}/event      # Gateway → Cloud (join/leave/err
     {
       "name": "vacancy_light_off",
       "trigger": {
-        "device_type": "occupancy_sensor",
+        "device_type": "motion",
         "attribute": "occupied",
         "condition": "equals",
         "value": false

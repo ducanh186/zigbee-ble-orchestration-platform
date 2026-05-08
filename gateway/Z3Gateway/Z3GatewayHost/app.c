@@ -3,7 +3,7 @@
  * @brief Z3GatewayHost application - ported from Z3Coordinator SoC.
  *
  * This file integrates the Coordinator's application logic (network management,
- * valve control, telemetry, JSON command protocol) into the Z3Gateway host
+ * light control, telemetry, JSON command protocol) into the Z3Gateway host
  * framework running on Linux.
  *
  * Original Z3Gateway sample callbacks (IAS ACE, token dump, etc.) are preserved.
@@ -36,9 +36,10 @@ void cli_json_command(sl_cli_command_arg_t *arguments);
 #include "app/app_utils.h"
 #include "app/app_mqtt.h"
 #include "app/net_mgr.h"
-#include "app/valve_ctrl.h"
 #include "app/cmd_handler.h"
 #include "app/device_monitor.h"
+#include "app/light_ctrl.h"
+#include "app/rule_engine.h"
 
 // ===== Original Z3Gateway token dump constants =====
 #define MFGSAMP_NUM_EZSP_TOKENS 8
@@ -150,6 +151,12 @@ void emberAfMainInitCallback(void)
   appMqttInit();
   appMqttStart();
 
+  // Light command module init
+  lightCtrlInit();
+
+  // Rule engine init (Phase 4: local switch->light automation)
+  ruleEngineInit();
+
   // Register "json" CLI command at runtime
   {
     static const sl_cli_command_info_t json_cmd_info =
@@ -187,6 +194,8 @@ void emberAfMainTickCallback(void)
   netMgrTick();
   deviceMonitorTick();
   appMqttTick();
+  lightCtrlTick();
+  ruleEngineTick();
 }
 
 //----------------------

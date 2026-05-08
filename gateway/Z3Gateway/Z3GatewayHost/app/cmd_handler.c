@@ -4,7 +4,11 @@
 #include "app_utils.h"
 #include "app_log.h"
 #include "net_mgr.h"
-#include "valve_ctrl.h"
+#include "app_mqtt.h"
+#include "sb_command.h"
+#include "device_dispatch.h"
+#include "device_registry.h"
+#include "device_discovery.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -13,8 +17,6 @@
 #define CMD_DEBOUNCE_MS       500
 #define CMD_DEDUP_WINDOW_MS   2000
 
-static uint32_t s_lastModeSetTick = 0;
-static uint32_t s_lastValveSetTick = 0;
 static uint32_t s_lastCmdId = 0xFFFFFFFF;
 static uint32_t s_lastCmdTick = 0;
 
@@ -54,124 +56,45 @@ void cmdHandleLine(const char *line)
     return;
   }
 
-  uint32_t now = msTick();
-
   if (strcmp(op, "info") == 0) {
     appLogInfo();
     appLogAck(id, true, "info");
     return;
   }
 
-  if (strcmp(op, "mode_set") == 0) {
-    if ((now - s_lastModeSetTick) < CMD_DEBOUNCE_MS) {
-      appLogAck(id, false, "debounced");
-      return;
-    }
-    s_lastModeSetTick = now;
-
-    char value[16] = {0};
-    if (!parseStringField(p, "\"value\"", value, sizeof(value))) {
-      appLogAck(id, false, "missing value");
-      return;
-    }
-    if (strcmp(value, "auto") == 0) g_mode = MODE_AUTO;
-    else if (strcmp(value, "manual") == 0) g_mode = MODE_MANUAL;
-    else { appLogAck(id, false, "value must be auto/manual"); return; }
-
-    appLogAck(id, true, "mode set");
-    valveCtrlAutoControl();
-    appLogData();
-    return;
-  }
-
-  if (strcmp(op, "threshold_set") == 0) {
-    uint32_t closeTh = 0, openTh = 0;
-    if (!parseUintField(p, "\"close_th\"", &closeTh)) { appLogAck(id, false, "missing close_th"); return; }
-    (void)parseUintField(p, "\"open_th\"", &openTh);
-
-    if (openTh >= closeTh) { appLogAck(id, false, "open_th must be < close_th"); return; }
-    if (closeTh > 65535u || openTh > 65535u) { appLogAck(id, false, "th too big"); return; }
-
-    valveCtrlSetThresholds((uint16_t)closeTh, (uint16_t)openTh);
-
-    appLogAck(id, true, "threshold updated");
-    valveCtrlAutoControl();
-    appLogData();
-    return;
-  }
-
-  if (strcmp(op, "valve_path_set") == 0) {
-    char value[16] = {0};
-    if (!parseStringField(p, "\"value\"", value, sizeof(value))) { appLogAck(id, false, "missing value"); return; }
-
-    if (strcmp(value, "auto") == 0) valveCtrlSetPath(VALVE_PATH_AUTO);
-    else if (strcmp(value, "direct") == 0) valveCtrlSetPath(VALVE_PATH_DIRECT);
-    else if (strcmp(value, "binding") == 0) valveCtrlSetPath(VALVE_PATH_BINDING);
-    else { appLogAck(id, false, "value must be auto/direct/binding"); return; }
-
-    appLogAck(id, true, "valve_path_set");
-    appLogInfo();
-    return;
-  }
-
-  if (strcmp(op, "valve_target_set") == 0) {
-    uint32_t nodeId = 0;
-    uint32_t dstEp = (uint32_t)VALVE_EP_DEFAULT;
-
-    if (!parseU32FieldAny(p, "\"node_id\"", &nodeId)) { appLogAck(id, false, "missing node_id"); return; }
-    (void)parseUintField(p, "\"dst_ep\"", &dstEp);
-
-    valveCtrlSetTarget((EmberNodeId)nodeId, (uint8_t)dstEp);
-
-    appLogAck(id, true, "valve_target_set");
-    appLogInfo();
-    return;
-  }
-
-  if (strcmp(op, "valve_pair") == 0) {
+  // --- Device pairing (register target light for MQTT commands) ---
+  if (strcmp(op, "device_pair") == 0) {
     char euiStr[40] = {0};
     uint32_t nodeId = 0;
-    uint32_t bindIndex = 0;
-    uint32_t dstEp = (uint32_t)VALVE_EP_DEFAULT;
+    uint32_t dstEp = 1;
 
-    if (!parseStringField(p, "\"eui64\"", euiStr, sizeof(euiStr))) { appLogAck(id, false, "missing eui64"); return; }
-    if (!parseU32FieldAny(p, "\"node_id\"", &nodeId)) { appLogAck(id, false, "missing node_id"); return; }
-    (void)parseUintField(p, "\"bind_index\"", &bindIndex);
+    if (!parseStringField(p, "\"eui64\"", euiStr, sizeof(euiStr))) {
+      appLogAck(id, false, "missing eui64");
+      return;
+    }
+    if (!parseU32FieldAny(p, "\"node_id\"", &nodeId)) {
+      appLogAck(id, false, "missing node_id");
+      return;
+    }
     (void)parseUintField(p, "\"dst_ep\"", &dstEp);
 
-    bool ok = valveCtrlPair(euiStr, (EmberNodeId)nodeId, (uint8_t)bindIndex, (uint8_t)dstEp);
-    appLogAck(id, ok, ok ? "valve_pair set" : "bad eui64");
+    // Manual pair from CLI: store as "unknown" and let ZDO discovery
+    // classify properly.  No type guess here.
+    bool ok = deviceRegistryUpsert(euiStr, (EmberNodeId)nodeId,
+                                   (uint8_t)dstEp, "unknown");
+    if (ok) {
+      // Convert ASCII eui to little-endian for discovery API.
+      EmberEUI64 euiLe;
+      if (parseHexEui64(euiStr, euiLe)) {
+        deviceDiscoveryStart((EmberNodeId)nodeId, euiLe);
+      }
+    }
+    appLogAck(id, ok, ok ? "device_pair set" : "bad eui64");
     if (ok) appLogInfo();
     return;
   }
 
-  if (strcmp(op, "valve_set") == 0) {
-    if ((now - s_lastValveSetTick) < CMD_DEBOUNCE_MS) {
-      appLogAck(id, false, "debounced");
-      return;
-    }
-    s_lastValveSetTick = now;
-
-    if (g_mode == MODE_AUTO) {
-      appLogAck(id, false, "rejected: AUTO mode");
-      return;
-    }
-
-    char value[16] = {0};
-    if (!parseStringField(p, "\"value\"", value, sizeof(value))) {
-      appLogAck(id, false, "missing value");
-      return;
-    }
-
-    bool wantOpen = false;
-    if (strcmp(value, "open") == 0) wantOpen = true;
-    else if (strcmp(value, "closed") == 0 || strcmp(value, "close") == 0) wantOpen = false;
-    else { appLogAck(id, false, "value must be open/closed"); return; }
-
-    (void)valveCtrlQueueTx(id, wantOpen);
-    return;
-  }
-
+  // --- Network management ---
   if (strcmp(op, "net_cfg_set") == 0) {
     uint32_t pan = g_netCfg.panId, ch = g_netCfg.ch, pwr = (uint32_t)g_netCfg.txPowerDbm;
     (void)parseU32FieldAny(p, "\"pan_id\"", &pan);
@@ -204,4 +127,30 @@ void cmdHandleLine(const char *line)
   }
 
   appLogAck(id, false, "unknown op");
+}
+
+// ===== sb/v1 MQTT entry: parser -> dispatcher =====
+// This is the production path. It is intentionally thin: all device-specific
+// logic lives in the dispatcher and the per-device modules.
+void cmdHandleMqttPayload(const char *topic, const char *body)
+{
+  if (!topic || !body) return;
+
+  sb_command_t cmd;
+  if (!sbCommandParse(topic, body, &cmd)) {
+    // If we at least have a command_id, try to tell the cloud.
+    // device_id is unknown here (parse failed) -> pass NULL -> emitted as null.
+    char fallbackId[64] = {0};
+    if (sbCommandExtractIdFromTopic(topic, fallbackId, sizeof(fallbackId))) {
+      appMqttPublishCommandReply(fallbackId, NULL, "failed", "bad_payload");
+    }
+    appLogLog("CMD", "parse_fail", "\"topic\":\"%s\"", topic);
+    return;
+  }
+
+  appLogLog("CMD", "parsed",
+    "\"command_id\":\"%s\",\"device_id\":\"%s\",\"op\":\"%s\",\"cmd\":\"%s\"",
+    cmd.command_id, cmd.device_id, cmd.op, cmd.command);
+
+  (void)deviceDispatch(&cmd);
 }

@@ -7,12 +7,36 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
+from cloud.app.schemas import (
+    TERMINAL_STATUSES,
+    validate_event_payload,
+    validate_reported_payload,
+)
 
 logger = logging.getLogger(__name__)
 
 
+def _now_ms() -> int:
+    return int(datetime.now(UTC).timestamp() * 1000)
+
+
+def _ts_ms_to_naive_utc(ts: object) -> datetime:
+    """Parse MQTT envelope `ts` (epoch ms) into a naive UTC datetime for DB.
+
+    Accepts int/float ms. If `ts` is missing or unparseable, falls back to now.
+    """
+    try:
+        if isinstance(ts, (int, float)):
+            return datetime.fromtimestamp(int(ts) / 1000.0, tz=UTC).replace(
+                tzinfo=None
+            )
+    except (ValueError, OSError, OverflowError):
+        pass
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class MQTTService:
-    """MQTT client service that bridges the cloud backend to the gateway broker.
+    """MQTT client service that connects the cloud backend to the gateway broker.
 
     Subscribes to device reported state, events, command replies, and gateway
     online status.  Provides ``publish_command`` for sending command requests.
@@ -64,17 +88,31 @@ class MQTTService:
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         logger.info("MQTT connected with rc=%s", rc)
+        # Demo deployment uses QoS 0 for all topics (see docs/MQTT_CONTRACT.md
+        # "Retain và QoS" → "Demo vs production"). Production must raise to
+        # the per-topic QoS defined in that table.
         prefix = self.topic_prefix
-        client.subscribe(f"{prefix}/devices/+/+/reported", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=1)
-        client.subscribe(f"{prefix}/devices/+/+/event", qos=1)
-        client.subscribe(f"{prefix}/commands/+/reply", qos=1)
-        client.subscribe(f"{prefix}/gateway/online", qos=1)
+        client.subscribe(f"{prefix}/devices/+/+/reported", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/event", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/registry", qos=0)
+        client.subscribe(f"{prefix}/commands/+/reply", qos=0)
+        client.subscribe(f"{prefix}/gateway/online", qos=0)
+        client.subscribe(f"{prefix}/gateway/health", qos=0)
+        client.subscribe(f"{prefix}/gateway/event", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
         try:
             logger.info("MQTT rx: %s (%d bytes)", msg.topic, len(msg.payload))
+            # An empty retained payload is the broker-level "clear retained"
+            # marker (gateway uses this to drop stale registry slots after
+            # ZDO re-classification).  Nothing to parse, nothing to persist.
+            if len(msg.payload) == 0:
+                logger.debug(
+                    "Empty payload on %s (retain-clear) -- skipping", msg.topic,
+                )
+                return
             payload = json.loads(msg.payload.decode("utf-8"))
             topic: str = msg.topic
 
@@ -84,10 +122,16 @@ class MQTTService:
                 self._handle_reported(topic, payload)
             elif "/devices/" in topic and topic.endswith("/event"):
                 self._handle_event(topic, payload)
+            elif "/devices/" in topic and topic.endswith("/registry"):
+                self._handle_registry(topic, payload)
             elif "/commands/" in topic and topic.endswith("/reply"):
                 self._handle_command_reply(topic, payload)
             elif topic.endswith("/gateway/online"):
                 self._handle_gateway_online(payload)
+            elif topic.endswith("/gateway/health"):
+                self._handle_gateway_health(payload)
+            elif topic.endswith("/gateway/event"):
+                self._handle_gateway_event(payload)
             else:
                 logger.debug("Unhandled topic: %s", topic)
         except Exception:
@@ -105,6 +149,16 @@ class MQTTService:
         device_type = parts[devices_idx + 1]
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
+
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_reported_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Reported payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            # Still persist raw data but log the warning
+            validated = inner
 
         async def _write():
             if not self._db_session_factory:
@@ -128,15 +182,15 @@ class MQTTService:
                     session.add(device)
                 else:
                     device.is_online = True
+                    if inner.get("device_type"):
+                        device.device_type = inner["device_type"]
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
 
                 state_row = DeviceState(
                     device_id=device_id,
                     state=inner.get("state", inner),
-                    reported_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    reported_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(state_row)
                 await session.commit()
@@ -145,32 +199,59 @@ class MQTTService:
         self._run_async(_write)
 
     def _handle_event(self, topic: str, envelope: dict) -> None:
-        """Handle device event -- insert event row."""
+        """Handle device event -- auto-register device + insert event row."""
         parts = topic.split("/")
         # Topic: sb/v1/{t}/{s}/{g}/devices/{device_type}/{device_id}/event
         devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
+
+        # Validate payload by device_type (Phase 3.4)
+        validated = validate_event_payload(device_type, inner)
+        if validated is None:
+            logger.warning(
+                "Event payload validation failed for %s (type=%s): %s",
+                device_id, device_type, inner,
+            )
+            validated = inner
 
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Event
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
 
             async with self._db_session_factory() as session:
+                # Auto-register device if not yet known (Phase 3.3)
+                result = await session.execute(
+                    select(Device).where(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                if not device:
+                    device = Device(
+                        id=device_id,
+                        device_type=validated.get("device_type", device_type),
+                        eui64=validated.get("eui64"),
+                        name=device_id,
+                        is_online=True,
+                    )
+                    session.add(device)
+                    logger.info("Auto-registered device %s (type=%s) from event",
+                                device_id, device_type)
+
                 event = Event(
                     device_id=device_id,
-                    event_type=inner.get(
-                        "event", inner.get("event_type", "unknown")
+                    event_type=validated.get(
+                        "event", validated.get("event_type", "unknown")
                     ),
-                    payload=inner,
-                    occurred_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
+                    payload=validated,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(event)
                 await session.commit()
-                logger.info("Saved event for %s", device_id)
+                logger.info("Saved event for %s (type=%s, event=%s)",
+                            device_id, device_type, event.event_type)
 
         self._run_async(_write)
 
@@ -185,19 +266,43 @@ class MQTTService:
             if not self._db_session_factory:
                 return
             from cloud.app.models import Command
-            from sqlalchemy import select
+            from sqlalchemy import or_, update
 
             async with self._db_session_factory() as session:
+                new_status = inner.get("status")
+                if not new_status:
+                    return
+
+                terminal_statuses = list(TERMINAL_STATUSES)
+                stmt = update(Command).where(Command.id == command_id)
+                if new_status in TERMINAL_STATUSES:
+                    stmt = stmt.where(
+                        or_(
+                            Command.status.notin_(terminal_statuses),
+                            Command.status == new_status,
+                        )
+                    )
+                else:
+                    stmt = stmt.where(Command.status.notin_(terminal_statuses))
+
                 result = await session.execute(
-                    select(Command).where(Command.id == command_id)
+                    stmt.values(status=new_status, reason=inner.get("reason"))
                 )
-                cmd = result.scalar_one_or_none()
-                if cmd:
-                    cmd.status = inner.get("status", cmd.status)
-                    cmd.reason = inner.get("reason")
-                    await session.commit()
+                await session.commit()
+
+                if result.rowcount:
                     logger.info(
-                        "Updated command %s status=%s", command_id, cmd.status
+                        "Updated command %s status=%s", command_id, new_status
+                    )
+                    return
+
+                current = await session.get(Command, command_id)
+                if current:
+                    logger.info(
+                        "Ignored stale command %s status=%s; current=%s",
+                        command_id,
+                        new_status,
+                        current.status,
                     )
 
         self._run_async(_write)
@@ -221,6 +326,98 @@ class MQTTService:
             }
             for key, value in inner.items():
                 payload.setdefault(key, value)
+    def _handle_registry(self, topic: str, envelope: dict) -> None:
+        """Handle retained device registry snapshot -- upsert device + log event.
+
+        Topic: .../devices/{device_type}/{device_id}/registry
+        Payload carries the gateway's view of the device (eui64, endpoints,
+        inferred clusters, metadata_source). Used for first-time device
+        discovery on cloud reconnect.
+        """
+        parts = topic.split("/")
+        devices_idx = parts.index("devices")
+        device_type = parts[devices_idx + 1]
+        device_id = parts[devices_idx + 2]
+        inner = envelope.get("payload", {})
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
+
+            async with self._db_session_factory() as session:
+                result = await session.execute(
+                    select(Device).where(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                if not device:
+                    device = Device(
+                        id=device_id,
+                        device_type=inner.get("device_type", device_type),
+                        eui64=inner.get("eui64"),
+                        name=device_id,
+                        is_online=True,
+                    )
+                    session.add(device)
+                    logger.info(
+                        "Registered device %s (type=%s) from registry",
+                        device_id, device_type,
+                    )
+                else:
+                    if inner.get("eui64"):
+                        device.eui64 = inner["eui64"]
+                    new_type = inner.get("device_type")
+                    if new_type and new_type != device.device_type:
+                        logger.warning(
+                            "Registry type change for %s: %s -> %s "
+                            "(gateway re-classified)",
+                            device_id, device.device_type, new_type,
+                        )
+                        device.device_type = new_type
+
+                event = Event(
+                    device_id=device_id,
+                    event_type="device_registry",
+                    payload=inner,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                )
+                session.add(event)
+                await session.commit()
+                logger.info("Saved device_registry event for %s", device_id)
+
+        self._run_async(_write)
+
+    def _handle_gateway_event(self, envelope: dict) -> None:
+        """Log gateway lifecycle events (e.g. permit_join_opened/closed/failed).
+
+        v1: log only.  Persistence into the events table is intentionally
+        deferred until we agree how to model gateway-level events without a
+        device_id.
+        """
+        inner = envelope.get("payload", {})
+        event = inner.get("event", "unknown")
+        logger.info("Gateway event: %s payload=%s", event, inner)
+
+    def _handle_gateway_health(self, envelope: dict) -> None:
+        """Persist a gateway health snapshot as an unattached event.
+
+        Device_id is null because health belongs to the gateway itself,
+        not any one device. occurred_at is the envelope ts.
+        """
+        inner = envelope.get("payload", {})
+        logger.info(
+            "Gateway health: uptime=%s ms, mqtt=%s, devices=%s, net=%s",
+            inner.get("uptime_ms"),
+            inner.get("mqtt_connected"),
+            inner.get("known_device_count"),
+            inner.get("network_state"),
+        )
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Event
 
             async with self._db_session_factory() as session:
                 event = Event(
@@ -234,6 +431,12 @@ class MQTTService:
                 session.add(event)
                 await session.commit()
                 logger.info("Saved gateway status event=%s", status)
+                    event_type="gateway_health",
+                    payload=inner,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                )
+                session.add(event)
+                await session.commit()
 
         self._run_async(_write)
 
@@ -255,12 +458,13 @@ class MQTTService:
         envelope = {
             "schema": "sb.v1",
             "msg_id": uuid4().hex,
-            "ts": datetime.now(UTC).replace(microsecond=0).isoformat(),
+            "ts": _now_ms(),
             "tenant_id": s.tenant_id,
             "site_id": s.site_id,
             "gateway_id": s.gateway_id,
             "source": "cloud",
-            "correlation_id": command_id,
+            # Optional per contract; format is "cmd_" + command_id.
+            "correlation_id": f"cmd_{command_id}",
             "payload": {
                 "device_id": device_id,
                 "op": op,
@@ -268,8 +472,43 @@ class MQTTService:
                 "timeout_ms": timeout_ms,
             },
         }
-        self.client.publish(topic, json.dumps(envelope), qos=1)
+        # Demo: QoS 0. Production: QoS 1 per docs/MQTT_CONTRACT.md.
+        self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published command %s for %s", command_id, device_id)
+
+    def publish_gateway_command(
+        self,
+        command_id: str,
+        op: str,
+        target: dict,
+        timeout_ms: int | None = 5000,
+    ) -> None:
+        """Publish a gateway-targeted command request envelope to MQTT.
+
+        Same topic shape as ``publish_command`` (``commands/{id}/request``) but
+        the payload omits ``device_id`` because there is no device target
+        (e.g. ``op=gateway.open_network``).  Gateway parser is responsible for
+        accepting payload without ``device_id`` when ``op`` is gateway-scoped.
+        """
+        s = self.settings
+        topic = f"{self.topic_prefix}/commands/{command_id}/request"
+        envelope = {
+            "schema": "sb.v1",
+            "msg_id": uuid4().hex,
+            "ts": _now_ms(),
+            "tenant_id": s.tenant_id,
+            "site_id": s.site_id,
+            "gateway_id": s.gateway_id,
+            "source": "cloud",
+            "correlation_id": f"cmd_{command_id}",
+            "payload": {
+                "op": op,
+                "target": target,
+                "timeout_ms": timeout_ms,
+            },
+        }
+        self.client.publish(topic, json.dumps(envelope), qos=0)
+        logger.info("Published gateway command %s op=%s", command_id, op)
 
     # ------------------------------------------------------------------
     # Internal helpers

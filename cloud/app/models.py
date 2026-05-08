@@ -10,8 +10,12 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB as JSON
+from sqlalchemy import JSON as _JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+
+# JSONB on Postgres, plain JSON on sqlite (tests)
+JSON = _JSON().with_variant(JSONB(), "postgresql")
 
 from cloud.app.database import Base
 
@@ -105,11 +109,18 @@ class Command(Base):
     __tablename__ = "commands"
 
     id = Column(String, primary_key=True)  # command_id uuid
-    device_id = Column(String, ForeignKey("devices.id"), nullable=False)
+    # device_id is nullable for gateway-targeted commands (commissioning, ...).
+    # For target_kind="device" it must be set to an existing devices.id.
+    device_id = Column(String, ForeignKey("devices.id"), nullable=True)
+    target_kind = Column(
+        String, nullable=False, default="device", server_default="device"
+    )
     op = Column(String, nullable=False)
     target = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="accepted")
     reason = Column(String, nullable=True)
+    timeout_ms = Column(Integer, nullable=False, default=5000)
+    expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

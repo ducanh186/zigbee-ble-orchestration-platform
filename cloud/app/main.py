@@ -1,11 +1,13 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.routers import commands, devices, events, health
+from cloud.app.routers import commands, devices, events, gateways, health
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,9 +27,20 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("MQTT connection failed (continuing without): %s", exc)
 
+    stop_event = asyncio.Event()
+    timeout_task = asyncio.create_task(
+        run_timeout_worker(async_session, stop_event),
+        name="command-timeout-worker",
+    )
+
     yield
 
     # -- Shutdown --
+    stop_event.set()
+    try:
+        await asyncio.wait_for(timeout_task, timeout=3.0)
+    except asyncio.TimeoutError:
+        timeout_task.cancel()
     mqtt_service.disconnect()
     logger.info("MQTT client stopped")
 
@@ -42,3 +55,4 @@ app.include_router(health.router)
 app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)
+app.include_router(gateways.router)

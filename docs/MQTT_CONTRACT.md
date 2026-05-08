@@ -28,13 +28,13 @@ Mọi MQTT message đều dùng chung JSON envelope:
 {
   "schema": "sb.v1",
   "msg_id": "e6f67ab087c64f1e9457a2f6e03f9a68",
-  "ts": "2026-03-19T07:00:00Z",
+  "ts": 1773990000000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
   "source": "gateway",
   "trace_id": "trace-01",
-  "correlation_id": "cmd-01",
+  "correlation_id": "cmd_01",
   "payload": {}
 }
 ```
@@ -42,6 +42,31 @@ Mọi MQTT message đều dùng chung JSON envelope:
 **Trường bắt buộc:** `schema`, `msg_id`, `ts`, `tenant_id`, `site_id`, `gateway_id`, `source`, `payload`.
 
 **Trường tùy chọn:** `trace_id`, `correlation_id`.
+
+### Kiểu của `correlation_id`
+
+`correlation_id` là **optional**. Khi có mặt, nó dùng để nối các message cùng
+một luồng nghiệp vụ (ví dụ: request ↔ reply). Quy ước format:
+
+- Luồng lệnh (commands): `correlation_id = "cmd_" + {command_id}`. Ví dụ nếu
+  `command_id = "a1b2c3"` thì `correlation_id = "cmd_a1b2c3"`.
+- Các luồng khác (OTA, scene...) nếu muốn dùng correlation_id thì áp dụng
+  prefix tương tự (`ota_`, `scene_`...), không tự phát minh format mới.
+
+Subscriber **không** được dùng `correlation_id` làm khoá chính để tra cứu
+command; khoá chính luôn là `command_id` lấy từ topic
+`commands/{command_id}/reply`. `correlation_id` chỉ để trace / log.
+
+### Kiểu của `ts`
+
+`ts` là **số nguyên** — Unix epoch tính bằng **milliseconds** (UTC). Ví dụ
+`1773990000000` tương ứng `2026-03-19T07:00:00Z`.
+
+- Publisher (gateway / cloud / adapter) luôn phát `ts` dạng số nguyên ms.
+- Subscriber tự chuyển sang định dạng hiển thị cần dùng. Cloud chuẩn hoá về
+  chuỗi `HH:MM MM/DD/YYYY` trước khi trả ra REST API cho consumer.
+- Không truyền `ts` dưới dạng chuỗi ISO8601, chuỗi số có dấu nháy, hay chuỗi
+  đã format — việc format là trách nhiệm của phía hiển thị.
 
 ## Cây topic
 
@@ -51,7 +76,26 @@ Mọi MQTT message đều dùng chung JSON envelope:
 sb/v1/{tenant}/{site}/{gateway}/gateway/online
 sb/v1/{tenant}/{site}/{gateway}/gateway/health
 sb/v1/{tenant}/{site}/{gateway}/gateway/log
+sb/v1/{tenant}/{site}/{gateway}/gateway/event
 ```
+
+`gateway/event` mang sự kiện cấp gateway (không gắn device cụ thể), ví dụ
+khi cửa permit-join mở/đóng. Payload có dạng:
+
+```json
+{ "event": "<event_name>", "...": "..." }
+```
+
+`event_name` đã định nghĩa:
+
+- `permit_join_opened` — kèm `duration_sec` (1..180), tuỳ chọn `trigger`
+  (`"form"` khi mở tự động sau khi network vừa form xong).
+- `permit_join_closed` — kèm `reason` (`"timeout"` khi auto-close hết
+  duration, `"command"` khi đóng do `gateway.close_network`) và
+  `zstatus` (Ember status hex).
+- `permit_join_failed` — kèm `reason` và `zstatus` khi gọi
+  `gateway.open_network` thất bại ở stack/native (gateway vẫn reply
+  command với `status="failed"`; event chỉ là kênh observability).
 
 ### Thiết bị (Devices)
 
@@ -67,6 +111,14 @@ sb/v1/{tenant}/{site}/{gateway}/devices/{device_type}/{device_id}/event
 ```
 
 Giá trị `device_type` đã biết: `light`, `motion`, `lock`, `switch`, `unknown`.
+
+> **Phase 0 freeze (v1):** chỉ `light`, `switch`, `motion` có capability chính thức — xem
+> [DEVICE_CAPABILITY_MATRIX.md](./DEVICE_CAPABILITY_MATRIX.md).
+> Đối ngoại (MQTT + `payload.device_type`) **luôn dùng `motion`**;
+> các tên cũ `occ` / `occupancy` chỉ là legacy nội bộ.
+> Trong `payload.state` của cảm biến `motion`, giá trị occupancy được biểu diễn là
+> `"occupied"` / `"unoccupied"` (đó là *trạng thái đo*, không phải *device_type*).
+> `lock` và `unknown` hợp lệ trong topic nhưng chưa có capability v1.
 
 ### Lệnh điều khiển (Commands)
 
@@ -100,11 +152,20 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 
 ## Retain và QoS
 
+> **Demo vs production:** Bảng dưới liệt kê QoS của **kiến trúc thực tế** (production).
+> Bản triển khai demo hiện tại của dự án (`cloud/`, `gateway/`, broker local
+> và EC2) **publish/subscribe toàn bộ topic ở QoS 0** để đơn giản hoá vận hành
+> và giảm overhead khi test. Khi chuyển sang production, publisher/subscriber
+> phải nâng QoS theo bảng này — đặc biệt là các luồng trạng thái và lệnh
+> (retained + QoS 1) không được hạ cấp. Retain policy giữ nguyên cho cả hai
+> môi trường.
+
 | Topic | QoS | Retain | Ghi chú |
 | --- | --- | --- | --- |
 | `gateway/online` | 1 | có | Dùng Last Will and Testament (LWT) |
 | `gateway/health` | 1 | có | |
 | `gateway/log` | 0 | không | |
+| `gateway/event` | 1 | không | Lifecycle gateway-level (e.g. permit_join_*) |
 | `devices/*/*/registry` | 1 | có | |
 | `devices/*/*/reported` | 1 | có | |
 | `devices/*/*/desired` | 1 | có | |
@@ -136,10 +197,12 @@ accepted → queued → sent → executed | failed | timeout
 
 Quy tắc:
 
-- `correlation_id` của mọi reply đều bằng `{command_id}`
+- `correlation_id` của mọi reply (nếu có) luôn là `"cmd_" + {command_id}`;
+  bản thân `correlation_id` là **optional** — gateway/adapter có thể bỏ qua,
+  consumer vẫn phải tra command theo `{command_id}` trong topic
 - `commands/{command_id}/reply` không bao giờ retain
-- Gateway phát ra: `accepted`, `queued`, `sent`
-- Adapter phát ra kết quả cuối cùng (`executed` / `failed`), hoặc gateway phát `timeout`
+- Z3Gateway C phát ra toàn bộ lifecycle: `accepted`, `queued`, `sent`
+- Z3Gateway C phát ra kết quả cuối cùng (`executed` / `failed` / `timeout`)
 
 Ví dụ payload reply tối giản:
 
@@ -175,7 +238,7 @@ Payload:
 {
   "schema": "sb.v1",
   "msg_id": "5c6d467f5f90460da65a9db62288def6",
-  "ts": "2026-03-19T07:15:00Z",
+  "ts": 1773990900000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
@@ -194,6 +257,41 @@ Payload:
 }
 ```
 
+### Sự kiện motion occupancy changed
+
+Gateway publish event này khi trạng thái occupancy của motion sensor đổi
+từ giá trị trước đó. Reported state vẫn nằm ở
+`devices/motion/{id}/reported`; event dùng để cloud lưu lịch sử.
+
+Topic:
+
+```text
+sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/00124b0001aa22cc/event
+```
+
+Payload:
+
+```json
+{
+  "schema": "sb.v1",
+  "msg_id": "b1c2d3e4f5a6478899aabbccddeeff00",
+  "ts": 1776064565000,
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "gateway",
+  "payload": {
+    "device_id": "00124b0001aa22cc",
+    "device_type": "motion",
+    "event": "occupancy_changed",
+    "occupancy": "occupied",
+    "eui64": "00124b0001aa22cc",
+    "nwk_addr": "0x4F2A",
+    "raw": "0x01"
+  }
+}
+```
+
 ### Gửi lệnh (command request)
 
 Topic:
@@ -208,12 +306,12 @@ Payload:
 {
   "schema": "sb.v1",
   "msg_id": "fb5247dbeb4f480ebcb1e835a85d8182",
-  "ts": "2026-03-19T07:16:00Z",
+  "ts": 1773990960000,
   "tenant_id": "hust",
   "site_id": "lab01",
   "gateway_id": "gw-ubuntu-01",
   "source": "cloud",
-  "correlation_id": "cmd-01",
+  "correlation_id": "cmd_01",
   "payload": {
     "device_id": "light-01",
     "op": "device.command",
@@ -226,6 +324,48 @@ Payload:
   }
 }
 ```
+
+### Lệnh gateway (commissioning)
+
+Một số `op` không nhắm vào device cụ thể mà tác động lên chính gateway.
+Topic vẫn dùng `commands/{command_id}/request|reply` (cùng lifecycle, cùng
+cloud-side timeout sweeper) nhưng payload **bỏ** trường `device_id`:
+gateway parser chấp nhận thiếu `device_id` chỉ khi `op` bắt đầu bằng
+`gateway.`. Reply của gateway emit `payload.device_id = null`.
+
+Op v1:
+
+| Op | Target | Tác dụng |
+| --- | --- | --- |
+| `gateway.open_network` | `{ "duration_sec": 1..180 }` | Broadcast permit-join (network-creator-security plugin) trong `duration_sec` giây. Gateway tự đóng khi hết thời gian và publish `gateway/event permit_join_closed reason=timeout`. |
+| `gateway.close_network` | `{}` | Đóng permit-join ngay (broadcast permit_duration=0). Publish `gateway/event permit_join_closed reason=command`. |
+
+Ví dụ commissioning open 60s:
+
+```json
+{
+  "schema": "sb.v1",
+  "msg_id": "c6b8f41353e74b9aa123a25c8e07b106",
+  "ts": 1778049999288,
+  "tenant_id": "hust",
+  "site_id": "lab01",
+  "gateway_id": "gw-ubuntu-01",
+  "source": "cloud",
+  "correlation_id": "cmd_a18b423b26ef4060b1bdc470802c2160",
+  "payload": {
+    "op": "gateway.open_network",
+    "target": { "duration_sec": 60 },
+    "timeout_ms": 5000
+  }
+}
+```
+
+Reply lifecycle giống device command (`accepted → queued → sent → executed`
+| `failed`); reason map đặc thù gateway:
+
+- `not_formed` — gateway chưa join network nào, không thể mở permit-join
+  (Ember `EMBER_NOT_JOINED`).
+- `zstatus:0xNN` — Ember status hex khác cho các lỗi stack/native khác.
 
 ## Ví dụ wildcard subscription
 
@@ -254,6 +394,8 @@ sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/telemetry
 sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/event
 sb/v1/hust/lab01/gw-ubuntu-01/commands/+/reply
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/online
+sb/v1/hust/lab01/gw-ubuntu-01/gateway/health
+sb/v1/hust/lab01/gw-ubuntu-01/gateway/event
 ```
 
 ### Gateway (nhận từ cloud)

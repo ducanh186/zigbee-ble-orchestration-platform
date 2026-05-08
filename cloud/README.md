@@ -32,18 +32,112 @@ cloud/
 
 ## Chạy local
 
+### 1. Bật Postgres + Mosquitto (Docker)
+
 ```bash
-# Cài dependencies
+# Postgres
+docker run -d --name sb-postgres -p 5432:5432 \
+  -e POSTGRES_USER=sb_user -e POSTGRES_PASSWORD=sb_pass -e POSTGRES_DB=sb_cloud \
+  postgres:16-alpine
+
+# Mosquitto (từ repo)
+cd mqtt/docker && docker compose up -d
+```
+
+### 2. Cài deps + chạy API
+
+```bash
 pip install -r cloud/requirements.txt
 
-# Seed sample data
+# (tuỳ chọn) Seed sample data — 1 home, 2 rooms, 3 devices
 python -m cloud.app.seed
 
-# Chạy API server (dev mode)
+# Chạy API (auto reload)
 python -m cloud
 ```
 
 Swagger UI: http://localhost:8000/docs
+
+### 3. Test
+
+```bash
+# Unit tests — dùng sqlite in-memory, không cần Postgres/MQTT
+pytest cloud/tests/ -v
+
+# End-to-end smoke test — cần Postgres + Mosquitto + API chạy
+python cloud/scripts/smoke_test.py
+```
+
+## Deploy lên EC2 (AWS)
+
+Stack production gồm 3 container: `sb-postgres` + `sb-mosquitto` + `sb-cloud-api`,
+được orchestrate bằng `deploy/docker-compose.prod.yml` trên EC2 Ubuntu.
+
+### Yêu cầu
+
+- EC2 Ubuntu 22.04+ (Docker + Docker Compose v2 cài sẵn — dùng `deploy/ec2-setup.ps1` nếu là lần đầu)
+- Security group mở port **8000** (API) và **1883** (MQTT)
+- Trên máy dev: PowerShell 5+, SSH client, `tar` (Windows 10+ có sẵn)
+- Private key (.pem) để SSH vào EC2
+
+### Các bước
+
+```powershell
+# 1) Copy file cấu hình mẫu và điền thông số EC2 của bạn
+cp deploy\.env.deploy.example deploy\.env.deploy
+# Mở file bằng editor và set: EC2_HOST, EC2_KEY, các password MQTT/Postgres
+# LƯU Ý: không thêm inline comment (# ...) trong file .env.deploy
+
+# 2) (Lần đầu tiên) cài Docker + dừng Mosquitto native trên EC2
+powershell -ExecutionPolicy Bypass -File deploy\ec2-setup.ps1
+
+# 3) Deploy: đóng gói code, upload qua scp, build + docker compose up
+powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1
+
+# 4) Seed dữ liệu mẫu trên EC2 (1 home, 2 rooms, 3 devices)
+powershell -ExecutionPolicy Bypass -File deploy\seed-remote.ps1
+
+# 5) Tiện ích
+powershell -File deploy\logs.ps1               # xem log tất cả container
+powershell -File deploy\logs.ps1 cloud-api     # log cloud-api
+powershell -File deploy\ssh.ps1                # SSH vào EC2
+```
+
+Sau khi deploy thành công:
+
+- API Swagger: `http://<EC2_HOST>:8000/docs`
+- Health: `http://<EC2_HOST>:8000/health`
+- MQTT broker: `<EC2_HOST>:1883`
+
+### Database migration
+
+`init_db()` chạy tự động khi container cloud-api khởi động:
+
+- `create_all` — tạo bảng còn thiếu (không đụng bảng đã có).
+- ALTER TABLE IF NOT EXISTS — thêm cột mới (`timeout_ms`, `expires_at`) an toàn trên Postgres hiện hữu.
+
+Nếu cần reset hoàn toàn DB (mất data):
+
+```bash
+# Trên EC2:
+cd /home/ubuntu/iot-platform/deploy
+docker compose -f docker-compose.prod.yml down -v    # -v xoá volume
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Troubleshooting deploy
+
+Xem mục **Known Issues** trong `CLAUDE.md` ở root (CRLF heredoc, UTF-8 BOM, port
+conflict mosquitto native, Docker healthcheck thiếu credentials, v.v.).
+
+Lỗi hay gặp và fix nhanh:
+
+| Triệu chứng | Nguyên nhân | Cách sửa |
+|---|---|---|
+| `tar: Cannot connect to C:` khi deploy từ Windows | GNU tar của Git Bash parse `C:\...` như remote host | `deploy.ps1` đã fallback sang pipe stdout — chạy lại |
+| `sb-cloud-api` không start do `sb-mosquitto` unhealthy | ACL `monitor` không cover `$SYS/broker/uptime` | `acl.conf` phải có `topic read $SYS/#` cho user `monitor` |
+| Port 1883 conflict | Mosquitto systemd trên EC2 | `sudo systemctl stop mosquitto && sudo systemctl disable mosquitto` |
+| Cloud API báo `relation "commands" does not exist` | Container start trước khi Postgres ready | Compose đã có `depends_on: postgres service_healthy`; thử `docker compose restart cloud-api` |
 
 ## API Endpoints
 

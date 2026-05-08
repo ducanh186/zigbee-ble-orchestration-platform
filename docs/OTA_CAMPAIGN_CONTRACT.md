@@ -4,15 +4,15 @@
 
 Cloud coordinates OTA rollout through metadata only.
 
-The gateway:
+Z3Gateway C:
 
-1. receives the campaign manifest over MQTT
+1. receives the campaign manifest directly over MQTT
 2. downloads the `.ota` artifact from `artifact.url`
 3. verifies `sha256` and `size_bytes`
 4. stores the file under `SB_OTA_DIR`
-5. forwards normalized OTA intent to the local adapter over IPC
+5. offers the staged file to the target device through native Zigbee OTA behavior
 
-The gateway never publishes firmware binary over MQTT.
+Z3Gateway C never publishes firmware binary over MQTT.
 
 ## MQTT Topics
 
@@ -66,7 +66,7 @@ sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/event
 
 ## Progress Payload
 
-The gateway uses retained progress messages as the latest device snapshot for rollout state.
+Z3Gateway C uses retained progress messages as the latest device snapshot for rollout state.
 
 ```json
 {
@@ -99,14 +99,22 @@ Events are non-retained and describe failures or terminal rollout milestones.
 }
 ```
 
-## IPC Handoff
+## Internal OTA Flow (inside Z3Gateway C)
 
-After successful staging, the bridge forwards an `ota_desired` IPC record that includes:
+After successful staging, Z3Gateway C handles the OTA offer internally:
 
-- `device_id`
-- `campaign_id`
-- `action`
-- normalized manifest payload
-- `local_artifact_path`
+1. Z3Gateway C subscribes to `ota/campaigns/{campaign_id}/manifest` and
+   `ota/devices/{device_id}/desired`
+2. On receiving a manifest, it downloads the artifact via HTTP, verifies checksum and
+   size, and stores it under `SB_OTA_DIR` (default `./ota-files`)
+3. On receiving `ota_desired` with `action: "stage_and_offer"`, it locates the staged
+   artifact and initiates native Zigbee OTA offer to the target device
+4. Progress and events are published directly to MQTT by Z3Gateway C
 
-That handoff allows the local adapter to offer the staged file through native Zigbee OTA behavior without re-downloading or using MQTT as a binary channel.
+This is an **internal function call** within the Z3Gateway C process — there is no
+IPC handoff or intermediate bridge process.
+
+> **Historical note:** earlier versions of this contract described an "IPC Handoff"
+> where a bridge process forwarded an `ota_desired` IPC record to a local adapter.
+> That architecture has been replaced. Z3Gateway C handles the entire OTA lifecycle
+> as a single process.
