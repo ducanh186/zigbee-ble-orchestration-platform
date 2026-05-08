@@ -1,0 +1,37 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Filter chips</title>
+<link rel="stylesheet" href="_card.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { padding: 22px; }
+  .row { gap: 8px; flex-wrap: wrap; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px; border:1px solid var(--border); background:var(--surface); font:500 13px var(--font-sans); color:var(--text-primary); cursor:pointer; }
+  .chip svg { width:14px; height:14px; }
+  .chip.active { background:var(--primary); color:var(--primary-on); border-color:transparent; }
+  .chip.muted { color: var(--text-secondary); }
+</style>
+</head><body>
+<div class="col" style="gap:14px">
+  <div>
+    <div class="label" style="margin-bottom:8px">Device type</div>
+    <div class="row">
+      <span class="chip active">All</span>
+      <span class="chip"><i data-lucide="lightbulb"></i>Light</span>
+      <span class="chip muted"><i data-lucide="radar"></i>Motion</span>
+      <span class="chip muted"><i data-lucide="toggle-left"></i>Switch</span>
+      <span class="chip muted"><i data-lucide="lock"></i>Lock</span>
+      <span class="chip muted"><i data-lucide="router"></i>Gateway</span>
+    </div>
+  </div>
+  <div>
+    <div class="label" style="margin-bottom:8px">Severity</div>
+    <div class="row">
+      <span class="chip active">All</span>
+      <span class="chip"><span style="width:6px;height:6px;border-radius:999px;background:var(--primary)"></span>Info</span>
+      <span class="chip"><span style="width:6px;height:6px;border-radius:999px;background:var(--warning)"></span>Warning</span>
+      <span class="chip"><span style="width:6px;height:6px;border-radius:999px;background:var(--error)"></span>Error</span>
+    </div>
+  </div>
+</div>
+<script>lucide.createIcons();</script>
+</body></html>

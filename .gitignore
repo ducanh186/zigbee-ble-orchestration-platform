@@ -3,7 +3,9 @@ z3.pem
 !**/README.md
 CLAUDE.md
 .claude/
+.codex/
 .github/
+excalidraw.log
 **/build/
 **/.*/
 # Deploy secrets
@@ -11,6 +13,7 @@ deploy/.env.deploy
 *.pem
 # Python
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 .venv/

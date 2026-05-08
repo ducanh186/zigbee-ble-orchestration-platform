@@ -1,0 +1,288 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../app_runtime_config.dart';
+import '../../../../domain/models/smart_device.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
+import '../../devices/views/devices_view.dart';
+import '../../logs/views/logs_view.dart';
+
+enum _SettingsSection { overview, devices, logs }
+
+class SettingsView extends StatefulWidget {
+  const SettingsView({required this.onOpenLight, super.key});
+
+  final ValueChanged<SmartDevice> onOpenLight;
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  _SettingsSection _section = _SettingsSection.overview;
+  bool _runtimeExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (_section) {
+      _SettingsSection.overview => _SettingsOverview(
+        runtimeExpanded: _runtimeExpanded,
+        onToggleRuntime: () {
+          setState(() => _runtimeExpanded = !_runtimeExpanded);
+        },
+        onOpenDevices: () {
+          setState(() => _section = _SettingsSection.devices);
+        },
+        onOpenLogs: () {
+          setState(() => _section = _SettingsSection.logs);
+        },
+      ),
+      _SettingsSection.devices => DevicesView(
+        onOpenLight: widget.onOpenLight,
+        onBack: _openOverview,
+      ),
+      _SettingsSection.logs => LogsView(onBack: _openOverview),
+    };
+  }
+
+  void _openOverview() {
+    setState(() => _section = _SettingsSection.overview);
+  }
+}
+
+class _SettingsOverview extends StatelessWidget {
+  const _SettingsOverview({
+    required this.runtimeExpanded,
+    required this.onToggleRuntime,
+    required this.onOpenDevices,
+    required this.onOpenLogs,
+  });
+
+  final bool runtimeExpanded;
+  final VoidCallback onToggleRuntime;
+  final VoidCallback onOpenDevices;
+  final VoidCallback onOpenLogs;
+
+  @override
+  Widget build(BuildContext context) {
+    final runtime = context.watch<AppRuntimeConfig>();
+    final themeController = context.watch<ThemeController>();
+    final palette = context.palette;
+
+    return CustomScrollView(
+      slivers: [
+        const SliverAppBar(title: Text('Settings'), pinned: true),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          sliver: SliverList.list(
+            children: [
+              const SectionTitle(title: 'Operator'),
+              const SizedBox(height: 8),
+              const AppCard(
+                child: _SettingsRow(
+                  icon: Icons.account_circle_outlined,
+                  title: 'Account',
+                  subtitle: 'operator@hust/lab01',
+                ),
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'System'),
+              const SizedBox(height: 8),
+              AppCard(
+                onTap: onToggleRuntime,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SettingsRow(
+                            icon: Icons.memory_outlined,
+                            title: 'Runtime',
+                            subtitle: runtime.useMockApi
+                                ? 'Mock API'
+                                : 'Cloud API',
+                          ),
+                        ),
+                        Icon(
+                          runtimeExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          color: palette.textSecondary,
+                        ),
+                      ],
+                    ),
+                    if (runtimeExpanded) ...[
+                      const SizedBox(height: 14),
+                      Divider(color: palette.border, height: 1),
+                      const SizedBox(height: 14),
+                      _SettingLine(
+                        label: 'API_BASE_URL',
+                        value: runtime.apiBaseUrl,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'Workspace'),
+              const SizedBox(height: 8),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.lightbulb_outline,
+                      title: 'Device inventory',
+                      subtitle: 'Review all cloud devices',
+                      onTap: onOpenDevices,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _SettingsRow(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Cloud logs',
+                      subtitle: 'Inspect event history',
+                      onTap: onOpenLogs,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const SectionTitle(title: 'Theme mode'),
+              const SizedBox(height: 8),
+              AppCard(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<AppThemeMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: AppThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Light'),
+                      ),
+                      ButtonSegment(
+                        value: AppThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Dark'),
+                      ),
+                      ButtonSegment(
+                        value: AppThemeMode.grey,
+                        icon: Icon(Icons.tonality_outlined),
+                        label: Text('Grey'),
+                      ),
+                    ],
+                    selected: {themeController.mode},
+                    onSelectionChanged: (selection) {
+                      themeController.setMode(selection.first);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              AppCard(
+                child: _SettingsRow(
+                  icon: Icons.logout,
+                  iconColor: palette.error,
+                  title: 'Logout',
+                  subtitle: 'Sign out placeholder',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color? iconColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final content = Padding(
+      padding: onTap == null
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor ?? palette.primary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: palette.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (onTap != null)
+            Icon(Icons.chevron_right, color: palette.textSecondary),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(onTap: onTap, child: content);
+  }
+}
+
+class _SettingLine extends StatelessWidget {
+  const _SettingLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: palette.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(fontFamily: 'JetBrains Mono', fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
