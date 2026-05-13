@@ -610,7 +610,7 @@ curl -s -X POST http://localhost:8000/api/gateways/gw-ubuntu-01/commissioning/cl
 Bằng chứng hoạt động:
 
 - MQTT trace thấy `commands/{id}/request` với `payload.op =
-  "gateway.open_network"`, `target.duration_sec = 60`, **không có**
+  "gateway.open_network"`, `targethttps://github.com/ducanh186/zigbee-ble-orchestration-platform/pull/21/conflict?name=gateway%252FZ3Gateway%252FZ3GatewayHost%252Fapp%252Fapp_mqtt.c&ancestor_oid=7fec2b63b36c49f00314d8fa23593b4cf4e3faa5&base_oid=f9efff3435290b07393f4fa38d60e608e845783f&head_oid=b77adba5c9b5862814a8df02cc9874210faa5814.duration_sec = 60`, **không có**
   `payload.device_id` (đó là gateway-scoped op).
 - `/tmp/z3gw.log` có `MQTT: rx [...commands/...]`,
   `CMD parsed op=gateway.open_network device_id=""`,

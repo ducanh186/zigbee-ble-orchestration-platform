@@ -557,6 +557,126 @@ void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson)
   appMqttPublish("gateway/event", envelope, 1, false);
 }
 
+// Phase 4: return a JSON-array-literal of inferred cluster IDs per device type.
+// Caller must not free. Unknown types return "[]".
+static const char *inferredClustersJson(const char *deviceType)
+{
+  if (!deviceType) return "[]";
+  if (strcmp(deviceType, "light")  == 0) return "[\"0x0006\",\"0x0008\"]";
+  if (strcmp(deviceType, "switch") == 0) return "[\"0x0006\",\"0x0001\"]";
+  if (strcmp(deviceType, "motion") == 0) return "[\"0x0406\"]";
+  if (strcmp(deviceType, "lock")   == 0) return "[\"0x0101\"]";
+  return "[]";
+}
+
+void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
+                                  const char *deviceType)
+{
+  if (!sMosq || !eui64Str || !deviceType) return;
+
+  uint64_t joinedAt = epochMillisNow();
+
+  // Inner payload per Phase 4 MVP contract.
+  char inner[640];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"endpoint\":1,"
+    "\"endpoints\":[1],"
+    "\"clusters\":%s,"
+    "\"manufacturer\":null,"
+    "\"model\":null,"
+    "\"joined_at\":%" PRIu64 ","
+    "\"metadata_source\":\"gateway_mvp_inferred\"",
+    eui64Str, deviceType, eui64Str, (unsigned)nodeId,
+    inferredClustersJson(deviceType),
+    joinedAt);
+
+  char envelope[896];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // Topic: devices/{device_type}/{eui64}/registry (QoS 1, retained per contract)
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/registry",
+           deviceType, eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
+{
+  if (!sMosq || !eui64Str) return;
+
+  // Keep this list aligned with inferredClustersJson() - any device_type
+  // the gateway can ever publish must appear here so we never leak a stale
+  // retained slot.
+  static const char *types[] = {"light", "switch", "motion", "unknown"};
+  for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+    if (keepType && strcmp(keepType, types[i]) == 0) continue;
+
+    char fullTopic[192];
+    snprintf(fullTopic, sizeof(fullTopic),
+             "%s/devices/%s/%s/registry", MQTT_PREFIX, types[i], eui64Str);
+
+    // Empty (zero-length) payload + retain=1 -> broker drops the retained
+    // value for this topic.  See MQTT 3.1.1 / 5 spec section on retained
+    // messages.
+    int rc = mosquitto_publish(sMosq, NULL, fullTopic, 0, NULL, 1, true);
+    if (rc != MOSQ_ERR_SUCCESS) {
+      emberAfCorePrintln("MQTT: clear-retained failed for %s: %s",
+                         fullTopic, mosquitto_strerror(rc));
+    } else {
+      emberAfCorePrintln("MQTT: cleared retained [%s]", fullTopic);
+    }
+  }
+}
+
+void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
+                                 uint32_t knownDeviceCount,
+                                 const char *networkState)
+{
+  if (!sMosq) return;
+
+  const char *ns = networkState ? networkState : "unknown";
+
+  char inner[256];
+  snprintf(inner, sizeof(inner),
+    "\"uptime_ms\":%" PRIu64 ","
+    "\"mqtt_connected\":%s,"
+    "\"known_device_count\":%u,"
+    "\"network_state\":\"%s\"",
+    uptime_ms,
+    mqttConnected ? "true" : "false",
+    (unsigned)knownDeviceCount, ns);
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // QoS 1, retained per MQTT_CONTRACT.
+  appMqttPublish("gateway/health", envelope, 1, true);
+}
+
+void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson)
+{
+  if (!sMosq || !eventName || !*eventName) return;
+
+  char inner[320];
+  if (extraJson && *extraJson) {
+    snprintf(inner, sizeof(inner),
+             "\"event\":\"%s\",%s", eventName, extraJson);
+  } else {
+    snprintf(inner, sizeof(inner), "\"event\":\"%s\"", eventName);
+  }
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // QoS 1, retain=false (per MQTT_CONTRACT.md events row).
+  appMqttPublish("gateway/event", envelope, 1, false);
+}
+
 void appMqttPublishCommandReply(const char *command_id,
                                 const char *device_id,
                                 const char *status,

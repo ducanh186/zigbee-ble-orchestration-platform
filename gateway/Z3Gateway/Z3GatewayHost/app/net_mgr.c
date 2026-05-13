@@ -160,6 +160,69 @@ EmberStatus netMgrCloseJoin(void)
 #endif
 }
 
+EmberStatus netMgrOpenForJoin(uint16_t durationSec)
+{
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    appLogLog("NET", "open_skip", "\"reason\":\"not_joined\"");
+    return EMBER_NOT_JOINED;
+  }
+
+  // Clamp to [1, 180] -- matches OPEN_JOIN_MS=180s and EZSP permit-join byte.
+  if (durationSec < 1) durationSec = 1;
+  if (durationSec > 180) durationSec = 180;
+
+  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
+  appLogLog("NET", "open_join_cmd",
+            "\"zstatus\":\"0x%02X\",\"duration_s\":%u",
+            (unsigned)st, (unsigned)durationSec);
+
+  if (st == EMBER_SUCCESS) {
+    g_networkOpen     = true;
+    g_openTick        = msTick();
+    g_openDurationMs  = (uint32_t)durationSec * 1000u;
+
+    char extra[64];
+    snprintf(extra, sizeof(extra), "\"duration_sec\":%u",
+             (unsigned)durationSec);
+    appMqttPublishGatewayEvent("permit_join_opened", extra);
+  } else {
+    char extra[80];
+    snprintf(extra, sizeof(extra),
+             "\"reason\":\"open_fail\",\"zstatus\":\"0x%02X\"",
+             (unsigned)st);
+    appMqttPublishGatewayEvent("permit_join_failed", extra);
+  }
+  return st;
+#else
+  appLogLog("NET", "open_skip", "\"reason\":\"plugin_missing\"");
+  return EMBER_LIBRARY_NOT_PRESENT;
+#endif
+}
+
+EmberStatus netMgrCloseJoin(void)
+{
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  EmberStatus st = emberAfPluginNetworkCreatorSecurityCloseNetwork();
+  appLogLog("NET", "close_join_cmd", "\"zstatus\":\"0x%02X\"", (unsigned)st);
+
+  // Always clear local flags even if the broadcast failed -- the request was
+  // intentional and the local TC link-key transient set is already cleared
+  // by the SDK.
+  g_networkOpen    = false;
+  g_openDurationMs = 0;
+
+  char extra[80];
+  snprintf(extra, sizeof(extra),
+           "\"reason\":\"command\",\"zstatus\":\"0x%02X\"", (unsigned)st);
+  appMqttPublishGatewayEvent("permit_join_closed", extra);
+  return st;
+#else
+  appLogLog("NET", "close_skip", "\"reason\":\"plugin_missing\"");
+  return EMBER_LIBRARY_NOT_PRESENT;
+#endif
+}
+
 // callback: formed network
 void emberAfPluginNetworkCreatorCompleteCallback(const EmberNetworkParameters *network,
                                                 bool usedSecondaryChannels)
