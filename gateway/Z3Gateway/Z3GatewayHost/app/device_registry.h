@@ -1,11 +1,12 @@
 #ifndef DEVICE_REGISTRY_H
 #define DEVICE_REGISTRY_H
 
-// Device registry: maps Zigbee EUI64/device_id -> Zigbee coordinates.
+// Device registry: maps logical device_id (EUI64 big-endian hex) to Zigbee
+// coordinates (nodeId, endpoint, classified device_type).
 //
-// The public device_id for native Zigbee devices is the EUI64 rendered as a
-// big-endian hex string.  Legacy single-light behavior is retained by falling
-// back to the first known light when a non-EUI logical id is supplied.
+// Multi-device store with a fixed-size slot array.  Devices are inserted by
+// `deviceRegistryUpsert` once their type has been classified by ZDO discovery
+// (see device_discovery.c).  TC-join itself does not write here directly.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,41 +16,35 @@
 extern "C" {
 #endif
 
+#define DEVICE_REGISTRY_MAX 8
+
 typedef struct {
   EmberNodeId nodeId;
   uint8_t     endpoint;
-  char        device_type[32]; // light, motion, switch, unknown
-  char        eui64[20];       // big-endian hex string, null terminated
-  bool        exact_match;     // true when device_id matched a registry EUI64
+  char        device_type[16]; // "light"|"switch"|"motion"|"unknown"
 } device_resolved_t;
 
 // Resolve a logical device_id into Zigbee coordinates.
-// Returns true if the device is known and usable; false otherwise.
+//   device_id == "*"            -> first slot whose type is "light"
+//   device_id == EUI64 hex (BE) -> exact match (case-insensitive)
+// Returns true if a usable entry was found.
 bool deviceRegistryResolve(const char *device_id, device_resolved_t *out);
 
-// Resolve a device by id and expected type.  device_id="*" returns the first
-// known device of expectedType.  expectedType may be NULL to match any type.
-bool deviceRegistryResolveByType(const char *device_id, const char *expectedType,
-                                 device_resolved_t *out);
-
-// Register the single controllable device.
-// Returns false if eui64Str is malformed.
-bool deviceRegistryPair(const char *eui64Str, EmberNodeId nodeId,
-                        uint8_t dstEp);
-
-// Upsert a device learned from join, reports, or local commissioning.
+// Insert or replace an entry keyed by EUI64 (big-endian hex).
+// Returns false if the table is full or eui64Str is malformed.
 bool deviceRegistryUpsert(const char *eui64Str, EmberNodeId nodeId,
-                          uint8_t endpoint, const char *deviceType);
-bool deviceRegistryUpsertLe(const EmberEUI64 euiLe, EmberNodeId nodeId,
-                            uint8_t endpoint, const char *deviceType);
+                          uint8_t dstEp, const char *device_type);
 
-// Record a telemetry source and inferred type.  Returns false if the EUI64
-// cannot be looked up from nodeId.
-bool deviceRegistryLearnReport(EmberNodeId nodeId, uint8_t endpoint,
-                               const char *deviceType, char *outEui64,
-                               uint32_t outEui64Size);
+// Update the nodeId for an existing entry (rejoin path).  Returns false if
+// the EUI64 is unknown.
+bool deviceRegistryUpdateNodeId(const char *eui64Str, EmberNodeId nodeId);
 
-// Getters for log/info output.
+// Number of populated slots.
+uint32_t deviceRegistryCount(void);
+
+// Compatibility getters (return data of the FIRST populated slot).  These
+// stay for app_log.c / health publishing where a single representative
+// device_id is fine.
 bool        deviceRegistryIsKnown(void);
 EmberNodeId deviceRegistryGetNodeId(void);
 uint8_t     deviceRegistryGetDstEp(void);

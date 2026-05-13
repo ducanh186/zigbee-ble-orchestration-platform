@@ -10,7 +10,6 @@
 #include "cmd_handler.h"
 
 #include <mosquitto.h>
-#include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,30 +80,30 @@ static uint64_t sLastHealthMs  = 0;
 
 // Unix epoch in milliseconds (UTC). Contract: envelope `ts` is an integer
 // number of milliseconds (docs/MQTT_CONTRACT.md → "Kiểu của `ts`").
-static uint64_t epochMillisNow(void)
+static uint64_t epochMs(void)
 {
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  return ((uint64_t)tv.tv_sec * 1000u) + ((uint64_t)tv.tv_usec / 1000u);
+  return (uint64_t)tv.tv_sec * 1000ULL + (uint64_t)(tv.tv_usec / 1000);
 }
 
 // Build a minimal sb.v1 envelope.  Caller supplies the inner payload JSON
 // (without outer braces).  Result written to buf.
 static int buildEnvelope(char *buf, size_t len, const char *innerPayloadJson)
 {
-  uint64_t ts = epochMillisNow();
+  uint64_t ts = epochMs();
   uint32_t id = ++sMsgId;
 
   return snprintf(buf, len,
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
-     "\"ts\":%" PRIu64 ","
+     "\"ts\":%llu,"
      "\"tenant_id\":\"" MQTT_TENANT "\","
      "\"site_id\":\"" MQTT_SITE "\","
      "\"gateway_id\":\"" MQTT_GW_ID "\","
      "\"source\":\"gateway\","
      "\"payload\":{%s}}",
-    (unsigned long)id, ts, innerPayloadJson);
+    (unsigned long)id, (unsigned long long)ts, innerPayloadJson);
 }
 
 //----------------------------------------------------------------------
@@ -300,7 +299,7 @@ void appMqttInit(void)
   mosquitto_will_set(sMosq, MQTT_PREFIX "/gateway/online",
                      (int)strlen(lwt), lwt, 1, true);
 
-  sAppStartMs   = epochMillisNow();
+  sAppStartMs   = epochMs();
   sLastHealthMs = 0;
 
   emberAfCorePrintln("MQTT: client initialized (id=%s)", MQTT_CLIENT_ID);
@@ -366,7 +365,7 @@ void appMqttTick(void)
 
   // Phase 5: periodic gateway/health publish (30 s, only while connected).
   if (sMqttConnected) {
-    uint64_t now = epochMillisNow();
+    uint64_t now = epochMs();
     if (now - sLastHealthMs >= MQTT_HEALTH_INTERVAL_MS) {
       uint32_t devCount = deviceRegistryCount();
       appMqttPublishGatewayHealth(now - sAppStartMs, true, devCount, "unknown");
@@ -411,70 +410,6 @@ void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
   appMqttPublish(topicSuffix, envelope, 1, true);
 }
 
-void appMqttPublishMotionReported(uint16_t nodeId, const char *eui64Str,
-                                  const char *occupancy,
-                                  bool hasBattery, uint8_t batteryPercent)
-{
-  if (!sMosq || !eui64Str || !occupancy) return;
-
-  char stateExtra[40] = "";
-  if (hasBattery) {
-    if (batteryPercent > 100u) batteryPercent = 100u;
-    snprintf(stateExtra, sizeof(stateExtra), ",\"battery\":%u",
-             (unsigned)batteryPercent);
-  }
-
-  char inner[360];
-  snprintf(inner, sizeof(inner),
-    "\"device_id\":\"%s\","
-    "\"device_type\":\"motion\","
-    "\"eui64\":\"%s\","
-    "\"nwk_addr\":\"0x%04X\","
-    "\"state\":{\"occupancy\":\"%s\",\"reachable\":true%s}",
-    eui64Str, eui64Str, (unsigned)nodeId, occupancy, stateExtra);
-
-  char envelope[700];
-  buildEnvelope(envelope, sizeof(envelope), inner);
-
-  char topicSuffix[120];
-  snprintf(topicSuffix, sizeof(topicSuffix), "devices/motion/%s/reported",
-           eui64Str);
-
-  appMqttPublish(topicSuffix, envelope, 1, true);
-  appLogLog("MQTT", "motion_reported",
-            "\"device_id\":\"%s\",\"occupancy\":\"%s\"",
-            eui64Str, occupancy);
-}
-
-void appMqttPublishMotionEvent(uint16_t nodeId, const char *eui64Str,
-                               const char *occupancy, uint8_t raw)
-{
-  if (!sMosq || !eui64Str || !occupancy) return;
-
-  char inner[360];
-  snprintf(inner, sizeof(inner),
-    "\"device_id\":\"%s\","
-    "\"device_type\":\"motion\","
-    "\"event\":\"occupancy_changed\","
-    "\"occupancy\":\"%s\","
-    "\"eui64\":\"%s\","
-    "\"nwk_addr\":\"0x%04X\","
-    "\"raw\":\"0x%02X\"",
-    eui64Str, occupancy, eui64Str, (unsigned)nodeId, (unsigned)raw);
-
-  char envelope[700];
-  buildEnvelope(envelope, sizeof(envelope), inner);
-
-  char topicSuffix[120];
-  snprintf(topicSuffix, sizeof(topicSuffix), "devices/motion/%s/event",
-           eui64Str);
-
-  appMqttPublish(topicSuffix, envelope, 1, false);
-  appLogLog("MQTT", "motion_event",
-            "\"device_id\":\"%s\",\"occupancy\":\"%s\",\"raw\":\"0x%02X\"",
-            eui64Str, occupancy, (unsigned)raw);
-}
-
 void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
                                const char *deviceType, const char *eventName)
 {
@@ -499,8 +434,127 @@ void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
   snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/event",
            deviceType, eui64Str);
 
-  // Topic: devices/{device_type}/{eui64}/event  (QoS 1, no retain)
   appMqttPublish(topicSuffix, envelope, 1, false);
+}
+
+// Phase 4: return a JSON-array-literal of inferred cluster IDs per device type.
+// Caller must not free. Unknown types return "[]".
+static const char *inferredClustersJson(const char *deviceType)
+{
+  if (!deviceType) return "[]";
+  if (strcmp(deviceType, "light")  == 0) return "[\"0x0006\",\"0x0008\"]";
+  if (strcmp(deviceType, "switch") == 0) return "[\"0x0006\",\"0x0001\"]";
+  if (strcmp(deviceType, "motion") == 0) return "[\"0x0406\"]";
+  if (strcmp(deviceType, "lock")   == 0) return "[\"0x0101\"]";
+  return "[]";
+}
+
+void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
+                                  const char *deviceType)
+{
+  if (!sMosq || !eui64Str || !deviceType) return;
+
+  uint64_t joinedAt = epochMs();
+
+  // Inner payload per Phase 4 MVP contract.
+  char inner[640];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"endpoint\":1,"
+    "\"endpoints\":[1],"
+    "\"clusters\":%s,"
+    "\"manufacturer\":null,"
+    "\"model\":null,"
+    "\"joined_at\":%llu,"
+    "\"metadata_source\":\"gateway_mvp_inferred\"",
+    eui64Str, deviceType, eui64Str, (unsigned)nodeId,
+    inferredClustersJson(deviceType),
+    (unsigned long long)joinedAt);
+
+  char envelope[896];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // Topic: devices/{device_type}/{eui64}/registry (QoS 1, retained per contract)
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/registry",
+           deviceType, eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
+{
+  if (!sMosq || !eui64Str) return;
+
+  // Keep this list aligned with inferredClustersJson() - any device_type
+  // the gateway can ever publish must appear here so we never leak a stale
+  // retained slot.
+  static const char *types[] = {"light", "switch", "motion", "unknown"};
+  for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+    if (keepType && strcmp(keepType, types[i]) == 0) continue;
+
+    char fullTopic[192];
+    snprintf(fullTopic, sizeof(fullTopic),
+             "%s/devices/%s/%s/registry", MQTT_PREFIX, types[i], eui64Str);
+
+    // Empty (zero-length) payload + retain=1 -> broker drops the retained
+    // value for this topic.  See MQTT 3.1.1 / 5 spec section on retained
+    // messages.
+    int rc = mosquitto_publish(sMosq, NULL, fullTopic, 0, NULL, 1, true);
+    if (rc != MOSQ_ERR_SUCCESS) {
+      emberAfCorePrintln("MQTT: clear-retained failed for %s: %s",
+                         fullTopic, mosquitto_strerror(rc));
+    } else {
+      emberAfCorePrintln("MQTT: cleared retained [%s]", fullTopic);
+    }
+  }
+}
+
+void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
+                                 uint32_t knownDeviceCount,
+                                 const char *networkState)
+{
+  if (!sMosq) return;
+
+  const char *ns = networkState ? networkState : "unknown";
+
+  char inner[256];
+  snprintf(inner, sizeof(inner),
+    "\"uptime_ms\":%llu,"
+    "\"mqtt_connected\":%s,"
+    "\"known_device_count\":%u,"
+    "\"network_state\":\"%s\"",
+    (unsigned long long)uptime_ms,
+    mqttConnected ? "true" : "false",
+    (unsigned)knownDeviceCount, ns);
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // QoS 1, retained per MQTT_CONTRACT.
+  appMqttPublish("gateway/health", envelope, 1, true);
+}
+
+void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson)
+{
+  if (!sMosq || !eventName || !*eventName) return;
+
+  char inner[320];
+  if (extraJson && *extraJson) {
+    snprintf(inner, sizeof(inner),
+             "\"event\":\"%s\",%s", eventName, extraJson);
+  } else {
+    snprintf(inner, sizeof(inner), "\"event\":\"%s\"", eventName);
+  }
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // QoS 1, retain=false (per MQTT_CONTRACT.md events row).
+  appMqttPublish("gateway/event", envelope, 1, false);
 }
 
 // Phase 4: return a JSON-array-literal of inferred cluster IDs per device type.
@@ -633,7 +687,7 @@ void appMqttPublishCommandReply(const char *command_id,
   // Per MQTT_CONTRACT: correlation_id on reply is "cmd_" + command_id.
   // Payload always carries raw command_id, device_id, status, reason.
   // Any of device_id/reason may be NULL -> emitted as JSON null.
-  uint64_t ts = epochMillisNow();
+  uint64_t ts = epochMs();
   uint32_t id = ++sMsgId;
 
   // Build device_id field (quoted or null)
@@ -656,7 +710,7 @@ void appMqttPublishCommandReply(const char *command_id,
   snprintf(envelope, sizeof(envelope),
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
-     "\"ts\":%" PRIu64 ","
+     "\"ts\":%llu,"
      "\"tenant_id\":\"" MQTT_TENANT "\","
      "\"site_id\":\"" MQTT_SITE "\","
      "\"gateway_id\":\"" MQTT_GW_ID "\","
@@ -666,7 +720,7 @@ void appMqttPublishCommandReply(const char *command_id,
                   "\"device_id\":%s,"
                   "\"status\":\"%s\","
                   "\"reason\":%s}}",
-    (unsigned long)id, ts, command_id,
+    (unsigned long)id, (unsigned long long)ts, command_id,
     command_id, devField, status, reasonField);
 
   char topicSuffix[96];

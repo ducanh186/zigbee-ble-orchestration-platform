@@ -23,19 +23,11 @@ extern "C" {
 // Call once from emberAfMainInitCallback().
 void ruleEngineInit(void);
 
-// Periodic tick for delayed actions.
-// Call from emberAfMainTickCallback().
-void ruleEngineTick(void);
-
 // Called when a switch event is detected.
 // switchDeviceId: the eui64 string of the switch that fired.
 // This is the ONLY entry point for rule dispatch (anti-loop: Phase 4.3).
 // It will NOT be called from light reported state changes.
 void ruleEngineOnSwitchEvent(const char *switchDeviceId);
-
-// Called when a motion occupancy report is parsed.
-// sensorDeviceId: EUI64 string of the PIR/motion device.
-void ruleEngineOnMotionReport(const char *sensorDeviceId, bool occupied);
 
 #ifdef __cplusplus
 }

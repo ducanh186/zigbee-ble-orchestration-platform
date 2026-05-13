@@ -7,11 +7,7 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
-from cloud.app.schemas import (
-    TERMINAL_STATUSES,
-    validate_event_payload,
-    validate_reported_payload,
-)
+from cloud.app.schemas import validate_event_payload, validate_reported_payload
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +178,6 @@ class MQTTService:
                     session.add(device)
                 else:
                     device.is_online = True
-                    if inner.get("device_type"):
-                        device.device_type = inner["device_type"]
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
 
@@ -266,43 +260,19 @@ class MQTTService:
             if not self._db_session_factory:
                 return
             from cloud.app.models import Command
-            from sqlalchemy import or_, update
+            from sqlalchemy import select
 
             async with self._db_session_factory() as session:
-                new_status = inner.get("status")
-                if not new_status:
-                    return
-
-                terminal_statuses = list(TERMINAL_STATUSES)
-                stmt = update(Command).where(Command.id == command_id)
-                if new_status in TERMINAL_STATUSES:
-                    stmt = stmt.where(
-                        or_(
-                            Command.status.notin_(terminal_statuses),
-                            Command.status == new_status,
-                        )
-                    )
-                else:
-                    stmt = stmt.where(Command.status.notin_(terminal_statuses))
-
                 result = await session.execute(
-                    stmt.values(status=new_status, reason=inner.get("reason"))
+                    select(Command).where(Command.id == command_id)
                 )
-                await session.commit()
-
-                if result.rowcount:
+                cmd = result.scalar_one_or_none()
+                if cmd:
+                    cmd.status = inner.get("status", cmd.status)
+                    cmd.reason = inner.get("reason")
+                    await session.commit()
                     logger.info(
-                        "Updated command %s status=%s", command_id, new_status
-                    )
-                    return
-
-                current = await session.get(Command, command_id)
-                if current:
-                    logger.info(
-                        "Ignored stale command %s status=%s; current=%s",
-                        command_id,
-                        new_status,
-                        current.status,
+                        "Updated command %s status=%s", command_id, cmd.status
                     )
 
         self._run_async(_write)
@@ -312,20 +282,6 @@ class MQTTService:
         status = inner.get("value", "unknown")
         logger.info("Gateway status: %s", status)
 
-        async def _write():
-            if not self._db_session_factory:
-                return
-            from cloud.app.models import Event
-
-            payload = {
-                "value": status,
-                "gateway_id": envelope.get(
-                    "gateway_id", self.settings.gateway_id
-                ),
-                "source": envelope.get("source", "gateway"),
-            }
-            for key, value in inner.items():
-                payload.setdefault(key, value)
     def _handle_registry(self, topic: str, envelope: dict) -> None:
         """Handle retained device registry snapshot -- upsert device + log event.
 
@@ -422,15 +378,6 @@ class MQTTService:
             async with self._db_session_factory() as session:
                 event = Event(
                     device_id=None,
-                    event_type="gateway_online",
-                    payload=payload,
-                    occurred_at=datetime.fromisoformat(
-                        envelope.get("ts", datetime.now(UTC).isoformat())
-                    ).replace(tzinfo=None),
-                )
-                session.add(event)
-                await session.commit()
-                logger.info("Saved gateway status event=%s", status)
                     event_type="gateway_health",
                     payload=inner,
                     occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),

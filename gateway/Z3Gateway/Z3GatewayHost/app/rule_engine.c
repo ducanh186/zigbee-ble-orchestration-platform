@@ -59,45 +59,6 @@ typedef struct {
 
 static CooldownEntry_t s_cooldown[MAX_BINDINGS];
 
-// ===== Motion -> light rule (disabled by default) =====
-#define MOTION_ID_MAX 24
-#define MOTION_DEFAULT_OFF_DELAY_MS 10000u
-
-static bool s_motionEnabled = false;
-static char s_motionSensorId[MOTION_ID_MAX] = "*";
-static char s_motionLightId[MOTION_ID_MAX] = "*";
-static uint32_t s_motionOffDelayMs = MOTION_DEFAULT_OFF_DELAY_MS;
-static bool s_motionOffPending = false;
-static uint32_t s_motionOffDeadline = 0;
-
-static void copyRuleId(char *dst, size_t dstSize, const char *src)
-{
-  if (!dst || dstSize == 0) return;
-  if (!src || !src[0]) src = "*";
-  strncpy(dst, src, dstSize - 1);
-  dst[dstSize - 1] = '\0';
-}
-
-static uint32_t parseDelayMs(const char *value)
-{
-  if (!value || !value[0]) return MOTION_DEFAULT_OFF_DELAY_MS;
-  char *end = NULL;
-  unsigned long parsed = strtoul(value, &end, 10);
-  if (end == value || (end && *end != '\0') || parsed == 0ul) {
-    return MOTION_DEFAULT_OFF_DELAY_MS;
-  }
-  if (parsed > 0xFFFFFFFFul) return MOTION_DEFAULT_OFF_DELAY_MS;
-  return (uint32_t)parsed;
-}
-
-static bool ruleIdMatches(const char *configuredId, const char *actualId)
-{
-  if (!configuredId || !configuredId[0] || strcmp(configuredId, "*") == 0) {
-    return true;
-  }
-  return actualId && strcmp(configuredId, actualId) == 0;
-}
-
 // ===== Public API =====
 
 void ruleEngineInit(void)
@@ -133,44 +94,6 @@ void ruleEngineInit(void)
             s_bindingCount, relay ? "true" : "false");
   emberAfCorePrintln("RULE: engine init, %d binding(s), switch->light relay %s",
                      s_bindingCount, relay ? "ENABLED" : "disabled (direct binding)");
-
-  const char *motionEnv = getenv("SB_RULES_MOTION_TO_LIGHT");
-  s_motionEnabled = (motionEnv && strcmp(motionEnv, "1") == 0);
-  copyRuleId(s_motionSensorId, sizeof(s_motionSensorId),
-             getenv("SB_RULES_MOTION_SENSOR_ID"));
-  copyRuleId(s_motionLightId, sizeof(s_motionLightId),
-             getenv("SB_RULES_MOTION_LIGHT_ID"));
-  s_motionOffDelayMs = parseDelayMs(getenv("SB_RULES_MOTION_OFF_DELAY_MS"));
-  s_motionOffPending = false;
-  s_motionOffDeadline = 0;
-
-  appLogLog("RULE", "motion_init",
-            "\"enabled\":%s,\"sensor\":\"%s\",\"light\":\"%s\","
-            "\"off_delay_ms\":%u",
-            s_motionEnabled ? "true" : "false",
-            s_motionSensorId, s_motionLightId,
-            (unsigned)s_motionOffDelayMs);
-  emberAfCorePrintln("RULE: motion->light %s sensor=%s light=%s off_delay_ms=%u",
-                     s_motionEnabled ? "ENABLED" : "disabled",
-                     s_motionSensorId, s_motionLightId,
-                     (unsigned)s_motionOffDelayMs);
-}
-
-void ruleEngineTick(void)
-{
-  if (!s_motionEnabled || !s_motionOffPending) return;
-
-  uint32_t now = msTick();
-  if ((int32_t)(now - s_motionOffDeadline) < 0) return;
-
-  s_motionOffPending = false;
-  appLogLog("RULE", "motion_off_action",
-            "\"light\":\"%s\",\"reason\":\"delay_expired\"",
-            s_motionLightId);
-
-  bool sent = lightCtrlSetOff(s_motionLightId);
-  appLogLog("RULE", sent ? "motion_off_sent" : "motion_off_skipped",
-            "\"light\":\"%s\"", s_motionLightId);
 }
 
 void ruleEngineOnSwitchEvent(const char *switchDeviceId)
@@ -218,45 +141,4 @@ void ruleEngineOnSwitchEvent(const char *switchDeviceId)
     // This is the LOCAL AUTOMATION path, separate from the cloud command path.
     lightCtrlLocalToggle();
   }
-}
-
-void ruleEngineOnMotionReport(const char *sensorDeviceId, bool occupied)
-{
-  if (!sensorDeviceId || !sensorDeviceId[0]) return;
-
-  const char *occupancy = occupied ? "occupied" : "unoccupied";
-  appLogLog("RULE", "motion_report",
-            "\"enabled\":%s,\"sensor\":\"%s\",\"occupancy\":\"%s\"",
-            s_motionEnabled ? "true" : "false", sensorDeviceId, occupancy);
-
-  if (!s_motionEnabled) return;
-
-  if (!ruleIdMatches(s_motionSensorId, sensorDeviceId)) {
-    appLogLog("RULE", "motion_skip",
-              "\"sensor\":\"%s\",\"configured_sensor\":\"%s\","
-              "\"reason\":\"sensor_no_match\"",
-              sensorDeviceId, s_motionSensorId);
-    return;
-  }
-
-  if (occupied) {
-    if (s_motionOffPending) {
-      s_motionOffPending = false;
-      appLogLog("RULE", "motion_off_timer_canceled",
-                "\"sensor\":\"%s\",\"reason\":\"reoccupied\"",
-                sensorDeviceId);
-    }
-
-    bool sent = lightCtrlSetOn(s_motionLightId);
-    appLogLog("RULE", sent ? "motion_on_sent" : "motion_on_skipped",
-              "\"sensor\":\"%s\",\"light\":\"%s\"",
-              sensorDeviceId, s_motionLightId);
-    return;
-  }
-
-  s_motionOffPending = true;
-  s_motionOffDeadline = msTick() + s_motionOffDelayMs;
-  appLogLog("RULE", "motion_off_timer_scheduled",
-            "\"sensor\":\"%s\",\"light\":\"%s\",\"delay_ms\":%u",
-            sensorDeviceId, s_motionLightId, (unsigned)s_motionOffDelayMs);
 }

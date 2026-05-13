@@ -422,7 +422,6 @@ echo $(pgrep -fx './Z3Gateway -p /dev/ttyACM0 -b 115200') > /tmp/z3gw.pid
 > `nohup ... </dev/null` hoặc `setsid ... </dev/null` — cả hai đều
 > dẫn về cùng triệu chứng.
 
-
 ### Runtime flags / env vars quan trọng
 
 | Flag / env | Default | Tác dụng |
@@ -441,181 +440,6 @@ echo $(pgrep -fx './Z3Gateway -p /dev/ttyACM0 -b 115200') > /tmp/z3gw.pid
 `/tmp/z3gw.log` (theo redirect `> /tmp/z3gw.log 2>&1` ở trên). Mọi thứ
 stdout/stderr đều vào file này. Không có systemd unit, không có log
 rotate — file sẽ phình ra đến khi bạn restart process hoặc tự truncate.
-
-### Cách xem log gateway và từng node
-
-Có 3 loại log khi test local:
-
-- **Gateway log**: log của process Linux `Z3Gateway`, nằm ở `/tmp/z3gw.log`
-  nếu start bằng `... > /tmp/z3gw.log 2>&1` hoặc `tee /tmp/z3gw.log`.
-- **Light node log**: log serial/VCOM của board chạy `ZigbeeMinimal_2`.
-- **Occupancy node log**: log serial/VCOM của board chạy
-  `ZigbeeMinimal` / `Z3_Occupancy_Sensor`.
-
-Gateway nói chuyện với coordinator NCP qua `/dev/ttyACM0`. Light và
-Occupancy là board riêng, nên log node thường nằm ở cổng serial khác
-như `/dev/ttyACM1`, `/dev/ttyACM2`, hoặc `/dev/ttyUSB0`. Cắm từng board
-vào rồi xem danh sách:
-
-```bash
-ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
-```
-
-Nếu không biết cổng nào mới xuất hiện, chạy lệnh này ngay sau khi cắm
-board:
-
-```bash
-dmesg | tail -30
-```
-
-#### Xem log gateway
-
-Xem toàn bộ log gateway:
-
-```bash
-tail -f /tmp/z3gw.log
-```
-
-Xem gateway form network / mở join / node join:
-
-```bash
-tail -f /tmp/z3gw.log | grep --line-buffered -E 'NET|tc_join|MON'
-```
-
-Xem flow Occupancy -> Gateway -> Light:
-
-```bash
-tail -f /tmp/z3gw.log | grep --line-buffered -E 'MOTION|RULE|LIGHT|0x0406|0x0006|device":"motion|device":"light'
-```
-
-Các dòng quan trọng:
-
-```text
-NET formed                       coordinator đã form Zigbee network
-NET open_join ... zstatus 0x00   coordinator đã mở permit join
-NET tc_join                      có node join/rejoin
-MON bind_req_sent                gateway gửi bind request sau khi node join
-MON cfg_report_sent              gateway cấu hình reporting cho cluster
-MOTION report_parsed             gateway đã nhận report Occupancy
-RULE motion_on_sent              rule đã quyết định bật Light
-RULE motion_off_timer_scheduled  hết motion, bắt đầu đếm delay tắt
-RULE motion_off_sent             đã gửi lệnh tắt Light
-LIGHT local_set_sent             gateway đã gửi ZCL On/Off tới Light
-LIGHT local_set_skip             gateway bỏ qua, xem reason để biết vì sao
-```
-
-Ví dụ lỗi thường gặp:
-
-```text
-LIGHT local_set_skip ... reason":"no_light_found"
-```
-
-Nghĩa là Occupancy đã report, rule đã chạy, nhưng gateway chưa nhận diện
-được node Light. Cho Light join lại hoặc tạo report On/Off từ Light để
-gateway học device type `light`.
-
-#### Xem log Light node
-
-Giả sử Light đang ở `/dev/ttyACM1`:
-
-```bash
-screen /dev/ttyACM1 115200
-```
-
-Nếu chưa có `screen`:
-
-```bash
-sudo apt update
-sudo apt install -y screen
-```
-
-Thoát `screen`:
-
-```text
-Ctrl-A rồi bấm K rồi bấm Y
-```
-
-Log Light cần thấy:
-
-```text
-ZigbeeMinimal_2 init
-NET: steering start st=0x00
-NET: steering complete st=0x00
-NET: stack status=0x90
-LIGHT: ON
-LIGHT: OFF
-```
-
-Ý nghĩa:
-
-- `NET: steering start`: Light bắt đầu tìm coordinator.
-- `NET: steering complete st=0x00`: join thành công.
-- `NET: stack status=0x90`: network up.
-- `LIGHT: ON`: gateway gửi ZCL On, LED1 bật.
-- `LIGHT: OFF`: gateway gửi ZCL Off, LED1 tắt.
-
-Nếu LED0 trên Light nháy liên tục, Light đang ở trạng thái tìm mạng /
-rejoin. Sau khi join ổn định, LED0 phải bật đứng. Nếu LED1 luôn bật,
-xem gateway log có liên tục `LIGHT local_set_sent action":"on"` không;
-nếu có, Occupancy đang báo `occupied` liên tục hoặc rule chưa đến thời
-điểm tắt.
-
-#### Xem log Occupancy node
-
-Giả sử Occupancy đang ở `/dev/ttyACM2`:
-
-```bash
-screen /dev/ttyACM2 115200
-```
-
-Log Occupancy cần thấy:
-
-```text
-NWK Steering: Start: 0x00
-NET: steering start st=0x00
-Join network complete: 0x00
-Occupancy detected
-Occupancy cleared
-```
-
-Nếu thấy:
-
-```text
-Beacons heard: 0
-Join network complete: 0xAB
-```
-
-thì node không nghe thấy coordinator đang mở join. Kiểm tra gateway log
-phải có:
-
-```text
-NET formed
-NET open_join ... zstatus":"0x00"
-```
-
-Sau đó reset node hoặc bấm PB0 để steering lại.
-
-#### Xem log bằng serial terminal khác
-
-Nếu không muốn dùng `screen`, có thể dùng `picocom`:
-
-```bash
-sudo apt install -y picocom
-picocom -b 115200 /dev/ttyACM1
-```
-
-Thoát `picocom`:
-
-```text
-Ctrl-A rồi Ctrl-X
-```
-
-Quy tắc quan trọng: mỗi cổng serial chỉ nên có một chương trình đang mở.
-Nếu không thấy log, kiểm tra process đang giữ cổng:
-
-```bash
-fuser /dev/ttyACM1
-```
 
 ### Inspect gateway đang chạy **mà không** start thêm một cái mới
 
@@ -749,61 +573,19 @@ Z3Switch battery report, và bất cứ occupancy sensor report nào. Tất cả
 
 ### H.4 Motion → light occupancy automation
 
-Mặc định rule này **tắt**. Bật trên process gateway bằng environment:
+*current repo gap.* Không có rule automation nào ở gateway
+(`rule_engine.c`) hay ở cloud. Scaffold rule engine vẫn giữ trong
+gateway (§B / §G) để sau này thêm rule tại cùng entry point. Những gì
+**đang** hoạt động hôm nay:
 
-```bash
-export SB_RULES_MOTION_TO_LIGHT=1
-export SB_RULES_MOTION_SENSOR_ID=*
-export SB_RULES_MOTION_LIGHT_ID=*
-export SB_RULES_MOTION_OFF_DELAY_MS=10000
-```
+- Firmware occupancy sensor (khi đã flash) sẽ gửi
+  `occupancy → occupied/unoccupied` dưới dạng ZCL attribute report.
+- Gateway sẽ publish report đó đến
+  `sb/v1/.../devices/occupancy_sensor/<eui64>/reported` qua đường
+  telemetry chung — *verify in local environment*: xác nhận bằng cách
+  đi qua trước sensor và xem MQTT trace.
 
-Firmware note: `Z3_Occupancy_Sensor.slcp` now includes
-`zigbee_reporting`. If generated Simplicity Studio files are stale, open
-the project in Simplicity Studio v5 with Gecko SDK 4.5.0 and regenerate
-before building/flashing.
-
-Luồng chuẩn:
-
-1. Z3_Occupancy_Sensor ghi Zigbee Occupancy Sensing server attribute
-   `0x0406/0x0000`: `0x01` khi có chuyển động, `0x00` khi clear.
-2. Gateway bind/configure-reporting cluster `0x0406`, parse attribute
-   report, và publish:
-
-```text
-sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/<eui64>/reported
-```
-
-Payload `payload.state` kỳ vọng:
-
-```json
-{"occupancy":"occupied","reachable":true}
-```
-
-hoặc:
-
-```json
-{"occupancy":"unoccupied","reachable":true}
-```
-
-3. Khi `occupied`, gateway hủy timer off đang chờ và gửi local ZCL On
-   đến target light.
-4. Khi `unoccupied`, gateway đặt timer. Hết
-   `SB_RULES_MOTION_OFF_DELAY_MS` mới gửi local ZCL Off.
-5. Nếu `occupied` xuất hiện lại trước deadline, timer off cũ bị hủy.
-
-Log cần thấy trong `/tmp/z3gw.log`:
-
-- `MOTION report_parsed`
-- `MQTT motion_reported`
-- `RULE motion_on_sent`
-- `RULE motion_off_timer_scheduled`
-- `RULE motion_off_action` và `RULE motion_off_sent`
-- `RULE motion_off_timer_canceled` khi re-occupied trước deadline
-
-Nếu đang có cloud command in-flight, local action bị skip để không chen
-vào command lifecycle; log sẽ có `LIGHT local_set_skip` với
-`reason:"command_in_flight"`.
+Hành động theo report đó (bật đèn) CHƯA implement.
 
 ### H.5 Cloud → gateway commissioning (open / close permit-join)
 
@@ -828,7 +610,7 @@ curl -s -X POST http://localhost:8000/api/gateways/gw-ubuntu-01/commissioning/cl
 Bằng chứng hoạt động:
 
 - MQTT trace thấy `commands/{id}/request` với `payload.op =
-  "gateway.open_network"`, `target.duration_sec = 60`, **không có**
+  "gateway.open_network"`, `targethttps://github.com/ducanh186/zigbee-ble-orchestration-platform/pull/21/conflict?name=gateway%252FZ3Gateway%252FZ3GatewayHost%252Fapp%252Fapp_mqtt.c&ancestor_oid=7fec2b63b36c49f00314d8fa23593b4cf4e3faa5&base_oid=f9efff3435290b07393f4fa38d60e608e845783f&head_oid=b77adba5c9b5862814a8df02cc9874210faa5814.duration_sec = 60`, **không có**
   `payload.device_id` (đó là gateway-scoped op).
 - `/tmp/z3gw.log` có `MQTT: rx [...commands/...]`,
   `CMD parsed op=gateway.open_network device_id=""`,
@@ -993,20 +775,9 @@ RULE: engine init, 0 binding(s), switch->light relay disabled (direct binding)
 
 ### Motion automation không kích hoạt
 
-Xem §H.4. Checklist nhanh:
-
-- `env | grep SB_RULES_MOTION_TO_LIGHT` trong shell start gateway phải
-  hiện `SB_RULES_MOTION_TO_LIGHT=1`; unset hoặc giá trị khác `1` nghĩa
-  là rule tắt.
-- `/tmp/z3gw.log` khi start phải có `RULE motion_init` với
-  `enabled:true`.
-- Nếu không có MQTT `devices/motion/<eui64>/reported`, kiểm tra log
-  `MON bind_req_sent` / `MON cfg_report_sent` cho cluster `0x0406`.
-- Nếu có motion report nhưng không bật đèn, kiểm tra registry đã học
-  light chưa (`devices/light/<eui64>/reported` hoặc log `REG updated`
-  type `light`).
-- Nếu log có `LIGHT local_set_skip reason:"command_in_flight"`, cloud
-  command đang chạy; local automation đã skip đúng thiết kế.
+Repo hiện tại không implement. Xem §H.4. Nếu bạn tưởng nó đã hoạt động
+trước đây, rất có thể đó là do rule wildcard cũ routing các ZCL traffic
+không liên quan vào `lightCtrlLocalToggle` — mà giờ đã bị tắt.
 
 ### Tin nhắn MQTT retained cũ gây nhầm lẫn
 
@@ -1086,176 +857,3 @@ mosquitto_pub -h localhost -u client -P client123 -r -q 1 \
       retained từ session trước không (§I "Tin nhắn MQTT retained cũ").
 - [ ] Dừng bằng `kill "$(cat /tmp/z3gw.pid)"`, chờ `fuser /dev/ttyACM0`
       không in gì nữa, rồi restart.
-
----
-
-## K. Test EC2 cloud -> local Zigbee
-
-Mục tiêu của phần này:
-
-- Cloud EC2 nhận REST command.
-- Cloud publish MQTT `commands/{id}/request`.
-- Gateway local nhận MQTT command và gửi ZCL On/Off xuống Light node.
-- Occupancy node gửi report; gateway publish `reported` và
-  `event=occupancy_changed` lên cloud.
-
-### K.1 Endpoint cloud thật
-
-Hiện EC2 đang expose:
-
-```bash
-curl http://98.83.4.87:8000/health
-```
-
-Port 80 của `http://98.83.4.87/` không phải API chính trong flow này.
-Dùng base URL:
-
-```text
-http://98.83.4.87:8000
-```
-
-MQTT broker:
-
-```bash
-mosquitto_sub -h 98.83.4.87 -p 1883 -u monitor -P monitor123 \
-  -t '$SYS/broker/uptime' -C 1 -W 3
-```
-
-### K.2 Chạy gateway local trỏ lên EC2 MQTT
-
-Không chạy `make` firmware end-device ở bước này. Dùng binary gateway host
-đã có, hoặc build host gateway thủ công nếu bạn cần.
-
-```bash
-cd /home/al/code/zigbee-ble-orchestration-platform/gateway/Z3Gateway/Z3GatewayHost
-
-pkill -f 'Z3Gateway -p /dev/ttyACM0' || true
-while fuser /dev/ttyACM0 >/dev/null 2>&1; do sleep 1; done
-
-export SB_MQTT_HOST=98.83.4.87
-export SB_MQTT_PORT=1883
-export SB_MQTT_USERNAME=gateway
-export SB_MQTT_PASSWORD=gateway123
-
-export SB_RULES_MOTION_TO_LIGHT=1
-export SB_RULES_MOTION_SENSOR_ID='*'
-export SB_RULES_MOTION_LIGHT_ID='*'
-export SB_RULES_MOTION_OFF_DELAY_MS=10000
-
-./build/debug/Z3Gateway -p /dev/ttyACM0 > /tmp/z3gw.log 2>&1 &
-echo $! > /tmp/z3gw.pid
-```
-
-Theo dõi log gateway:
-
-```bash
-tail -f /tmp/z3gw.log | grep --line-buffered -E \
-  'MQTT|CMD|DISPATCH|LIGHT|MOTION|RULE|occupancy_changed|0x0406|0x0006'
-```
-
-Khi gateway chạy đúng, log phải có:
-
-```text
-MQTT: connected to 98.83.4.87:1883
-MQTT: subscribed to sb/v1/hust/lab01/gw-ubuntu-01/commands/+/request
-```
-
-### K.3 Cho node join và lấy EUI64 thật
-
-Form/open network trên coordinator như phần local Zigbee đã test trước.
-Sau đó cho Light và Occupancy join.
-
-Kiểm tra cloud đã thấy device chưa:
-
-```bash
-curl -s http://98.83.4.87:8000/api/devices/ | python3 -m json.tool
-```
-
-Light ID và Motion ID nên là EUI64 thật, ví dụ:
-
-```text
-SB_LIGHT_ID=0000000000000055
-SB_MOTION_ID=0000000000000053
-```
-
-Với bộ kit hiện tại trong Simplicity Studio:
-
-| Adapter | EUI64 dùng để test |
-|---|---|
-| `Light_55` | `0000000000000055` |
-| `occupancy_53` | `0000000000000053` |
-
-Nếu chưa thấy EUI64 trên cloud:
-
-- Với Light: tạo một report On/Off từ Light, hoặc bấm/test để gateway học
-  `devices/light/<eui64>/reported`.
-- Với Occupancy: kích hoạt PIR để gateway nhận report cluster `0x0406` và
-  publish `devices/motion/<eui64>/reported`.
-
-Xem MQTT trực tiếp:
-
-```bash
-mosquitto_sub -h 98.83.4.87 -p 1883 -u monitor -P monitor123 -v \
-  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/reported' \
-  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/event'
-```
-
-### K.4 Chạy smoke test cloud điều khiển đèn
-
-Cài dependency Python trong `/tmp` nếu máy chưa có:
-
-```bash
-python3 -m venv /tmp/zigbee-cloud-venv
-/tmp/zigbee-cloud-venv/bin/pip install -r /home/al/code/zigbee-ble-orchestration-platform/cloud/requirements.txt
-```
-
-Chạy test ON rồi OFF:
-
-```bash
-cd /home/al/code/zigbee-ble-orchestration-platform
-
-export SB_API_URL=http://98.83.4.87:8000
-export SB_MQTT_HOST=98.83.4.87
-export SB_MQTT_PORT=1883
-export SB_MQTT_USERNAME=monitor
-export SB_MQTT_PASSWORD=monitor123
-export SB_LIGHT_ID=0000000000000055
-export SB_MOTION_ID=0000000000000053
-
-/tmp/zigbee-cloud-venv/bin/python -m cloud.scripts.cloud_to_zigbee_smoke
-```
-
-Kết quả pass mong đợi:
-
-```text
-[ok] POST ON command id=...
-[ok] command ... terminal status=executed
-[ok] light state power=on
-[ok] POST OFF command id=...
-[ok] command ... terminal status=executed
-[ok] light state power=off
-CLOUD TO ZIGBEE SMOKE PASSED
-```
-
-Nếu script fail `Device not found`, cloud chưa auto-register EUI64 thật.
-Cho node join và phát report trước, rồi chạy lại.
-
-### K.5 Verify occupancy log lên cloud
-
-Trigger PIR, rồi xem state mới nhất:
-
-```bash
-curl -s "http://98.83.4.87:8000/api/devices/$SB_MOTION_ID/state" | python3 -m json.tool
-```
-
-Xem lịch sử event occupancy:
-
-```bash
-curl -s "http://98.83.4.87:8000/api/events/?device_id=$SB_MOTION_ID&event_type=occupancy_changed&limit=10" \
-  | python3 -m json.tool
-```
-
-Gateway publish event chỉ khi occupancy đổi trạng thái. Nếu bạn trigger PIR
-liên tục mà trạng thái vẫn `occupied`, cloud sẽ thấy `reported` mới nhưng
-không có event `occupancy_changed` mới cho đến khi state đổi sang
-`unoccupied` hoặc ngược lại.

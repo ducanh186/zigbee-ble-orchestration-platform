@@ -33,6 +33,7 @@ ota-files/
 
 # Local E2E test artifacts (live MQTT/API captures, not for tracking)
 docs/samples/real/
+cloud/.cloud-api.*.log
 
 # Simplicity Studio / EFR32 end device projects
 end_devices/**/GNU ARM*/

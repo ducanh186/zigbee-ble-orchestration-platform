@@ -105,17 +105,3 @@ async def test_post_command_switch_rejects_422(
     assert r.status_code == 422
     assert "does not accept commands" in r.json()["detail"]
     assert fake_mqtt.published == []
-
-
-@pytest.mark.asyncio
-async def test_post_command_motion_rejects_422(
-    client, fake_mqtt, seed_motion
-):
-    body = {
-        "op": "device.command",
-        "target": {"endpoint": 1, "cluster_id": "0x0006", "command": "on"},
-    }
-    r = await client.post(f"/api/devices/{seed_motion}/command", json=body)
-    assert r.status_code == 422
-    assert "does not accept commands" in r.json()["detail"]
-    assert fake_mqtt.published == []
