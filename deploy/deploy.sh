@@ -181,8 +181,9 @@ set -e
 cd $REMOTE_DIR/deploy
 
 # Copy cloud source into deploy context for Docker build
-rm -rf cloud/app cloud/requirements.txt cloud/Dockerfile cloud/__init__.py cloud/__main__.py 2>/dev/null || true
+rm -rf cloud/app cloud/webdev cloud/requirements.txt cloud/Dockerfile cloud/__init__.py cloud/__main__.py 2>/dev/null || true
 cp -r ../cloud/app         cloud/
+cp -r ../cloud/webdev      cloud/
 cp    ../cloud/requirements.txt cloud/
 cp    ../cloud/Dockerfile  cloud/
 cp    ../cloud/__init__.py cloud/

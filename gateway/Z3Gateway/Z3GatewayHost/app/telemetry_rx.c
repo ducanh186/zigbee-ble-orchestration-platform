@@ -4,6 +4,7 @@
 #include "app_log.h"
 #include "app_mqtt.h"
 #include "device_registry.h"
+#include "device_discovery.h"
 #include "rule_engine.h"
 #include "app/framework/include/af.h"
 #include "app_zcl_fallback.h"
@@ -57,19 +58,32 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
             eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
 
             // Telemetry-driven fallback registration: if THIS EUI is not
-            // yet in the registry, register it as "light" (evidence-based:
-            // a server-side OnOff attribute report only comes from a light).
-            // Then clear any stale retained registry slots under other
-            // device_types and publish the authoritative one.
+            // yet in the registry, only auto-register if:
+            //   1. ZDO discovery is NOT in progress (let discovery classify)
+            //   2. This nodeId is not already registered under a different
+            //      EUI64 (avoids duplicate entries for the same device)
             device_resolved_t resolved;
             if (!deviceRegistryResolve(euiStr, &resolved)) {
-              deviceRegistryUpsert(euiStr, sender, 1, "light");
-              appMqttClearRetainedRegistry(euiStr, "light");
-              appMqttPublishDeviceRegistry(sender, euiStr, "light");
-              appLogLog("REG", "auto_paired",
-                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
-                "\"trigger\":\"attr_report\",\"type\":\"light\"",
-                euiStr, (unsigned)sender);
+              if (deviceDiscoveryInProgress(sender)) {
+                appLogLog("REG", "auto_skip_discovery",
+                  "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                  "\"reason\":\"zdo_discovery_active\"",
+                  euiStr, (unsigned)sender);
+              } else if (deviceRegistryResolveByNodeId(sender, &resolved)) {
+                appLogLog("REG", "auto_skip_dup_node",
+                  "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                  "\"reason\":\"node_already_registered\","
+                  "\"existing_type\":\"%s\"",
+                  euiStr, (unsigned)sender, resolved.device_type);
+              } else {
+                deviceRegistryUpsert(euiStr, sender, 1, "light");
+                appMqttClearRetainedRegistry(euiStr, "light");
+                appMqttPublishDeviceRegistry(sender, euiStr, "light");
+                appLogLog("REG", "auto_paired",
+                  "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                  "\"trigger\":\"attr_report\",\"type\":\"light\"",
+                  euiStr, (unsigned)sender);
+              }
             }
 
             appMqttPublishDeviceReportedFull(sender, euiStr, "light",

@@ -7,10 +7,14 @@ from __future__ import annotations
 
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from cloud.app.database import async_session, init_db
-from cloud.app.models import Device, Home, Room, User
+from cloud.app.models import Command, Device, DeviceState, Event, Home, Room, User
+
+# Placeholder device IDs that were seeded before real MQTT registration existed.
+# These have no EUI64 and clutter the dashboard alongside real devices.
+_LEGACY_PLACEHOLDER_IDS = {"light-01", "light-02", "pir-01", "switch-01"}
 
 
 async def _upsert(session, model, pk: str, **kwargs):
@@ -30,6 +34,22 @@ async def seed() -> None:
 
     async with async_session() as session:
         async with session.begin():
+            # Remove legacy placeholder devices (no EUI64, no real data)
+            for pid in _LEGACY_PLACEHOLDER_IDS:
+                existing = await session.get(Device, pid)
+                if existing is not None:
+                    await session.execute(
+                        delete(Command).where(Command.device_id == pid)
+                    )
+                    await session.execute(
+                        delete(Event).where(Event.device_id == pid)
+                    )
+                    await session.execute(
+                        delete(DeviceState).where(DeviceState.device_id == pid)
+                    )
+                    await session.delete(existing)
+                    print(f"Removed placeholder device: {pid}")
+
             # Home
             await _upsert(session, Home, "home-01", name="HUST Lab")
 
@@ -37,41 +57,8 @@ async def seed() -> None:
             await _upsert(session, Room, "room-01", home_id="home-01", name="Lab 01")
             await _upsert(session, Room, "room-02", home_id="home-01", name="Lab 02")
 
-            # Devices
-            await _upsert(
-                session,
-                Device,
-                "light-01",
-                device_type="light",
-                room_id="room-01",
-                name="Light 01",
-            )
-            await _upsert(
-                session,
-                Device,
-                "pir-01",
-                device_type="motion",
-                room_id="room-01",
-                name="PIR Sensor 01",
-            )
-            await _upsert(
-                session,
-                Device,
-                "light-02",
-                device_type="light",
-                room_id="room-02",
-                name="Light 02",
-            )
-
-            # Switch (Phase 3)
-            await _upsert(
-                session,
-                Device,
-                "switch-01",
-                device_type="switch",
-                room_id="room-01",
-                name="Switch 01",
-            )
+            # No placeholder devices — real devices are auto-registered
+            # via MQTT when the gateway discovers them (ZDO + registry).
 
             # User
             await _upsert(

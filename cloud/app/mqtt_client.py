@@ -250,7 +250,7 @@ class MQTTService:
         self._run_async(_write)
 
     def _handle_command_reply(self, topic: str, envelope: dict) -> None:
-        """Handle command reply -- update command status."""
+        """Handle command reply -- update command status and infer device state."""
         parts = topic.split("/")
         cmd_id_idx = parts.index("commands") + 1
         command_id = parts[cmd_id_idx]
@@ -259,7 +259,7 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Command
+            from cloud.app.models import Command, Device, DeviceState
             from sqlalchemy import select
 
             async with self._db_session_factory() as session:
@@ -267,15 +267,70 @@ class MQTTService:
                     select(Command).where(Command.id == command_id)
                 )
                 cmd = result.scalar_one_or_none()
-                if cmd:
-                    cmd.status = inner.get("status", cmd.status)
-                    cmd.reason = inner.get("reason")
-                    await session.commit()
-                    logger.info(
-                        "Updated command %s status=%s", command_id, cmd.status
+                if not cmd:
+                    return
+                new_status = inner.get("status", cmd.status)
+                cmd.status = new_status
+                cmd.reason = inner.get("reason")
+                await session.flush()
+                logger.info(
+                    "Updated command %s status=%s", command_id, new_status
+                )
+
+                # When a light command is executed, infer the new device state
+                # so the dashboard can show updated status immediately.
+                if (
+                    new_status == "executed"
+                    and cmd.device_id
+                    and cmd.target_kind == "device"
+                ):
+                    dev_result = await session.execute(
+                        select(Device).where(Device.id == cmd.device_id)
                     )
+                    device = dev_result.scalar_one_or_none()
+                    if device and device.device_type == "light":
+                        inferred = self._infer_light_state(
+                            session, device, cmd.target
+                        )
+                        if inferred is not None:
+                            # Read current state to merge
+                            latest_q = await session.execute(
+                                select(DeviceState)
+                                .where(DeviceState.device_id == device.id)
+                                .order_by(DeviceState.reported_at.desc())
+                                .limit(1)
+                            )
+                            latest = latest_q.scalar_one_or_none()
+                            merged = dict(latest.state) if latest else {
+                                "power": "off", "level": 0, "reachable": True,
+                            }
+                            merged.update(inferred)
+                            now = datetime.now(UTC).replace(tzinfo=None)
+                            session.add(DeviceState(
+                                device_id=device.id,
+                                state=merged,
+                                reported_at=now,
+                            ))
+                            logger.info(
+                                "Inferred light state for %s: %s",
+                                device.id, merged,
+                            )
+
+                await session.commit()
 
         self._run_async(_write)
+
+    @staticmethod
+    def _infer_light_state(session, device, target: dict) -> dict | None:
+        """Infer new light state fields from a command target."""
+        cmd_name = target.get("command")
+        if cmd_name == "on":
+            return {"power": "on", "reachable": True}
+        if cmd_name == "off":
+            return {"power": "off", "reachable": True}
+        if cmd_name == "set_level" and "level" in target:
+            return {"level": target["level"], "reachable": True}
+        return None
 
     def _handle_gateway_online(self, envelope: dict) -> None:
         inner = envelope.get("payload", {})

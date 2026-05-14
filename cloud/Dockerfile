@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY __init__.py cloud/
 COPY __main__.py cloud/
 COPY app/         cloud/app/
+COPY webdev/      cloud/webdev/
 
 # Data volume mount point
 RUN mkdir -p /app/data
