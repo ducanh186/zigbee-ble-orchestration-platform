@@ -168,15 +168,6 @@ const EmberEUI64 *deviceRegistryGetEuiLe(void)
   return s ? (const EmberEUI64 *)&s->euiLe : &zero;
 }
 
-uint32_t deviceRegistryCount(void)
-{
-  uint32_t n = 0;
-  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
-    if (s_devices[i].active) n++;
-  }
-  return n;
-}
-
 // ===== Trust Center join callback =====
 // Fired by the Ember framework on every TC join event.
 // New flow (post-classification fix):

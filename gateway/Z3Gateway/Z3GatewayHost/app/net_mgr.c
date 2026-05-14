@@ -3,6 +3,8 @@
 #include "app_utils.h"
 #include "app_log.h"
 #include "app_mqtt.h"
+#include "device_discovery.h"
+#include "device_registry.h"
 
 #include "app/framework/include/af.h"
 
@@ -31,6 +33,17 @@ static uint32_t g_openTick        = 0;
 // Runtime auto-close window: 0 means "use compile-time OPEN_JOIN_MS".
 // netMgrOpenForJoin() overrides this per request.
 static uint32_t g_openDurationMs  = 0;
+
+// Layer-1 boot rediscovery: 0 = inactive, otherwise msTick deadline at which
+// netMgrTick() should walk the child table and queue ZDO discovery for any
+// already-joined device the registry does not yet classify.  This solves the
+// case where a device joined before this gateway instance started: the TC-join
+// callback never fired so neither device_discovery nor the registry got
+// populated, and the device stays invisible until it happens to publish an
+// attribute report. We defer a few seconds after EMBER_NETWORK_UP so the
+// EZSP-host cache of the NCP child table has time to repopulate.
+static uint32_t g_rediscoverDeadline = 0;
+#define BOOT_REDISCOVER_DELAY_MS 3000u
 
 static bool startNetworkForm(uint16_t panId, int8_t txPwrDbm, uint8_t ch, const char *src)
 {
@@ -77,9 +90,104 @@ bool netMgrRequestForm(NetCfg_t cfg, const char *src, bool force)
   return (st == EMBER_SUCCESS);
 }
 
+// Layer-1: walk the EZSP child table and run ZDO discovery for any device
+// that is on the network but not yet classified in our registry (or is
+// classified as "unknown"). Idempotent — deviceDiscoveryStart reuses slot
+// for the same nodeId.
+static void netMgrRediscoverChildren(void)
+{
+  uint8_t kicked = 0, skipped = 0, scanned = 0;
+#ifdef EMBER_AF_PLUGIN_CHILD_TABLE_SIZE
+  const uint8_t maxIdx = EMBER_AF_PLUGIN_CHILD_TABLE_SIZE;
+#else
+  const uint8_t maxIdx = 32;  // safe upper bound for EZSP host child table
+#endif
+  for (uint8_t i = 0; i < maxIdx; i++) {
+    EmberChildData child;
+    EmberStatus st = emberGetChildData(i, &child);
+    if (st != EMBER_SUCCESS) continue;
+    scanned++;
+
+    char euiStr[17];
+    eui64ToStringBigEndian(euiStr, sizeof(euiStr), child.eui64);
+
+    device_resolved_t resolved;
+    bool inReg = deviceRegistryResolve(euiStr, &resolved);
+    if (inReg && resolved.device_type[0]
+        && strcmp(resolved.device_type, "unknown") != 0) {
+      appLogLog("BOOT", "rediscover_skip",
+        "\"eui64\":\"%s\",\"node_id\":\"0x%04X\",\"type\":\"%s\","
+        "\"reason\":\"already_classified\"",
+        euiStr, (unsigned)child.id, resolved.device_type);
+      skipped++;
+      continue;
+    }
+    appLogLog("BOOT", "rediscover_kick",
+      "\"eui64\":\"%s\",\"node_id\":\"0x%04X\"",
+      euiStr, (unsigned)child.id);
+    deviceDiscoveryStart(child.id, child.eui64);
+    kicked++;
+  }
+  appLogLog("BOOT", "rediscover_done",
+    "\"scanned\":%u,\"kicked\":%u,\"skipped\":%u",
+    (unsigned)scanned, (unsigned)kicked, (unsigned)skipped);
+}
+
+// Layer-2: on-demand rediscovery by big-endian EUI64 hex (gateway.rediscover_device).
+// Returns true if a ZDO discovery was queued, false if the EUI cannot be
+// resolved to a known nodeId on this network.
+bool netMgrRediscoverByEui(const char *euiStr)
+{
+  if (!euiStr || !*euiStr) return false;
+
+  EmberEUI64 euiLe;
+  if (!parseHexEui64(euiStr, euiLe)) {
+    appLogLog("REDISC", "bad_eui", "\"eui64\":\"%s\"", euiStr);
+    return false;
+  }
+
+#ifdef EMBER_AF_PLUGIN_CHILD_TABLE_SIZE
+  const uint8_t maxIdx = EMBER_AF_PLUGIN_CHILD_TABLE_SIZE;
+#else
+  const uint8_t maxIdx = 32;
+#endif
+  for (uint8_t i = 0; i < maxIdx; i++) {
+    EmberChildData child;
+    if (emberGetChildData(i, &child) != EMBER_SUCCESS) continue;
+    if (memcmp(child.eui64, euiLe, EUI64_SIZE) == 0) {
+      appLogLog("REDISC", "found_in_child_table",
+        "\"eui64\":\"%s\",\"node_id\":\"0x%04X\"",
+        euiStr, (unsigned)child.id);
+      deviceDiscoveryStart(child.id, child.eui64);
+      return true;
+    }
+  }
+
+  // Fallback: stack address lookup (covers router devices not in child table).
+  EmberNodeId nodeId = emberLookupNodeIdByEui64(euiLe);
+  if (nodeId != EMBER_NULL_NODE_ID) {
+    appLogLog("REDISC", "found_in_lookup",
+      "\"eui64\":\"%s\",\"node_id\":\"0x%04X\"",
+      euiStr, (unsigned)nodeId);
+    deviceDiscoveryStart(nodeId, euiLe);
+    return true;
+  }
+
+  appLogLog("REDISC", "not_found",
+    "\"eui64\":\"%s\",\"reason\":\"not_on_network\"", euiStr);
+  return false;
+}
+
 void netMgrTick(void)
 {
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
+  // Layer-1 boot rediscovery fires once, ~3 s after EMBER_NETWORK_UP.
+  if (g_rediscoverDeadline != 0
+      && (int32_t)(msTick() - g_rediscoverDeadline) >= 0) {
+    g_rediscoverDeadline = 0;
+    netMgrRediscoverChildren();
+  }
+
   uint32_t window = (g_openDurationMs > 0) ? g_openDurationMs : OPEN_JOIN_MS;
   if (g_networkOpen && (msTick() - g_openTick >= window)) {
     EmberStatus st = emberAfPluginNetworkCreatorSecurityCloseNetwork();
@@ -94,69 +202,6 @@ void netMgrTick(void)
              "\"reason\":\"timeout\",\"zstatus\":\"0x%02X\"", (unsigned)st);
     appMqttPublishGatewayEvent("permit_join_closed", extra);
   }
-#endif
-}
-
-EmberStatus netMgrOpenForJoin(uint16_t durationSec)
-{
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
-  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
-    appLogLog("NET", "open_skip", "\"reason\":\"not_joined\"");
-    return EMBER_NOT_JOINED;
-  }
-
-  // Clamp to [1, 180] -- matches OPEN_JOIN_MS=180s and EZSP permit-join byte.
-  if (durationSec < 1) durationSec = 1;
-  if (durationSec > 180) durationSec = 180;
-
-  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetwork();
-  appLogLog("NET", "open_join_cmd",
-            "\"zstatus\":\"0x%02X\",\"duration_s\":%u",
-            (unsigned)st, (unsigned)durationSec);
-
-  if (st == EMBER_SUCCESS) {
-    g_networkOpen     = true;
-    g_openTick        = msTick();
-    g_openDurationMs  = (uint32_t)durationSec * 1000u;
-
-    char extra[64];
-    snprintf(extra, sizeof(extra), "\"duration_sec\":%u",
-             (unsigned)durationSec);
-    appMqttPublishGatewayEvent("permit_join_opened", extra);
-  } else {
-    char extra[80];
-    snprintf(extra, sizeof(extra),
-             "\"reason\":\"open_fail\",\"zstatus\":\"0x%02X\"",
-             (unsigned)st);
-    appMqttPublishGatewayEvent("permit_join_failed", extra);
-  }
-  return st;
-#else
-  appLogLog("NET", "open_skip", "\"reason\":\"plugin_missing\"");
-  return EMBER_LIBRARY_NOT_PRESENT;
-#endif
-}
-
-EmberStatus netMgrCloseJoin(void)
-{
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
-  EmberStatus st = emberAfPluginNetworkCreatorSecurityCloseNetwork();
-  appLogLog("NET", "close_join_cmd", "\"zstatus\":\"0x%02X\"", (unsigned)st);
-
-  // Always clear local flags even if the broadcast failed -- the request was
-  // intentional and the local TC link-key transient set is already cleared
-  // by the SDK.
-  g_networkOpen    = false;
-  g_openDurationMs = 0;
-
-  char extra[80];
-  snprintf(extra, sizeof(extra),
-           "\"reason\":\"command\",\"zstatus\":\"0x%02X\"", (unsigned)st);
-  appMqttPublishGatewayEvent("permit_join_closed", extra);
-  return st;
-#else
-  appLogLog("NET", "close_skip", "\"reason\":\"plugin_missing\"");
-  return EMBER_LIBRARY_NOT_PRESENT;
 #endif
 }
 
@@ -257,6 +302,14 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   if (status == EMBER_NETWORK_UP) {
     appLogEmitHeartbeat();
+    // Arm boot-time rediscovery once per session. netMgrTick fires it after
+    // BOOT_REDISCOVER_DELAY_MS so the EZSP child-table cache has time to
+    // repopulate after stack-up.
+    if (g_rediscoverDeadline == 0) {
+      g_rediscoverDeadline = msTick() + BOOT_REDISCOVER_DELAY_MS;
+      appLogLog("BOOT", "rediscover_armed",
+                "\"delay_ms\":%u", (unsigned)BOOT_REDISCOVER_DELAY_MS);
+    }
   } else if (status == EMBER_NETWORK_DOWN) {
     appLogEmitHeartbeat();
   }

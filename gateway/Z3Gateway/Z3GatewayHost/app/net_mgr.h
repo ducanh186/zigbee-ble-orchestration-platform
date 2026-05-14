@@ -31,4 +31,11 @@ EmberStatus netMgrOpenForJoin(uint16_t durationSec);
 // Cancels any auto-close timer.  Returns SDK status.
 EmberStatus netMgrCloseJoin(void);
 
+// On-demand rediscovery (gateway.rediscover_device). Looks up `euiStr`
+// (big-endian hex, 16 chars) in the EZSP child table or the stack address
+// cache, then kicks ZDO Simple Descriptor classification via
+// deviceDiscoveryStart(). Returns false if the device cannot be located on
+// this network (caller should reply command status="failed").
+bool netMgrRediscoverByEui(const char *euiStr);
+
 #endif

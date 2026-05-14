@@ -59,6 +59,7 @@ app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)
 app.include_router(gateways.router)
+app.include_router(gateways.devices_router)
 
 # -- Serve web dashboard --
 _webdev_dir = Path(__file__).resolve().parent.parent / "webdev"
