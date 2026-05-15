@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/smart_device.dart';
+import '../../devices/views/devices_view.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../../automation/views/automation_rules_view.dart';
 import '../../home/views/home_view.dart';
@@ -52,6 +53,11 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
                 label: 'Home',
               ),
               NavigationDestination(
+                icon: Icon(Icons.lightbulb_outline),
+                selectedIcon: Icon(Icons.lightbulb),
+                label: 'Devices',
+              ),
+              NavigationDestination(
                 icon: Icon(Icons.rule_outlined),
                 selectedIcon: Icon(Icons.rule),
                 label: 'Automation',
@@ -76,8 +82,9 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
   Widget _buildTabBody() {
     return switch (_tabIndex) {
       0 => HomeView(onOpenLight: _openLight),
-      1 => const AutomationRulesView(),
-      2 => const ProvisioningView(),
+      1 => DevicesView(onOpenLight: _openLight),
+      2 => const AutomationRulesView(),
+      3 => const ProvisioningView(),
       _ => SettingsView(onOpenLight: _openLight),
     };
   }

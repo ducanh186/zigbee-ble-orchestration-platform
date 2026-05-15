@@ -53,12 +53,15 @@ class DevicesView extends StatelessWidget {
                       onRetry: viewModel.load,
                     );
                   }
+
                   final offset = viewModel.errorMessage == null
                       ? index
                       : index - 1;
                   final device = viewModel.devices[offset];
+
                   return _DeviceRow(
                     device: device,
+                    viewModel: viewModel,
                     onTap: device.isLight ? () => onOpenLight(device) : null,
                   );
                 },
@@ -72,9 +75,10 @@ class DevicesView extends StatelessWidget {
 }
 
 class _DeviceRow extends StatelessWidget {
-  const _DeviceRow({required this.device, this.onTap});
+  const _DeviceRow({required this.device, required this.viewModel, this.onTap});
 
   final SmartDevice device;
+  final DeviceDashboardViewModel viewModel;
   final VoidCallback? onTap;
 
   @override
@@ -93,6 +97,7 @@ class _DeviceRow extends StatelessWidget {
     return AppCard(
       onTap: onTap,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 42,
@@ -134,14 +139,86 @@ class _DeviceRow extends StatelessWidget {
               ],
             ),
           ),
-          device.isLight
-              ? StatusBadge.forPower(device.power)
-              : StatusBadge(
-                  label: device.isOnline ? 'ONLINE' : 'OFFLINE',
-                  tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
-                ),
+          const SizedBox(width: 12),
+          _DeviceActions(device: device, viewModel: viewModel),
         ],
       ),
+    );
+  }
+}
+
+class _DeviceActions extends StatelessWidget {
+  const _DeviceActions({required this.device, required this.viewModel});
+
+  final SmartDevice device;
+  final DeviceDashboardViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!device.isLight) {
+      return StatusBadge(
+        label: device.isOnline ? 'ONLINE' : 'OFFLINE',
+        tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
+      );
+    }
+
+    final isPending =
+        viewModel.hasPendingCommand &&
+        viewModel.lastCommand?.deviceId == device.id;
+    final canCommand = device.isReachable && !viewModel.hasPendingCommand;
+    final showOnSpinner = isPending && viewModel.lastTarget == DevicePower.on;
+    final showOffSpinner = isPending && viewModel.lastTarget == DevicePower.off;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        StatusBadge.forPower(device.power),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 58,
+              child: FilledButton(
+                onPressed: canCommand
+                    ? () => viewModel.setLightPower(device, DevicePower.on)
+                    : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(58, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: showOnSpinner
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('ON'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 58,
+              child: OutlinedButton(
+                onPressed: canCommand
+                    ? () => viewModel.setLightPower(device, DevicePower.off)
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(58, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: showOffSpinner
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('OFF'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

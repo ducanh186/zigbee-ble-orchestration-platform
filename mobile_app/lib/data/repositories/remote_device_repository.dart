@@ -144,7 +144,7 @@ class RemoteDeviceRepository implements DeviceRepository {
     required DevicePower target,
   }) async {
     final json = await _apiClient.postJson('/api/devices/$deviceId/command', {
-      'op': 'set_power',
+      'op': 'set',
       'target': {'power': target.wireValue},
       'timeout_ms': 5000,
     });

@@ -2,19 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
+import 'package:zigbee_smart_building/domain/models/command_result.dart';
+import 'package:zigbee_smart_building/domain/models/command_status.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
+import 'package:zigbee_smart_building/domain/models/device_power.dart';
+import 'package:zigbee_smart_building/domain/models/event_log.dart';
+import 'package:zigbee_smart_building/domain/models/smart_device.dart';
+import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
 import 'package:zigbee_smart_building/main.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
 import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_card.dart';
 
 void main() {
-  Future<void> pumpDashboard(
+  Future<void> pumpApp(
     WidgetTester tester, {
+    required DeviceRepository repository,
     required bool useMockApi,
   }) async {
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
-        repository: MockDeviceRepository(),
+        repository: repository,
         apiBaseUrl: useMockApi ? 'mock' : 'http://98.83.4.87:8000',
         useMockApi: useMockApi,
       ),
@@ -23,17 +30,115 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('renders LIGHT control dashboard', (tester) async {
+  Future<void> pumpDashboard(
+    WidgetTester tester, {
+    required bool useMockApi,
+  }) async {
+    await pumpApp(
+      tester,
+      repository: MockDeviceRepository(),
+      useMockApi: useMockApi,
+    );
+  }
+
+  testWidgets('renders LIGHT control dashboard with devices tab', (
+    tester,
+  ) async {
     await pumpDashboard(tester, useMockApi: true);
 
     expect(find.text('Home'), findsWidgets);
+    expect(find.text('Devices'), findsOneWidget);
     expect(find.text('Automation'), findsOneWidget);
     expect(find.text('Provisioning'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Devices'), findsNothing);
     expect(find.text('Logs'), findsNothing);
     expect(find.text('QUICK LIGHTS'), findsOneWidget);
     expect(find.text('Lab Light 01'), findsOneWidget);
+  });
+
+  testWidgets('devices tab lists devices and shows inline light controls', (
+    tester,
+  ) async {
+    final repository = _TestDeviceRepository(
+      devices: const [
+        SmartDevice(
+          id: 'light-01',
+          deviceType: 'light',
+          name: 'Lab Light 01',
+          isOnline: true,
+          power: DevicePower.off,
+          roomId: 'lab01',
+          reportedAt: '07:16 05/07/2026',
+        ),
+        SmartDevice(
+          id: 'motion-01',
+          deviceType: 'motion',
+          name: 'Lab Motion',
+          isOnline: true,
+          power: DevicePower.unknown,
+          roomId: 'lab01',
+          reportedAt: '07:15 05/07/2026',
+        ),
+      ],
+    );
+
+    await pumpApp(tester, repository: repository, useMockApi: true);
+
+    await tester.tap(find.text('Devices'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lab Light 01'), findsOneWidget);
+    expect(find.text('Lab Motion'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'ON'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'OFF'), findsOneWidget);
+    expect(find.text('ONLINE'), findsOneWidget);
+  });
+
+  testWidgets('devices tab ON and OFF buttons send command and refresh state', (
+    tester,
+  ) async {
+    final repository = _TestDeviceRepository(
+      devices: const [
+        SmartDevice(
+          id: 'light-01',
+          deviceType: 'light',
+          name: 'Lab Light 01',
+          isOnline: true,
+          power: DevicePower.off,
+          roomId: 'lab01',
+          reportedAt: '07:16 05/07/2026',
+        ),
+      ],
+    );
+
+    await pumpApp(tester, repository: repository, useMockApi: true);
+
+    await tester.tap(find.text('Devices'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, 'ON'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'OFF'), findsOneWidget);
+    expect(repository.currentPower('light-01'), DevicePower.off);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'ON'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 750));
+    await tester.pumpAndSettle();
+
+    expect(repository.sentTargets, [DevicePower.on]);
+    expect(repository.currentPower('light-01'), DevicePower.on);
+    expect(find.widgetWithText(FilledButton, 'ON'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'OFF'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'OFF'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 750));
+    await tester.pumpAndSettle();
+
+    expect(repository.sentTargets, [DevicePower.on, DevicePower.off]);
+    expect(repository.currentPower('light-01'), DevicePower.off);
+    expect(find.widgetWithText(FilledButton, 'ON'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'OFF'), findsOneWidget);
   });
 
   testWidgets('automation and provisioning tabs show placeholders', (
@@ -147,4 +252,72 @@ void main() {
     expect(AppPalette.grey.primary, const Color(0xFF475569));
     expect(AppPalette.grey.textSecondary, const Color(0xFF64748B));
   });
+}
+
+class _TestDeviceRepository implements DeviceRepository {
+  _TestDeviceRepository({required List<SmartDevice> devices})
+    : _devices = List<SmartDevice>.from(devices);
+
+  final List<SmartDevice> _devices;
+  final List<DevicePower> sentTargets = [];
+  int _nextCommand = 1;
+  String? _lastDeviceId;
+  DevicePower? _lastTarget;
+
+  @override
+  Future<CloudStatus> fetchCloudStatus() async => const CloudStatus.mock();
+
+  @override
+  Future<List<SmartDevice>> fetchDevices() async =>
+      List<SmartDevice>.unmodifiable(_devices);
+
+  DevicePower? currentPower(String deviceId) {
+    for (final device in _devices) {
+      if (device.id == deviceId) {
+        return device.power;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<EventLog>> fetchEvents({String? deviceId}) async => const [];
+
+  @override
+  Future<CommandResult> sendLightPowerCommand({
+    required String deviceId,
+    required DevicePower target,
+  }) async {
+    _lastDeviceId = deviceId;
+    _lastTarget = target;
+    sentTargets.add(target);
+    return CommandResult(
+      id: 'cmd-${_nextCommand++}',
+      deviceId: deviceId,
+      status: CommandStatus.accepted,
+    );
+  }
+
+  @override
+  Future<CommandResult> fetchCommand(String commandId) async {
+    final lastDeviceId = _lastDeviceId;
+    final lastTarget = _lastTarget;
+
+    if (lastDeviceId != null && lastTarget != null) {
+      final index = _devices.indexWhere((device) => device.id == lastDeviceId);
+      if (index != -1) {
+        _devices[index] = _devices[index].copyWith(
+          power: lastTarget,
+          isOnline: true,
+          reportedAt: 'now',
+        );
+      }
+    }
+
+    return CommandResult(
+      id: commandId,
+      deviceId: lastDeviceId ?? '',
+      status: CommandStatus.executed,
+    );
+  }
 }
