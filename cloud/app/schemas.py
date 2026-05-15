@@ -248,6 +248,40 @@ class CommandOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Automation rules
+# ---------------------------------------------------------------------------
+
+
+class AutomationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    enabled: bool = True
+    trigger: dict[str, Any]
+    actions: list[dict[str, Any]] = Field(min_length=1)
+
+
+class AutomationOut(BaseModel):
+    id: str
+    name: str
+    enabled: bool
+    tenant_id: str
+    site_id: str
+    gateway_id: str
+    trigger: dict[str, Any]
+    actions: list[dict[str, Any]]
+    sync_status: Literal["pending", "synced", "failed"]
+    last_run_status: Literal["never_run", "executed", "failed", "timeout"]
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "updated_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
+
+# ---------------------------------------------------------------------------
 # Gateway commissioning (open / close permit-join)
 # ---------------------------------------------------------------------------
 

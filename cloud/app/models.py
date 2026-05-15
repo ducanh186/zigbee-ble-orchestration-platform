@@ -129,3 +129,31 @@ class Command(Base):
     __table_args__ = (
         Index("ix_commands_device_created", "device_id", "created_at"),
     )
+
+
+class Automation(Base):
+    __tablename__ = "automations"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    tenant_id = Column(String, nullable=False)
+    site_id = Column(String, nullable=False)
+    gateway_id = Column(String, nullable=False)
+    trigger = Column("trigger", JSON, nullable=False, quote=True)
+    actions = Column(JSON, nullable=False)
+    sync_status = Column(String, nullable=False, default="pending")
+    last_run_status = Column(String, nullable=False, default="never_run")
+    last_error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_automations_gateway_created",
+            "tenant_id",
+            "site_id",
+            "gateway_id",
+            "created_at",
+        ),
+    )
