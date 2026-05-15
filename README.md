@@ -1,117 +1,136 @@
-# IoT Smart Building Platform
+# Zigbee Smart Building Platform
 
-Nền tảng quản lý thiết bị IoT Zigbee/BLE cho tòa nhà thông minh, xây dựng trên kiến trúc Z3Gateway-native.
+This repository contains a small smart-building system for Zigbee devices. It
+connects a Flutter mobile app, a FastAPI cloud backend, a Mosquitto broker, and
+a native Silicon Labs Z3Gateway host application.
 
-## Kiến trúc
+The current MVP focuses on real device monitoring, light control, and simple
+automation rules such as "when motion is occupied, turn these lights on".
 
-```
-Flutter App ──HTTP──▶ Cloud API (FastAPI :8000) ◄──▶ Mosquitto (:1883) ◄──MQTT──▶ Z3Gateway C ◄──EZSP/ASH──▶ EFR32 NCP ◄──Zigbee──▶ End Devices
-                           │ PostgreSQL                                     │
-                           ▼                                                ├─ MQTT client (direct)
-                        sb_cloud DB                                         ├─ command lifecycle
-                                                                            ├─ device registry
-                                                                            └─ local automation
-```
+## System Overview
 
-Z3Gateway C là **single process** trên Ubuntu host — chạy trực tiếp MQTT client, command management, local automation, và Zigbee EZSP/ASH handling. Không có IPC socket hay bridge process riêng.
-
-| Thành phần | Mô tả | Trạng thái |
-|---|---|---|
-| **Z3Gateway C** (`gateway/`) | Single-process gateway: MQTT client + Zigbee + command + automation, chạy trên Linux | In progress |
-| **Cloud Backend** (`cloud/`) | FastAPI REST API + MQTT subscriber, quản lý device/state/command | Done |
-| **MQTT Broker** (`mqtt/`) | Mosquitto broker config + Docker Compose | Done |
-| **Deploy Scripts** (`deploy/`) | Auto deploy lên AWS EC2 từ Windows (PowerShell) | Done |
-
-## Cấu trúc repository
-
-```
-gateway/          Z3Gateway C source — single process (MQTT + Zigbee + automation)
-cloud/            Cloud backend — FastAPI REST API + MQTT subscriber (Python)
-mqtt/             Local Mosquitto broker configuration
-deploy/           EC2 deployment scripts (PowerShell) + docker-compose
-docs/             Architecture contracts, sprint plan, implementation plans
-end_devices/      End device firmware (Simplicity Studio projects)
-artifact/         Pre-built firmware binaries (.s37)
-mobile_app/       Mobile app code (placeholder)
+```text
+Flutter app
+  -> Cloud REST API (FastAPI)
+  -> Mosquitto MQTT broker
+  -> Z3Gateway C host app
+  -> EFR32 NCP
+  -> Zigbee end devices
 ```
 
-## Quick Start
+The Gateway talks to MQTT directly. The old Python MQTT-to-IPC bridge is no
+longer part of the active architecture.
 
-### 1. MQTT Broker (local)
+## Main Parts
+
+| Path | What it contains |
+| --- | --- |
+| `mobile_app/` | Flutter app for monitoring devices, controlling lights, and managing automation rules |
+| `cloud/` | FastAPI backend, MQTT client, command tracking, events, and automation API |
+| `gateway/` | Native Z3Gateway C host app for MQTT, Zigbee command dispatch, telemetry, and local rule handling |
+| `mqtt/` | Mosquitto configuration for local and deployed brokers |
+| `database/` | PostgreSQL schema used by the cloud backend |
+| `deploy/` | EC2 deployment scripts and production Docker Compose setup |
+| `docs/` | Contracts, design notes, implementation plans, and user-facing guides |
+| `end_devices/` | Silicon Labs end-device firmware projects |
+
+## Current MVP Features
+
+- device list and device state through the mobile app
+- light on/off commands from the app through Cloud and Gateway
+- command status tracking
+- motion occupancy display
+- automation rule creation from the app
+- Cloud automation rule storage and API
+- event history through Cloud
+- EC2 deployment scripts for the backend stack
+
+Automation is intentionally simple in this version. The app creates and displays
+rules. Cloud stores them. Gateway execution remains the device-side
+responsibility.
+
+## Run Locally
+
+Start the local MQTT broker:
 
 ```bash
 cd mqtt/docker
 docker compose up -d
 ```
 
-### 2. Cloud Backend
+Run the Cloud API:
 
 ```bash
 pip install -r cloud/requirements.txt
-python -m cloud.app.seed          # Seed sample data
-python -m cloud                   # API server → http://localhost:8000/docs
+python -m cloud.app.seed
+python -m cloud
 ```
 
-### 3. Z3Gateway C
-
-Z3Gateway C chạy trên Ubuntu host với NCP radio qua serial/UART.
-Xem [docs/plan.md](docs/plan.md) cho build/run instructions.
-
-### 4. Tests
+Run Cloud tests:
 
 ```bash
-pytest cloud/tests/ -v
+pytest cloud/tests -q
 ```
 
-## Deploy lên EC2
+Run the Flutter app:
+
+```bash
+cd mobile_app
+flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000
+```
+
+For an Android emulator talking to a host machine API, use `10.0.2.2` instead
+of `localhost`.
+
+## Deploy
+
+Copy and fill the deployment environment file:
 
 ```powershell
-# Cấu hình (1 lần)
-cp deploy\.env.deploy.example deploy\.env.deploy
-# Sửa: EC2_HOST, EC2_KEY, MQTT passwords
+Copy-Item deploy\.env.deploy.example deploy\.env.deploy
+```
 
-# Setup EC2 (1 lần)
-powershell -ExecutionPolicy Bypass -File deploy\ec2-setup.ps1
+Deploy to EC2:
 
-# Deploy (mỗi lần update code)
+```powershell
 powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1
 ```
 
-Chi tiết: xem [SUMMARY.md](SUMMARY.md)
+Useful follow-up commands:
 
-## API Endpoints
+```powershell
+powershell -File deploy\logs.ps1 cloud-api
+powershell -File deploy\seed-remote.ps1
+powershell -File deploy\ssh.ps1
+```
 
-| Method | Path | Mô tả |
-|---|---|---|
-| GET | `/health` | Health check |
-| GET | `/api/devices` | Danh sách devices (optional `?room_id=`) |
-| GET | `/api/devices/{device_id}` | Chi tiết device |
-| GET | `/api/devices/{device_id}/state` | State mới nhất |
-| POST | `/api/devices/{device_id}/command` | Gửi command |
-| GET | `/api/commands/{command_id}` | Trạng thái command |
-| GET | `/api/events` | Lịch sử events |
+## Key Documentation
 
-## Tài liệu
+| Document | Use it for |
+| --- | --- |
+| [docs/AUTOMATION_APP_DESIGN_BRIEF.md](docs/AUTOMATION_APP_DESIGN_BRIEF.md) | Automation screen brief for product/design work |
+| [docs/AUTOMATION_USER_GUIDE.md](docs/AUTOMATION_USER_GUIDE.md) | How to use the Automation feature in the app |
+| [docs/MQTT_CONTRACT.md](docs/MQTT_CONTRACT.md) | MQTT topic tree, envelopes, QoS, retain rules, and command lifecycle |
+| [docs/DEVICE_CAPABILITY_MATRIX.md](docs/DEVICE_CAPABILITY_MATRIX.md) | Supported MVP device types and capabilities |
+| [docs/ADAPTER_ACTION_MAP.md](docs/ADAPTER_ACTION_MAP.md) | Mapping between MQTT payloads and Z3Gateway C behavior |
+| [docs/CLOUD_IMPLEMENTATION_PLAN.md](docs/CLOUD_IMPLEMENTATION_PLAN.md) | Cloud API and database implementation notes |
+| [docs/OTA_CAMPAIGN_CONTRACT.md](docs/OTA_CAMPAIGN_CONTRACT.md) | OTA staging and delivery contract |
+| [docs/README.md](docs/README.md) | Documentation index |
 
-| File | Nội dung |
-|---|---|
-| [SUMMARY.md](SUMMARY.md) | Tổng kết toàn bộ dự án (hướng dẫn chi tiết, API reference, DB schema, MQTT) |
-| [CLAUDE.md](CLAUDE.md) | Hướng dẫn cho AI assistant (kiến trúc, contracts, dev commands) |
-| [docs/MQTT_CONTRACT.md](docs/MQTT_CONTRACT.md) | MQTT topic tree, envelope, QoS, retain |
-| [docs/UART_FRAME_FORMAT.md](docs/UART_FRAME_FORMAT.md) | Native boundary + application architecture |
-| [docs/OTA_CAMPAIGN_CONTRACT.md](docs/OTA_CAMPAIGN_CONTRACT.md) | OTA artifact staging workflow |
-| [docs/CLOUD_IMPLEMENTATION_PLAN.md](docs/CLOUD_IMPLEMENTATION_PLAN.md) | Cloud DB schema + API design |
+## Branch and PR Rules
 
-## Git Workflow Rules
+Use this branch format:
 
-### Branch Naming
+```text
+prefix/<jira-ticket-id>-<short-description>
+```
 
-- Format: `prefix/<jira-ticket-id>-<branch-description>`
-- Allowed prefix: `feature`, `bugfix`
-- Ví dụ: `feature/1-create-code-base`
+Examples:
 
-### Pull Request Rules
+```text
+feature/SCRUM-43-mobile-automation-rule-management
+docs/SCRUM-43-automation-app-docs
+```
 
-- Tất cả code phải merge vào `main` qua pull request.
-- Không được commit/merge trực tiếp vào `main`.
-- Mỗi pull request phải được approve trước khi merge.
+All work should merge into `main` through a pull request. Do not commit directly
+to `main`.
