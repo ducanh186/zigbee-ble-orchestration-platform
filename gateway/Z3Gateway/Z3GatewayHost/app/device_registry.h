@@ -39,6 +39,10 @@ bool deviceRegistryUpsert(const char *eui64Str, EmberNodeId nodeId,
 // the EUI64 is unknown.
 bool deviceRegistryUpdateNodeId(const char *eui64Str, EmberNodeId nodeId);
 
+// Check if a nodeId is already registered (under any EUI64).
+// Returns true and fills out->device_type if found.
+bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out);
+
 // Number of populated slots.
 uint32_t deviceRegistryCount(void);
 

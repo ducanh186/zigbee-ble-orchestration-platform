@@ -52,6 +52,28 @@ static bool dispatchGatewayOp(const sb_command_t *cmd)
     st = netMgrOpenForJoin((uint16_t)dur);
   } else if (strcmp(cmd->op, "gateway.close_network") == 0) {
     st = netMgrCloseJoin();
+  } else if (strcmp(cmd->op, "gateway.rediscover_device") == 0) {
+    // Layer-2 on-demand classification.  Requires a device_id (EUI64 hex).
+    // Result of classification arrives asynchronously as a retained
+    // devices/{type}/{eui}/registry MQTT publish from device_discovery;
+    // the command reply only confirms the ZDO query was kicked off.
+    if (cmd->device_id[0] == '\0') {
+      appMqttPublishCommandReply(cmd->command_id, devId,
+                                 "failed", "missing_device_id");
+      appLogLog("DISPATCH", "reject",
+                "\"command_id\":\"%s\",\"reason\":\"missing_device_id\"",
+                cmd->command_id);
+      return false;
+    }
+    bool ok = netMgrRediscoverByEui(cmd->device_id);
+    if (ok) {
+      appMqttPublishCommandReply(cmd->command_id, cmd->device_id,
+                                 "executed", "discovery_started");
+      return true;
+    }
+    appMqttPublishCommandReply(cmd->command_id, cmd->device_id,
+                               "failed", "device_not_on_network");
+    return false;
   } else {
     appMqttPublishCommandReply(cmd->command_id, devId,
                                "failed", "unsupported_op");

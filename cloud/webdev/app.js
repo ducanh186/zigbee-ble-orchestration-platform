@@ -208,9 +208,12 @@ function renderDevices() {
     });
 
     const main = document.createElement("div");
+    const stateInfo = state.deviceStates.get(device.id);
+    const lightHtml = buildDeviceStateHint(device, stateInfo);
     main.innerHTML = `
       <div class="device-name">${escapeHtml(device.name || device.id)}</div>
       <div class="device-id">${escapeHtml(device.id)}</div>
+      ${lightHtml}
     `;
 
     const tags = document.createElement("div");
@@ -238,9 +241,28 @@ function renderDetail() {
   const currentState = state.deviceStates.get(device.id);
   els.detailTitle.textContent = device.name || device.id;
   els.detailMeta.textContent = `${device.device_type} / ${device.id}`;
-  els.statePayload.textContent = prettyJson(currentState || {});
+
+  if (device.device_type === "light" && currentState && !currentState.error) {
+    els.statePayload.innerHTML = buildLightStateVisual(currentState);
+  } else if (device.device_type === "motion" && currentState && !currentState.error) {
+    els.statePayload.innerHTML = buildMotionStateVisual(currentState);
+  } else {
+    els.statePayload.textContent = prettyJson(currentState || {});
+  }
+
   setDetailStatus(device.is_online ? "Online" : "Offline", device.is_online ? "ok" : "danger");
   setCommandControls(device.device_type === "light");
+
+  // Sync On/Off button active states with current light state
+  if (device.device_type === "light" && currentState && !currentState.error) {
+    const s = currentState.state || currentState;
+    const power = s.power;
+    els.lightOnBtn.classList.toggle("active-on", power === "on");
+    els.lightOffBtn.classList.toggle("active-off", power === "off");
+  } else {
+    els.lightOnBtn.classList.remove("active-on");
+    els.lightOffBtn.classList.remove("active-off");
+  }
 }
 
 function renderEvents() {
@@ -344,6 +366,15 @@ async function createDeviceCommand(deviceId, body) {
     });
     await trackCommand(command);
     toast(`Command ${command.status}: ${command.id}`);
+    // Refresh device state after a short delay to pick up changes
+    setTimeout(async () => {
+      try {
+        const payload = await fetchJson(`/api/devices/${encodeURIComponent(deviceId)}/state`);
+        state.deviceStates.set(deviceId, payload);
+        renderDevices();
+        renderDetail();
+      } catch { /* state may not have updated yet */ }
+    }, 2000);
   } catch (error) {
     toast(cleanError(error));
   }
@@ -482,6 +513,71 @@ function scheduleRefresh() {
 
 function selectedDevice() {
   return state.devices.find((device) => device.id === state.selectedDeviceId) || null;
+}
+
+function buildDeviceStateHint(device, stateInfo) {
+  if (!stateInfo || stateInfo.error) return "";
+  const s = stateInfo.state || stateInfo;
+  if (device.device_type === "light") {
+    const power = s.power === "on";
+    const icon = power ? "&#9728;" : "&#9790;";
+    const label = power ? "ON" : "OFF";
+    const cls = power ? "state-hint on" : "state-hint off";
+    return `<div class="${cls}">
+      <span class="state-icon">${icon}</span>
+      <span>${label}</span>
+    </div>`;
+  }
+  if (device.device_type === "motion") {
+    const occ = s.occupancy === "occupied";
+    const icon = occ ? "&#9673;" : "&#9675;";
+    const label = occ ? "Occupied" : "Unoccupied";
+    const cls = occ ? "state-hint on" : "state-hint off";
+    return `<div class="${cls}"><span class="state-icon">${icon}</span><span>${label}</span></div>`;
+  }
+  return "";
+}
+
+function buildLightStateVisual(stateData) {
+  const s = stateData.state || stateData;
+  const power = s.power === "on";
+  const level = s.level != null ? s.level : 0;
+  const pct = Math.round((level / 254) * 100);
+  const reachable = s.reachable !== false;
+  const reportedAt = stateData.reported_at || "";
+  return `<div class="visual-state">
+  <div class="visual-state-row">
+    <div class="visual-power ${power ? "on" : "off"}">
+      <span class="visual-power-icon">${power ? "&#9728;" : "&#9790;"}</span>
+      <span class="visual-power-label">${power ? "ON" : "OFF"}</span>
+    </div>
+    <div class="visual-reachable ${reachable ? "" : "unreachable"}">
+      ${reachable ? "Reachable" : "Unreachable"}
+    </div>
+  </div>
+  ${reportedAt ? `<div class="visual-reported">Last reported: ${escapeHtml(reportedAt)}</div>` : ""}
+  <details class="visual-raw"><summary>Raw JSON</summary><pre>${escapeHtml(prettyJson(stateData))}</pre></details>
+</div>`;
+}
+
+function buildMotionStateVisual(stateData) {
+  const s = stateData.state || stateData;
+  const occ = s.occupancy === "occupied";
+  const reachable = s.reachable !== false;
+  const reportedAt = stateData.reported_at || "";
+  return `<div class="visual-state">
+  <div class="visual-state-row">
+    <div class="visual-power ${occ ? "on" : "off"}">
+      <span class="visual-power-icon">${occ ? "&#9673;" : "&#9675;"}</span>
+      <span class="visual-power-label">${occ ? "Occupied" : "Unoccupied"}</span>
+    </div>
+    <div class="visual-reachable ${reachable ? "" : "unreachable"}">
+      ${reachable ? "Reachable" : "Unreachable"}
+    </div>
+  </div>
+  ${reportedAt ? `<div class="visual-reported">Last reported: ${escapeHtml(reportedAt)}</div>` : ""}
+  <details class="visual-raw"><summary>Raw JSON</summary><pre>${escapeHtml(prettyJson(stateData))}</pre></details>
+</div>`;
 }
 
 function tag(text, className = "") {

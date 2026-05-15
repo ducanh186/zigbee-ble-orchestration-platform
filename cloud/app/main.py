@@ -1,8 +1,11 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
@@ -56,3 +59,14 @@ app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)
 app.include_router(gateways.router)
+app.include_router(gateways.devices_router)
+
+# -- Serve web dashboard --
+_webdev_dir = Path(__file__).resolve().parent.parent / "webdev"
+if _webdev_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_webdev_dir)), name="static")
+
+    @app.get("/", include_in_schema=False)
+    async def _serve_dashboard():
+        return FileResponse(str(_webdev_dir / "index.html"))
+

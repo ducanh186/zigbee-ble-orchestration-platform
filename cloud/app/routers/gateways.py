@@ -121,3 +121,65 @@ async def commissioning_close(
         timeout_ms=timeout_ms,
     )
     return cmd
+
+
+# ---------------------------------------------------------------------------
+# Per-device rediscovery (gateway.rediscover_device)
+# ---------------------------------------------------------------------------
+# Layer-2 on-demand classification: ask the gateway to ZDO-query a specific
+# device by EUI64, regardless of whether it currently sits in the gateway's
+# in-memory registry. Returns immediately after the gateway acknowledges; the
+# actual classification result lands on the broker as a retained
+# devices/{type}/{eui}/registry message a moment later, and the cloud's
+# _handle_registry already persists it into the devices/events tables.
+
+# Mounted under a separate router because the path is /api/devices/... not
+# /api/gateways/...; FastAPI lets us register a second router from this same
+# module so the related "commission + rediscover" set stays co-located.
+devices_router = APIRouter(prefix="/api/devices", tags=["gateways"])
+
+
+@devices_router.post(
+    "/{device_id}/rediscover",
+    response_model=CommandOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def device_rediscover(
+    device_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger ZDO Simple Descriptor classification for `device_id`.
+
+    No body required.  The gateway resolves the EUI64 to a current nodeId via
+    its child table or stack address cache, then runs the same discovery flow
+    used at join time.  Failure case (most common: device offline / not on
+    network) returns ``status=failed reason=device_not_on_network`` on the
+    command reply.
+    """
+    timeout_ms = 5000
+    command_id = uuid4().hex
+    expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
+        milliseconds=timeout_ms
+    )
+    cmd = Command(
+        id=command_id,
+        device_id=device_id,
+        target_kind="device",
+        op="gateway.rediscover_device",
+        target={},
+        status="accepted",
+        timeout_ms=timeout_ms,
+        expires_at=expires_at,
+    )
+    db.add(cmd)
+    await db.commit()
+    await db.refresh(cmd)
+
+    mqtt_service.publish_command(
+        command_id=command_id,
+        device_id=device_id,
+        op="gateway.rediscover_device",
+        target={},
+        timeout_ms=timeout_ms,
+    )
+    return cmd

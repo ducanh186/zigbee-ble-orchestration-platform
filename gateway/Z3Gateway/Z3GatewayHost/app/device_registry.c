@@ -118,6 +118,22 @@ bool deviceRegistryResolve(const char *device_id, device_resolved_t *out)
   return true;
 }
 
+bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out)
+{
+  if (!out) return false;
+  memset(out, 0, sizeof(*out));
+  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+    if (g_slots[i].used && g_slots[i].nodeId == nodeId) {
+      out->nodeId   = g_slots[i].nodeId;
+      out->endpoint = g_slots[i].endpoint;
+      strncpy(out->device_type, g_slots[i].device_type,
+              sizeof(out->device_type) - 1);
+      return true;
+    }
+  }
+  return false;
+}
+
 uint32_t deviceRegistryCount(void)
 {
   uint32_t n = 0;
@@ -150,15 +166,6 @@ const EmberEUI64 *deviceRegistryGetEuiLe(void)
   static const EmberEUI64 zero = {0};
   reg_slot_t *s = findFirstUsed();
   return s ? (const EmberEUI64 *)&s->euiLe : &zero;
-}
-
-uint32_t deviceRegistryCount(void)
-{
-  uint32_t n = 0;
-  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
-    if (s_devices[i].active) n++;
-  }
-  return n;
 }
 
 // ===== Trust Center join callback =====

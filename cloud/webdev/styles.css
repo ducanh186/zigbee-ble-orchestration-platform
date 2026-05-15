@@ -588,6 +588,182 @@ td {
   font-size: 11px;
 }
 
+/* --- Device state hint in card --- */
+.state-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.state-hint.on {
+  background: #fef9e7;
+  color: #8a6d00;
+}
+
+.state-hint.off {
+  background: #edf2f6;
+  color: var(--muted);
+}
+
+.state-icon {
+  font-size: 14px;
+}
+
+.state-bar {
+  display: inline-block;
+  width: 48px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e4ea;
+  vertical-align: middle;
+}
+
+.state-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #d4a700;
+  transition: width 0.3s;
+}
+
+/* --- Visual state in detail panel --- */
+.visual-state {
+  color: var(--ink);
+  font-family: inherit;
+  white-space: normal;
+  word-break: normal;
+}
+
+.visual-state-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.visual-power {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.visual-power.on {
+  background: #fef9e7;
+  color: #8a6d00;
+}
+
+.visual-power.off {
+  background: #3a4554;
+  color: #9aacbf;
+}
+
+.visual-power-icon {
+  font-size: 24px;
+}
+
+.visual-reachable {
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: #e6f5eb;
+  color: var(--ok);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.visual-reachable.unreachable {
+  background: #fdecea;
+  color: var(--danger);
+}
+
+.visual-level-section {
+  margin-bottom: 16px;
+}
+
+.visual-level-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #c8d4e0;
+}
+
+.visual-level-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.visual-level-track {
+  height: 10px;
+  border-radius: 5px;
+  background: #2a3545;
+  overflow: hidden;
+}
+
+.visual-level-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #d4a700, #ffe066);
+  transition: width 0.3s;
+}
+
+.visual-level-raw {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #7a8da0;
+}
+
+.visual-reported {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #7a8da0;
+}
+
+.visual-raw {
+  margin-top: 12px;
+}
+
+.visual-raw summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #7a8da0;
+  margin-bottom: 4px;
+}
+
+.visual-raw pre {
+  margin: 0;
+  font-size: 11px;
+  color: #8ea3b8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- On/Off button active states --- */
+#lightOnBtn.active-on {
+  border-color: #d4a700;
+  background: #fef9e7;
+  color: #8a6d00;
+  font-weight: 800;
+}
+
+#lightOffBtn.active-off {
+  border-color: #657386;
+  background: #3a4554;
+  color: #c8d4e0;
+  font-weight: 800;
+}
+
 .toast {
   position: fixed;
   right: 16px;

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cloud Ops Console</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -91,12 +91,12 @@
                   <button id="lightOnBtn" type="button">On</button>
                   <button id="lightOffBtn" type="button">Off</button>
                 </div>
-                <label class="range-row" for="levelSlider">
+                <label class="range-row" for="levelSlider" style="display:none">
                   <span>Level</span>
                   <input id="levelSlider" type="range" min="0" max="254" value="128" />
                   <output id="levelOutput">128</output>
                 </label>
-                <button id="sendLevelBtn" class="primary wide" type="button">Set Level</button>
+                <button id="sendLevelBtn" class="primary wide" type="button" style="display:none">Set Level</button>
                 <textarea id="rawTargetInput" spellcheck="false"></textarea>
                 <button id="sendRawBtn" class="wide" type="button">Send Raw Target</button>
               </div>
@@ -171,6 +171,6 @@
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js" type="module"></script>
+    <script src="/static/app.js" type="module"></script>
   </body>
 </html>
