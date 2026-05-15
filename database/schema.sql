@@ -69,3 +69,22 @@ CREATE TABLE commands (
 
 CREATE INDEX ix_commands_device_created
     ON commands (device_id, created_at);
+
+CREATE TABLE automations (
+    id              VARCHAR     PRIMARY KEY,
+    name            VARCHAR     NOT NULL,
+    enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
+    tenant_id       VARCHAR     NOT NULL,
+    site_id         VARCHAR     NOT NULL,
+    gateway_id      VARCHAR     NOT NULL,
+    "trigger"       JSONB       NOT NULL,
+    actions         JSONB       NOT NULL,
+    sync_status     VARCHAR     NOT NULL DEFAULT 'pending',
+    last_run_status VARCHAR     NOT NULL DEFAULT 'never_run',
+    last_error      VARCHAR,
+    created_at      TIMESTAMP   DEFAULT now(),
+    updated_at      TIMESTAMP   DEFAULT now()
+);
+
+CREATE INDEX ix_automations_gateway_created
+    ON automations (tenant_id, site_id, gateway_id, created_at);

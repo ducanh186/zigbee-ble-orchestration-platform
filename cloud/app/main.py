@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.routers import commands, devices, events, gateways, health
+from cloud.app.routers import automations, commands, devices, events, gateways, health
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,6 +58,7 @@ app.include_router(health.router)
 app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)
+app.include_router(automations.router)
 app.include_router(gateways.router)
 app.include_router(gateways.devices_router)
 

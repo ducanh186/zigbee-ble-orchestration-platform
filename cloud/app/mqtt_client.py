@@ -7,7 +7,11 @@ from uuid import uuid4
 import paho.mqtt.client as mqtt
 
 from cloud.app.config import settings as _settings
-from cloud.app.schemas import validate_event_payload, validate_reported_payload
+from cloud.app.schemas import (
+    TERMINAL_STATUSES,
+    validate_event_payload,
+    validate_reported_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,7 @@ class MQTTService:
         )
         self._db_session_factory = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._terminal_command_ids: set[str] = set()
 
     # ------------------------------------------------------------------
     # Configuration helpers
@@ -255,12 +260,25 @@ class MQTTService:
         cmd_id_idx = parts.index("commands") + 1
         command_id = parts[cmd_id_idx]
         inner = envelope.get("payload", {})
+        incoming_status = inner.get("status")
+        if (
+            command_id in self._terminal_command_ids
+            and incoming_status not in TERMINAL_STATUSES
+        ):
+            logger.info(
+                "Ignoring command %s status=%s after terminal callback",
+                command_id,
+                incoming_status,
+            )
+            return
+        if incoming_status in TERMINAL_STATUSES:
+            self._terminal_command_ids.add(command_id)
 
         async def _write():
             if not self._db_session_factory:
                 return
             from cloud.app.models import Command, Device, DeviceState
-            from sqlalchemy import select
+            from sqlalchemy import select, update
 
             async with self._db_session_factory() as session:
                 result = await session.execute(
@@ -270,9 +288,24 @@ class MQTTService:
                 if not cmd:
                     return
                 new_status = inner.get("status", cmd.status)
+                update_result = await session.execute(
+                    update(Command)
+                    .where(
+                        Command.id == command_id,
+                        Command.status.notin_(list(TERMINAL_STATUSES)),
+                    )
+                    .values(status=new_status, reason=inner.get("reason"))
+                )
+                if update_result.rowcount == 0:
+                    logger.info(
+                        "Ignoring non-authoritative command %s status=%s after terminal %s",
+                        command_id,
+                        new_status,
+                        cmd.status,
+                    )
+                    return
                 cmd.status = new_status
                 cmd.reason = inner.get("reason")
-                await session.flush()
                 logger.info(
                     "Updated command %s status=%s", command_id, new_status
                 )
@@ -336,6 +369,26 @@ class MQTTService:
         inner = envelope.get("payload", {})
         status = inner.get("value", "unknown")
         logger.info("Gateway status: %s", status)
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Event
+
+            payload = dict(inner)
+            payload["gateway_id"] = envelope.get("gateway_id")
+            payload["source"] = envelope.get("source")
+            async with self._db_session_factory() as session:
+                event = Event(
+                    device_id=None,
+                    event_type="gateway_online",
+                    payload=payload,
+                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                )
+                session.add(event)
+                await session.commit()
+
+        self._run_async(_write)
 
     def _handle_registry(self, topic: str, envelope: dict) -> None:
         """Handle retained device registry snapshot -- upsert device + log event.
