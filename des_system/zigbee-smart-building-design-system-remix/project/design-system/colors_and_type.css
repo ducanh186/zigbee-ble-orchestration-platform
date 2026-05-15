@@ -1,0 +1,172 @@
+/* =========================================================================
+   Zigbee Smart Building — Colors & Type
+   Theme modes: light (default), dark, grey.
+   Apply by setting [data-theme="dark"] or [data-theme="grey"] on <html>.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ---------- Type families ---------- */
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Semantic type roles (mobile, 16px base) */
+  --display-size: 28px;
+  --display-weight: 700;
+  --display-lh: 1.2;
+
+  --title-size: 20px;
+  --title-weight: 600;
+  --title-lh: 1.3;
+
+  --body-size: 15px;
+  --body-weight: 400;
+  --body-strong-weight: 600;
+  --body-lh: 1.5;
+
+  --caption-size: 13px;
+  --caption-weight: 500;
+  --caption-lh: 1.4;
+
+  --mono-size: 13px;
+  --mono-weight: 400;
+  --mono-lh: 1.5;
+
+  /* Spacing scale (4px grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  /* Radii */
+  --radius-button: 12px;
+  --radius-input: 12px;
+  --radius-card: 20px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.02);
+  --elev-2: 0 8px 24px rgb(0 0 0 / 0.08);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+}
+
+/* ---------- LIGHT (default) ---------- */
+:root,
+[data-theme="light"] {
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+
+  --primary: #4F7DFF;
+  --primary-on: #FFFFFF;
+  --primary-tint: rgb(79 125 255 / 0.12);
+
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --error: #EF4444;
+
+  --success-tint: rgb(34 197 94 / 0.12);
+  --warning-tint: rgb(245 158 11 / 0.14);
+  --error-tint:   rgb(239 68 68 / 0.12);
+
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-on-surface: #111827;
+
+  --border: #E5E7EB;
+  --border-strong: #CBD2DB;
+
+  --scrim: rgb(0 0 0 / 0.40);
+}
+
+/* ---------- DARK ---------- */
+[data-theme="dark"] {
+  --bg: #0F1115;
+  --surface: #171A21;
+  --surface-elevated: #20242D;
+
+  --primary: #7AA2FF;
+  --primary-on: #0F1115;
+  --primary-tint: rgb(122 162 255 / 0.18);
+
+  --success: #34D399;
+  --warning: #FBBF24;
+  --error: #F87171;
+
+  --success-tint: rgb(52 211 153 / 0.16);
+  --warning-tint: rgb(251 191 36 / 0.18);
+  --error-tint:   rgb(248 113 113 / 0.16);
+
+  --text-primary: #F9FAFB;
+  --text-secondary: #A1A1AA;
+  --text-on-surface: #F9FAFB;
+
+  --border: #2D3340;
+  --border-strong: #3A4150;
+
+  --scrim: rgb(0 0 0 / 0.55);
+
+  /* Dark uses elevation-tinted surfaces, weaker shadows */
+  --elev-1: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --elev-2: 0 12px 32px rgb(0 0 0 / 0.50);
+}
+
+/* ---------- GREY (neutral slate, log-friendly) ---------- */
+[data-theme="grey"] {
+  --bg: #E7E9EC;
+  --surface: #F1F2F4;
+  --surface-elevated: #FAFBFC;
+
+  --primary: #4B5563;
+  --primary-on: #FFFFFF;
+  --primary-tint: rgb(75 85 99 / 0.12);
+
+  --success: #4F7A5E;
+  --warning: #8E7635;
+  --error: #9C5A5A;
+
+  --success-tint: rgb(79 122 94 / 0.13);
+  --warning-tint: rgb(142 118 53 / 0.14);
+  --error-tint:   rgb(156 90 90 / 0.13);
+
+  --text-primary: #111418;
+  --text-secondary: #5C6470;
+  --text-on-surface: #111418;
+
+  --border: #C8CCD2;
+  --border-strong: #AAB0B8;
+
+  --scrim: rgb(0 0 0 / 0.40);
+}
+
+/* ---------- Base ---------- */
+html, body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--body-size);
+  line-height: var(--body-lh);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Semantic type classes */
+.t-display { font: var(--display-weight) var(--display-size)/var(--display-lh) var(--font-sans); letter-spacing: -0.01em; }
+.t-title   { font: var(--title-weight)   var(--title-size)/var(--title-lh)     var(--font-sans); letter-spacing: -0.005em; }
+.t-body    { font: var(--body-weight)    var(--body-size)/var(--body-lh)       var(--font-sans); }
+.t-strong  { font: var(--body-strong-weight) var(--body-size)/var(--body-lh)   var(--font-sans); }
+.t-caption { font: var(--caption-weight) var(--caption-size)/var(--caption-lh) var(--font-sans); color: var(--text-secondary); }
+.t-mono    { font: var(--mono-weight)    var(--mono-size)/var(--mono-lh)       var(--font-mono); }
+
+.t-secondary { color: var(--text-secondary); }
