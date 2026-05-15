@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
 import 'package:zigbee_smart_building/main.dart';
@@ -15,6 +16,7 @@ void main() {
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
         repository: MockDeviceRepository(),
+        automationRepository: MockAutomationRepository(),
         apiBaseUrl: useMockApi ? 'mock' : 'http://98.83.4.87:8000',
         useMockApi: useMockApi,
       ),
@@ -36,7 +38,7 @@ void main() {
     expect(find.text('Lab Light 01'), findsOneWidget);
   });
 
-  testWidgets('automation and provisioning tabs show placeholders', (
+  testWidgets('automation tab shows MVP rule list and create flow', (
     tester,
   ) async {
     await pumpDashboard(tester, useMockApi: true);
@@ -45,7 +47,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Automation Rules'), findsWidgets);
-    expect(find.text('Rule setup placeholder'), findsOneWidget);
+    expect(find.text('CREATE RULE'), findsOneWidget);
+    expect(find.text('Motion becomes occupied'), findsOneWidget);
+    expect(find.text('Save rule'), findsOneWidget);
+    expect(find.text('Rule setup placeholder'), findsNothing);
 
     await tester.tap(find.text('Provisioning'));
     await tester.pumpAndSettle();
