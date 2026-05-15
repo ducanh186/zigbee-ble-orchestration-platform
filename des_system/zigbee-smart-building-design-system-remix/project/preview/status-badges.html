@@ -1,0 +1,38 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Status badges</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 22px; }
+  .grid { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font:500 12px var(--font-mono); letter-spacing:0.02em; }
+  .dot { width:6px; height:6px; border-radius:999px; }
+  .b-on    { background:var(--success-tint); color:var(--success); }
+  .b-off   { background:rgb(107 114 128 / 0.14); color:var(--text-secondary); }
+  .b-unr   { background:var(--warning-tint); color:var(--warning); }
+  .b-err   { background:var(--error-tint); color:var(--error); }
+  .b-acc   { background:var(--primary-tint); color:var(--primary); }
+  .b-exec  { background:var(--success-tint); color:var(--success); }
+  .b-fail  { background:var(--error-tint); color:var(--error); }
+  .b-time  { background:var(--warning-tint); color:var(--warning); }
+  .row { gap:8px; flex-wrap:wrap; }
+</style>
+</head><body>
+<div class="col">
+  <div class="label">Device state</div>
+  <div class="row grid">
+    <span class="badge b-on"><span class="dot" style="background:var(--success)"></span>ON</span>
+    <span class="badge b-off"><span class="dot" style="background:var(--text-secondary)"></span>OFF</span>
+    <span class="badge b-unr"><span class="dot" style="background:var(--warning)"></span>UNREACHABLE</span>
+    <span class="badge b-err"><span class="dot" style="background:var(--error)"></span>OFFLINE</span>
+  </div>
+  <div class="label" style="margin-top:6px">Command lifecycle</div>
+  <div class="row grid">
+    <span class="badge b-acc">ACCEPTED</span>
+    <span class="badge b-acc">QUEUED</span>
+    <span class="badge b-acc">SENT</span>
+    <span class="badge b-exec">EXECUTED</span>
+    <span class="badge b-fail">FAILED</span>
+    <span class="badge b-time">TIMEOUT</span>
+  </div>
+</div>
+</body></html>

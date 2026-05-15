@@ -1,0 +1,77 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Buttons</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+  body { padding: 22px; }
+  .row { gap: 10px; align-items: center; flex-wrap: wrap; }
+  .label { margin-top: 4px; }
+  button {
+    font: 600 14px var(--font-sans);
+    border-radius: var(--radius-button);
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .primary { background: var(--primary); color: var(--primary-on); }
+  .ghost   { background: transparent;   color: var(--primary); border-color: var(--border); }
+  .danger  { background: var(--error);  color: #fff; }
+  .danger-ghost {
+    background: transparent;
+    color: var(--error);
+    border-color: color-mix(in oklab, var(--error) 35%, transparent);
+  }
+  .disabled { opacity: 0.4; cursor: not-allowed; }
+  .ring {
+    width: 14px; height: 14px; border-radius: 999px;
+    border: 2px solid currentColor; border-right-color: transparent;
+    animation: r 0.8s linear infinite;
+  }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .pill { padding: 14px 22px; border-radius: 999px; font-size: 16px; }
+  svg.icn { width: 14px; height: 14px; }
+</style>
+</head><body>
+<div class="col">
+
+  <div class="label">Primary / ghost / loading / retry</div>
+  <div class="row">
+    <button class="primary">ON</button>
+    <button class="ghost">OFF</button>
+    <button class="primary disabled"><span class="ring"></span>Sending…</button>
+    <button class="danger">Retry</button>
+  </div>
+
+  <div class="label">Pill toggles + tertiary action</div>
+  <div class="row">
+    <button class="primary pill">ON</button>
+    <button class="ghost pill">OFF</button>
+    <button class="ghost" style="border-color:transparent;color:var(--text-secondary)">Refresh</button>
+  </div>
+
+  <div class="label">Automation actions — trigger / delete</div>
+  <div class="row">
+    <!-- Trigger: fire the rule now, used on rule cards & detail sheet. Ghost-primary feels right: it's a deliberate, reversible action, not the headline primary toggle. -->
+    <button class="ghost">
+      <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      Trigger
+    </button>
+
+    <!-- Delete: destructive, but rarely "press by accident". Filled red feels too shouty for a list-row action; ghost-red is loud enough next to the calm ghost trigger. -->
+    <button class="danger-ghost">
+      <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+      Delete
+    </button>
+
+    <!-- Solid danger variant — reserve this for the confirm step of an irreversible delete (modal "Delete rule" button). -->
+    <button class="danger">
+      <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      Delete rule
+    </button>
+
+    <!-- Loading state for Trigger — same cadence as the global Sending… spinner -->
+    <button class="ghost disabled"><span class="ring"></span>Triggering…</button>
+  </div>
+
+</div>
+</body></html>

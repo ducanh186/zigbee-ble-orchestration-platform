@@ -1,0 +1,148 @@
+<!doctype html>
+<html data-theme="light"><head><meta charset="utf-8"><title>Log row</title>
+<link rel="stylesheet" href="_card.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  body { padding: 18px 22px; }
+
+  .label { margin-top: 6px; }
+  .stack {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .stack + .label { margin-top: 18px; }
+
+  /* Each log row is a <button>: full-width, accessible, no native chrome. */
+  .row {
+    display: flex; align-items: flex-start; gap: 12px;
+    width: 100%; padding: 10px 12px;
+    background: transparent; border: none;
+    font-family: inherit; text-align: left; cursor: pointer;
+    color: var(--text-primary);
+  }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row:hover { background: color-mix(in oklab, var(--primary) 4%, transparent); }
+
+  .ts {
+    font: 500 12px var(--font-mono);
+    color: var(--text-secondary);
+    width: 64px; flex-shrink: 0; padding-top: 1px;
+  }
+  .icon { width: 18px; height: 18px; flex-shrink: 0; padding-top: 1px; }
+  .icon svg { width: 18px; height: 18px; }
+
+  .body { flex: 1; min-width: 0; }
+  .head { font: 500 13px var(--font-mono); }
+  .head .tag { color: var(--text-secondary); }
+  .msg  { font: 400 13px var(--font-sans); margin-top: 2px; }
+  .meta { font: 400 12px var(--font-mono); color: var(--text-secondary); margin-top: 2px; }
+
+  /* Collapsed: head & msg sit inline, no meta line, single visual line */
+  .row.collapsed .body {
+    display: flex; align-items: center; gap: 0; min-width: 0;
+    flex-wrap: nowrap; overflow: hidden;
+  }
+  .row.collapsed .head,
+  .row.collapsed .msg {
+    margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row.collapsed .sep {
+    color: var(--text-secondary); padding: 0 6px; font-family: var(--font-mono);
+  }
+  .row.collapsed .msg { color: var(--text-secondary); }
+  .row.collapsed .meta { display: none; }
+
+  /* Toggle chevron — right-aligned, rotates when expanded */
+  .toggle {
+    flex-shrink: 0; padding-top: 1px;
+    color: var(--text-secondary);
+    transition: transform var(--dur-fast) var(--ease-standard);
+  }
+  .toggle svg { width: 16px; height: 16px; display: block; }
+  .row.expanded .toggle { transform: rotate(180deg); color: var(--primary); }
+
+  .sev-info { color: var(--primary); }
+  .sev-warn { color: var(--warning); }
+  .sev-err  { color: var(--error); }
+</style>
+</head><body>
+<div>
+  <div class="label">Collapsed by default — tap to expand</div>
+  <div class="stack" id="stack">
+
+    <button class="row collapsed" data-row>
+      <div class="ts">07:16:03</div>
+      <div class="icon sev-info"><i data-lucide="circle-check"></i></div>
+      <div class="body">
+        <span class="head"><span class="tag">LIGHT</span> light-01</span>
+        <span class="sep">·</span>
+        <span class="msg">Command executed: off</span>
+        <div class="meta">source=gateway · command_id=cmd-01</div>
+      </div>
+      <div class="toggle"><i data-lucide="chevron-down"></i></div>
+    </button>
+
+    <button class="row expanded" data-row>
+      <div class="ts">07:15:41</div>
+      <div class="icon sev-warn"><i data-lucide="triangle-alert"></i></div>
+      <div class="body">
+        <div class="head"><span class="tag">GATEWAY</span> gw-1</div>
+        <div class="msg">Command timeout</div>
+        <div class="meta">source=cloud · command_id=cmd-00</div>
+      </div>
+      <div class="toggle"><i data-lucide="chevron-down"></i></div>
+    </button>
+
+    <button class="row collapsed" data-row>
+      <div class="ts">07:15:09</div>
+      <div class="icon sev-err"><i data-lucide="circle-x"></i></div>
+      <div class="body">
+        <span class="head"><span class="tag">LIGHT</span> light-02</span>
+        <span class="sep">·</span>
+        <span class="msg">Command failed: cluster busy</span>
+        <div class="meta">source=gateway · command_id=cmd-99</div>
+      </div>
+      <div class="toggle"><i data-lucide="chevron-down"></i></div>
+    </button>
+
+    <button class="row collapsed" data-row>
+      <div class="ts">07:13:00</div>
+      <div class="icon sev-info"><i data-lucide="radar"></i></div>
+      <div class="body">
+        <span class="head"><span class="tag">MOTION</span> pir-01</span>
+        <span class="sep">·</span>
+        <span class="msg">Motion detected</span>
+        <div class="meta">source=gateway · zone=lab</div>
+      </div>
+      <div class="toggle"><i data-lucide="chevron-down"></i></div>
+    </button>
+
+  </div>
+</div>
+
+<script>
+  lucide.createIcons();
+  // Toggle expand / collapse on click. Collapsed = head + sep + msg inline; expanded = stacked with meta.
+  document.querySelectorAll('[data-row]').forEach(row => {
+    row.addEventListener('click', () => {
+      const expanded = row.classList.toggle('expanded');
+      row.classList.toggle('collapsed', !expanded);
+      // Rewire the body markup between inline (collapsed) and stacked (expanded).
+      // We keep both representations in the DOM and just rely on CSS .collapsed / .expanded
+      // to flip layout, so no rewiring is actually needed. The .sep element is hidden in
+      // expanded via the stacked body using block children — but our markup uses spans for
+      // collapsed and divs for expanded inside the same .body. Simpler: hide .sep when expanded.
+    });
+  });
+</script>
+<style>
+  /* In expanded state the head/msg sit on their own lines, so the inline separator should disappear. */
+  .row.expanded .sep { display: none; }
+  .row.expanded .head,
+  .row.expanded .msg { display: block; white-space: normal; overflow: visible; }
+  .row.expanded .body { display: block; }
+  .row.expanded .msg { color: var(--text-primary); margin-top: 2px; }
+</style>
+</body></html>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 56" width="200" height="56">
+  <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 14a10 10 0 0 1 6 17.9V36a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-4.1A10 10 0 0 1 22 14Z"></path>
+    <line x1="18" y1="42" x2="26" y2="42"></line>
+    <line x1="20" y1="46" x2="24" y2="46"></line>
+  </g>
+  <text x="46" y="36" font-family="Inter, system-ui, sans-serif" font-weight="600" font-size="20" letter-spacing="-0.5" fill="currentColor">SB Zigbee</text>
+</svg>
