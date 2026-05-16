@@ -26,6 +26,7 @@ class RemoteAuthRepository implements AuthRepository {
     if (rawAccessToken is! String || rawAccessToken.isEmpty) {
       throw const ApiException(
         statusCode: 200,
+        kind: ApiErrorKind.unknown,
         message: 'Auth response missing access_token',
       );
     }

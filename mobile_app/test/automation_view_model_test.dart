@@ -35,14 +35,18 @@ void main() {
     expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
   });
 
-  test('createRule surfaces API errors without adding fake success', () async {
+  test('createRule surfaces friendly error without leaking raw exception',
+      () async {
     final repository = _FakeAutomationRepository(createError: 'network down');
     final viewModel = AutomationViewModel(repository: repository);
 
     await viewModel.createRule(_draft());
 
     expect(viewModel.rules, isEmpty);
-    expect(viewModel.errorMessage, contains('network down'));
+    expect(viewModel.errorMessage, isNotNull);
+    expect(viewModel.errorMessage, contains('Khong tao duoc automation rule'));
+    // Raw repository exception text must not be surfaced to the user.
+    expect(viewModel.errorMessage, isNot(contains('network down')));
   });
 }
 

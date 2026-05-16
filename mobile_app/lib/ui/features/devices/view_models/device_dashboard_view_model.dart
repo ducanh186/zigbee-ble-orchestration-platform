@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/command_result.dart';
 import '../../../../domain/models/command_status.dart';
 import '../../../../domain/models/cloud_status.dart';
@@ -65,8 +66,10 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       _events = events;
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
-      _errorMessage =
-          'Khong ket noi duoc Cloud API. Kiem tra server hoac mang. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong ket noi duoc Cloud API',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -103,7 +106,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
         status: CommandStatus.failed,
         reason: error.toString(),
       );
-      _errorMessage = error.toString();
+      _errorMessage = friendlyErrorMessage(error);
       notifyListeners();
     }
   }

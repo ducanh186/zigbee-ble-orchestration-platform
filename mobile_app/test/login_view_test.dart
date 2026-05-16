@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
+import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/main.dart';
@@ -20,7 +21,11 @@ class FakeAuthRepository implements AuthRepository {
   }) async {
     loginCalls++;
     if (shouldFail) {
-      throw Exception('401 unauthorized');
+      throw const ApiException(
+        statusCode: 401,
+        kind: ApiErrorKind.unauthorized,
+        message: 'invalid credentials',
+      );
     }
     return AuthSession(
       accessToken: 'test-token',
@@ -102,7 +107,10 @@ void main() {
 
     expect(viewModel.isAuthenticated, isFalse);
     expect(find.byKey(const Key('login-submit')), findsOneWidget);
-    expect(find.textContaining('401 unauthorized'), findsOneWidget);
+    // The banner shows the friendly Vietnamese message, not raw HTTP text.
+    expect(find.textContaining('Dang nhap that bai'), findsOneWidget);
+    expect(find.textContaining('invalid credentials'), findsNothing);
+    expect(find.textContaining('API 401'), findsNothing);
   });
 
   testWidgets('logout from settings returns to the login screen', (
