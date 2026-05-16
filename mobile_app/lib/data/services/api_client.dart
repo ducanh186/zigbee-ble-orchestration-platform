@@ -9,19 +9,38 @@ class ApiClient {
 
   final String baseUrl;
   final http.Client _httpClient;
+  String? _accessToken;
+
+  /// Sets the bearer token attached to subsequent requests. Pass `null` to
+  /// clear the token (e.g. on logout).
+  void setAccessToken(String? token) {
+    _accessToken = token;
+  }
 
   Future<Object?> getJson(String path) async {
-    final response = await _httpClient.get(_uri(path));
+    final response = await _httpClient.get(_uri(path), headers: _headers());
     return _decode(response);
   }
 
   Future<Object?> postJson(String path, Map<String, Object?> body) async {
     final response = await _httpClient.post(
       _uri(path),
-      headers: const {'Content-Type': 'application/json'},
+      headers: _headers(includeJsonContentType: true),
       body: jsonEncode(body),
     );
     return _decode(response);
+  }
+
+  Map<String, String> _headers({bool includeJsonContentType = false}) {
+    final headers = <String, String>{};
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+    final token = _accessToken;
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 
   Uri _uri(String path) {
