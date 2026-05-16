@@ -63,7 +63,7 @@ def _motion_on_rule() -> dict:
 
 @pytest.mark.asyncio
 async def test_create_automation_persists_pending_rule(
-    client, db_session_factory
+    client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
 
@@ -83,6 +83,13 @@ async def test_create_automation_persists_pending_rule(
     assert data["sync_status"] == "pending"
     assert data["last_run_status"] == "never_run"
     assert data["last_error"] is None
+    assert fake_mqtt.published[-1]["topic"].endswith(
+        f"/desired/automation/{data['id']}"
+    )
+    assert fake_mqtt.published[-1]["retain"] is True
+    assert fake_mqtt.published[-1]["payload"]["payload"]["id"] == data["id"]
+    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 1
+    assert fake_mqtt.published[-1]["payload"]["payload"]["deleted"] is False
 
 
 @pytest.mark.asyncio
@@ -101,7 +108,7 @@ async def test_list_and_detail_automations(client, db_session_factory):
 
 @pytest.mark.asyncio
 async def test_enable_disable_automation_marks_sync_pending(
-    client, db_session_factory
+    client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
@@ -118,11 +125,13 @@ async def test_enable_disable_automation_marks_sync_pending(
     assert disable_response.json()["enabled"] is False
     assert disable_response.json()["version"] == 3
     assert disable_response.json()["sync_status"] == "pending"
+    assert fake_mqtt.published[-1]["payload"]["payload"]["enabled"] is False
+    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 3
 
 
 @pytest.mark.asyncio
 async def test_update_automation_bumps_version_and_rejects_stale_version(
-    client, db_session_factory
+    client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
     created = (await client.post("/api/automations", json=_motion_on_rule())).json()
@@ -155,11 +164,17 @@ async def test_update_automation_bumps_version_and_rejects_stale_version(
     assert update_response.status_code == 200
     assert update_response.json()["version"] == 2
     assert update_response.json()["actions"][0]["command"] == "off"
+    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 2
+    assert fake_mqtt.published[-1]["payload"]["payload"]["trigger"]["state"] == {
+        "occupancy": "unoccupied"
+    }
     assert stale_response.status_code == 409
 
 
 @pytest.mark.asyncio
-async def test_delete_automation_removes_rule(client, db_session_factory):
+async def test_delete_automation_publishes_tombstone_and_removes_rule(
+    client, db_session_factory, fake_mqtt
+):
     await _seed_automation_devices(db_session_factory)
     created = (await client.post("/api/automations", json=_motion_on_rule())).json()
 
@@ -168,6 +183,12 @@ async def test_delete_automation_removes_rule(client, db_session_factory):
 
     assert delete_response.status_code == 204
     assert detail_response.status_code == 404
+    assert fake_mqtt.published[-1]["topic"].endswith(
+        f"/desired/automation/{created['id']}"
+    )
+    assert fake_mqtt.published[-1]["payload"]["payload"]["id"] == created["id"]
+    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 2
+    assert fake_mqtt.published[-1]["payload"]["payload"]["deleted"] is True
 
 
 @pytest.mark.asyncio
