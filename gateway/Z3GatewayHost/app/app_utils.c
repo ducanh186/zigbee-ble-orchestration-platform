@@ -108,10 +108,10 @@ bool parseStringField(const char *json, const char *key, char *out, uint32_t out
   p++;
   p = skipSpaces(p);
 
-  if (*p == '\"') {
+  if (*p == '"') {
     p++;
     uint32_t i = 0;
-    while (*p && *p != '\"' && i + 1 < outSize) out[i++] = *p++;
+    while (*p && *p != '"' && i + 1 < outSize) out[i++] = *p++;
     out[i] = 0;
     return (*p == '\"');
   } else {
