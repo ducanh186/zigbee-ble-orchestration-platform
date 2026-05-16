@@ -148,3 +148,112 @@ async def test_command_reply_does_not_regress_terminal_status():
     assert command.status == "executed"
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_gateway_event_updates_automation_sync_and_execution_state():
+    from cloud.app.database import Base
+    from cloud.app.models import Automation, Event
+    from cloud.app.mqtt_client import MQTTService
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    db_session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+
+    async with db_session_factory() as session:
+        session.add(
+            Automation(
+                id="rule-01",
+                name="Motion turns on light",
+                enabled=True,
+                tenant_id="hust",
+                site_id="lab01",
+                gateway_id="gw-ubuntu-01",
+                version=1,
+                trigger={
+                    "device_id": "motion-01",
+                    "device_type": "motion",
+                    "event": "occupancy_changed",
+                    "state": {"occupancy": "occupied"},
+                },
+                actions=[
+                    {
+                        "device_id": "light-01",
+                        "device_type": "light",
+                        "command": "on",
+                    }
+                ],
+                sync_status="pending",
+                last_run_status="never_run",
+                last_error=None,
+            )
+        )
+        await session.commit()
+
+    service._handle_gateway_event(
+        {
+            "schema": "sb.v1",
+            "msg_id": "gw-event-1",
+            "ts": 1776064500000,
+            "tenant_id": "hust",
+            "site_id": "lab01",
+            "gateway_id": "gw-ubuntu-01",
+            "source": "gateway",
+            "payload": {
+                "event": "automation_synced",
+                "rule_id": "rule-01",
+                "version": 1,
+                "result": "ok",
+            },
+        }
+    )
+    service._handle_gateway_event(
+        {
+            "schema": "sb.v1",
+            "msg_id": "gw-event-2",
+            "ts": 1776064500500,
+            "tenant_id": "hust",
+            "site_id": "lab01",
+            "gateway_id": "gw-ubuntu-01",
+            "source": "gateway",
+            "payload": {
+                "event": "automation_executed",
+                "rule_id": "rule-01",
+                "version": 1,
+                "result": "ok",
+                "trigger_device_id": "motion-01",
+                "target_device_id": "light-01",
+            },
+        }
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as session:
+        rule = await session.get(Automation, "rule-01")
+        events = (
+            await session.execute(
+                select(Event).order_by(Event.occurred_at.asc())
+            )
+        ).scalars().all()
+
+    assert rule is not None
+    assert rule.sync_status == "synced"
+    assert rule.last_run_status == "executed"
+    assert [event.event_type for event in events] == [
+        "automation_synced",
+        "automation_executed",
+    ]
+
+    await engine.dispose()

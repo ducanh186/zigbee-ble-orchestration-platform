@@ -453,15 +453,55 @@ class MQTTService:
         self._run_async(_write)
 
     def _handle_gateway_event(self, envelope: dict) -> None:
-        """Log gateway lifecycle events (e.g. permit_join_opened/closed/failed).
-
-        v1: log only.  Persistence into the events table is intentionally
-        deferred until we agree how to model gateway-level events without a
-        device_id.
-        """
+        """Persist gateway-level events and fold automation status updates."""
         inner = envelope.get("payload", {})
         event = inner.get("event", "unknown")
         logger.info("Gateway event: %s payload=%s", event, inner)
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Automation, Event
+
+            payload = dict(inner)
+            payload["gateway_id"] = envelope.get("gateway_id")
+            payload["source"] = envelope.get("source")
+            rule_id = payload.get("rule_id") or payload.get("automation_id")
+
+            async with self._db_session_factory() as session:
+                session.add(
+                    Event(
+                        device_id=None,
+                        event_type=event,
+                        payload=payload,
+                        occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                    )
+                )
+
+                if isinstance(rule_id, str) and rule_id:
+                    rule = await session.get(Automation, rule_id)
+                    if rule is not None:
+                        if event == "automation_synced":
+                            rule.sync_status = "synced"
+                            rule.last_error = None
+                        elif event == "automation_sync_failed":
+                            rule.sync_status = "failed"
+                            rule.last_error = payload.get("reason")
+                        elif event == "automation_executed":
+                            result = payload.get("result")
+                            if result == "ok":
+                                rule.last_run_status = "executed"
+                                rule.last_error = None
+                            elif result == "timeout":
+                                rule.last_run_status = "timeout"
+                                rule.last_error = payload.get("reason")
+                            else:
+                                rule.last_run_status = "failed"
+                                rule.last_error = payload.get("reason")
+
+                await session.commit()
+
+        self._run_async(_write)
 
     def _handle_gateway_health(self, envelope: dict) -> None:
         """Persist a gateway health snapshot as an unattached event.
