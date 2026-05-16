@@ -22,13 +22,19 @@ class RemoteAuthRepository implements AuthRepository {
       'password': password,
     });
     final map = Map<String, Object?>.from(json as Map);
-    final accessToken = map['access_token'] as String;
+    final rawAccessToken = map['access_token'];
+    if (rawAccessToken is! String || rawAccessToken.isEmpty) {
+      throw const ApiException(
+        statusCode: 200,
+        message: 'Auth response missing access_token',
+      );
+    }
     final userId = map['user_id'] as String?;
     final expiresAtRaw = map['expires_at'] as String?;
     return AuthSession(
-      accessToken: accessToken,
+      accessToken: rawAccessToken,
       userId: userId,
-      expiresAt: expiresAtRaw == null ? null : DateTime.parse(expiresAtRaw),
+      expiresAt: expiresAtRaw == null ? null : DateTime.tryParse(expiresAtRaw),
     );
   }
 

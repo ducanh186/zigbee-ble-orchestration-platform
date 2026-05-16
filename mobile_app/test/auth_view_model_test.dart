@@ -20,6 +20,19 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> logout() async {}
 }
 
+class FailingAuthRepository implements AuthRepository {
+  @override
+  Future<AuthSession> login({
+    required String username,
+    required String password,
+  }) async {
+    throw Exception('401 unauthorized');
+  }
+
+  @override
+  Future<void> logout() async {}
+}
+
 void main() {
   test('login stores an authenticated session', () async {
     final viewModel = AuthViewModel(repository: FakeAuthRepository());
@@ -29,5 +42,16 @@ void main() {
     expect(viewModel.isAuthenticated, isTrue);
     expect(viewModel.session?.accessToken, 'test-token');
     expect(viewModel.errorMessage, isNull);
+  });
+
+  test('login surfaces error message when repository throws', () async {
+    final viewModel = AuthViewModel(repository: FailingAuthRepository());
+
+    await viewModel.login(username: 'operator', password: 'wrong');
+
+    expect(viewModel.isAuthenticated, isFalse);
+    expect(viewModel.session, isNull);
+    expect(viewModel.errorMessage, isNotNull);
+    expect(viewModel.errorMessage, contains('401 unauthorized'));
   });
 }
