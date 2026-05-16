@@ -36,7 +36,10 @@ class AutomationVisuals {
     return switch (status) {
       AutomationSyncStatus.synced => BadgeTone.success,
       AutomationSyncStatus.failed => BadgeTone.error,
-      AutomationSyncStatus.pending => BadgeTone.warning,
+      // SCRUM-50: syncing/pending maps to neutral. The cloud has not yet
+      // acknowledged the rule, so a warning tone would over-claim. The
+      // "PENDING" label still distinguishes it from idle neutral states.
+      AutomationSyncStatus.pending => BadgeTone.neutral,
     };
   }
 

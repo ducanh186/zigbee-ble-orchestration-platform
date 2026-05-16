@@ -91,7 +91,10 @@ class _GatewayStatusPresentation {
         title: 'Gateway status unknown',
         subtitle: status.detail ?? 'No gateway status log found',
         badgeLabel: 'CHECK',
-        tone: BadgeTone.warning,
+        // SCRUM-50: unknown maps to neutral so the UI does not imply the
+        // gateway has confirmed any device state — the cloud event log
+        // simply did not surface a status entry.
+        tone: BadgeTone.neutral,
       ),
       CloudConnectionState.mock => _GatewayStatusPresentation(
         title: 'Mock gateway log',
