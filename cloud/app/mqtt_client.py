@@ -565,6 +565,30 @@ class MQTTService:
         self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published gateway command %s op=%s", command_id, op)
 
+    def publish_automation_rule(
+        self,
+        automation_id: str,
+        payload: dict,
+        *,
+        deleted: bool = False,
+    ) -> None:
+        s = self.settings
+        topic = f"{self.topic_prefix}/desired/automation/{automation_id}"
+        envelope = {
+            "schema": "sb.v1",
+            "msg_id": uuid4().hex,
+            "ts": _now_ms(),
+            "tenant_id": s.tenant_id,
+            "site_id": s.site_id,
+            "gateway_id": s.gateway_id,
+            "source": "cloud",
+            "payload": payload | {"deleted": deleted},
+        }
+        self.client.publish(topic, json.dumps(envelope), qos=0, retain=True)
+        logger.info(
+            "Published automation %s deleted=%s", automation_id, deleted
+        )
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

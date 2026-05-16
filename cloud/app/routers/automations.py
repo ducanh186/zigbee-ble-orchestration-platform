@@ -11,10 +11,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
+from cloud.app.mqtt_client import mqtt_service
 from cloud.app.models import Automation, Device
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
+
+
+def _automation_payload(rule: Automation, *, deleted: bool = False) -> dict[str, Any]:
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "enabled": rule.enabled,
+        "tenant_id": rule.tenant_id,
+        "site_id": rule.site_id,
+        "gateway_id": rule.gateway_id,
+        "version": rule.version,
+        "trigger": rule.trigger,
+        "actions": rule.actions,
+        "deleted": deleted,
+    }
+
+
+def _publish_automation_rule(rule: Automation, *, deleted: bool = False) -> None:
+    mqtt_service.publish_automation_rule(
+        rule.id,
+        _automation_payload(rule, deleted=deleted),
+        deleted=deleted,
+    )
 
 
 def _require_string(payload: dict[str, Any], field: str) -> str:
@@ -144,6 +168,7 @@ async def create_automation(
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
+    _publish_automation_rule(rule)
     return rule
 
 
@@ -169,6 +194,7 @@ async def update_automation(
     mark_sync_pending(rule, "automation.upsert")
     await db.commit()
     await db.refresh(rule)
+    _publish_automation_rule(rule)
     return rule
 
 
@@ -186,6 +212,7 @@ async def _set_enabled(
     mark_sync_pending(rule, "automation.enable" if enabled else "automation.disable")
     await db.commit()
     await db.refresh(rule)
+    _publish_automation_rule(rule)
     return rule
 
 
@@ -213,6 +240,22 @@ async def delete_automation(
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+
+    tombstone = Automation(
+        id=rule.id,
+        name=rule.name,
+        enabled=rule.enabled,
+        tenant_id=rule.tenant_id,
+        site_id=rule.site_id,
+        gateway_id=rule.gateway_id,
+        version=rule.version + 1,
+        trigger=rule.trigger,
+        actions=rule.actions,
+        sync_status=rule.sync_status,
+        last_run_status=rule.last_run_status,
+        last_error=rule.last_error,
+    )
     await db.delete(rule)
     await db.commit()
+    _publish_automation_rule(tombstone, deleted=True)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
