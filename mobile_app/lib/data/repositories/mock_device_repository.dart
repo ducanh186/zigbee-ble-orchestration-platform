@@ -7,6 +7,7 @@ import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
 import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
+import '../models/device_state_api_model.dart';
 
 class MockDeviceRepository implements DeviceRepository {
   final List<SmartDevice> _devices = [
@@ -110,6 +111,37 @@ class MockDeviceRepository implements DeviceRepository {
       deviceId: deviceId,
       status: CommandStatus.accepted,
     );
+  }
+
+  @override
+  Future<List<DeviceStateApiModel>> refreshDeviceStates(
+    List<String> deviceIds,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    final states = <DeviceStateApiModel>[];
+    for (final deviceId in deviceIds) {
+      final device = _devices.firstWhere(
+        (d) => d.id == deviceId,
+        orElse: () => const SmartDevice(
+          id: '',
+          deviceType: '',
+          name: '',
+          isOnline: false,
+          power: DevicePower.unknown,
+        ),
+      );
+      if (device.id.isEmpty) {
+        continue;
+      }
+      states.add(
+        DeviceStateApiModel(
+          deviceId: device.id,
+          power: device.power,
+          reportedAt: device.reportedAt,
+        ),
+      );
+    }
+    return states;
   }
 
   @override

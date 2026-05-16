@@ -12,10 +12,22 @@ import '../../../../domain/models/smart_device.dart';
 import '../../../../domain/repositories/device_repository.dart';
 
 class DeviceDashboardViewModel extends ChangeNotifier {
-  DeviceDashboardViewModel({required DeviceRepository repository})
-    : _repository = repository;
+  DeviceDashboardViewModel({
+    required DeviceRepository repository,
+    this.pollInterval = const Duration(seconds: 10),
+  }) : _repository = repository;
 
   final DeviceRepository _repository;
+
+  /// How often to refresh per-device state from cloud while the dashboard is
+  /// alive. Pass `null` to disable auto-polling (used by tests and any caller
+  /// that wants a fully manual refresh strategy). The 10-second default
+  /// balances perceived freshness against per-device HTTP fan-out cost, since
+  /// the cloud currently only exposes a per-device state endpoint.
+  final Duration? pollInterval;
+
+  Timer? _pollTimer;
+  bool _disposed = false;
 
   List<SmartDevice> _devices = [];
   List<EventLog> _events = [];
@@ -72,8 +84,74 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
     } finally {
       _isLoading = false;
+      _ensurePollTimer();
       notifyListeners();
     }
+  }
+
+  /// Re-fetch the latest reported state for every known light from the cloud
+  /// per-device state endpoint and merge the results into the in-memory device
+  /// list. Non-light devices and unknown ids are left untouched.
+  Future<void> refreshDeviceStates() async {
+    if (_devices.isEmpty) {
+      return;
+    }
+    final lightIds = _devices
+        .where((device) => device.isLight)
+        .map((device) => device.id)
+        .toList(growable: false);
+    if (lightIds.isEmpty) {
+      return;
+    }
+
+    try {
+      final states = await _repository.refreshDeviceStates(lightIds);
+      var changed = false;
+      final nextDevices = List<SmartDevice>.of(_devices);
+      for (final state in states) {
+        final index = nextDevices.indexWhere(
+          (device) => device.id == state.deviceId,
+        );
+        if (index == -1) {
+          continue;
+        }
+        final reachable = state.power != DevicePower.unreachable;
+        nextDevices[index] = nextDevices[index].copyWith(
+          power: state.power,
+          isOnline: reachable,
+          reportedAt: state.reportedAt,
+        );
+        changed = true;
+      }
+      if (changed) {
+        _devices = nextDevices;
+        notifyListeners();
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong cap nhat duoc trang thai thiet bi',
+      );
+      notifyListeners();
+    }
+  }
+
+  void _ensurePollTimer() {
+    final interval = pollInterval;
+    if (interval == null || _pollTimer != null || _disposed) {
+      return;
+    }
+    _pollTimer = Timer.periodic(interval, (_) {
+      refreshDeviceStates();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    super.dispose();
   }
 
   Future<void> setLightPower(SmartDevice device, DevicePower target) async {
