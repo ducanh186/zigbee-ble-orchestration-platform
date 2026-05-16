@@ -140,6 +140,7 @@ class Automation(Base):
     tenant_id = Column(String, nullable=False)
     site_id = Column(String, nullable=False)
     gateway_id = Column(String, nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
     trigger = Column("trigger", JSON, nullable=False, quote=True)
     actions = Column(JSON, nullable=False)
     sync_status = Column(String, nullable=False, default="pending")

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,7 @@ from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import Automation, Device
-from cloud.app.schemas import AutomationCreate, AutomationOut
+from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
 
@@ -133,6 +133,7 @@ async def create_automation(
         tenant_id=settings.tenant_id,
         site_id=settings.site_id,
         gateway_id=settings.gateway_id,
+        version=1,
         trigger=body.trigger,
         actions=body.actions,
         sync_status="pending",
@@ -141,6 +142,31 @@ async def create_automation(
     )
     mark_sync_pending(rule, "automation.upsert")
     db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    return rule
+
+
+@router.put("/{automation_id}", response_model=AutomationOut)
+async def update_automation(
+    automation_id: str,
+    body: AutomationUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    rule = await db.get(Automation, automation_id)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    if body.version != rule.version:
+        raise HTTPException(status_code=409, detail="Automation version conflict")
+
+    await _validate_rule_template(db, body.trigger, body.actions)
+    rule.name = body.name
+    rule.enabled = body.enabled
+    rule.version += 1
+    rule.trigger = body.trigger
+    rule.actions = body.actions
+    rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    mark_sync_pending(rule, "automation.upsert")
     await db.commit()
     await db.refresh(rule)
     return rule
@@ -155,6 +181,7 @@ async def _set_enabled(
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     rule.enabled = enabled
+    rule.version += 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
     mark_sync_pending(rule, "automation.enable" if enabled else "automation.disable")
     await db.commit()
@@ -176,3 +203,16 @@ async def disable_automation(
     db: AsyncSession = Depends(get_db),
 ):
     return await _set_enabled(automation_id, False, db)
+
+
+@router.delete("/{automation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_automation(
+    automation_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    rule = await db.get(Automation, automation_id)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    await db.delete(rule)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
