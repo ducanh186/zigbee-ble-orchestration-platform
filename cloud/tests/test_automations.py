@@ -62,7 +62,9 @@ def _motion_on_rule() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_create_automation_persists_pending_rule(client, db_session_factory):
+async def test_create_automation_persists_pending_rule(
+    client, db_session_factory
+):
     await _seed_automation_devices(db_session_factory)
 
     response = await client.post("/api/automations", json=_motion_on_rule())
@@ -77,6 +79,7 @@ async def test_create_automation_persists_pending_rule(client, db_session_factor
         "light-01",
         "light-02",
     ]
+    assert data["version"] == 1
     assert data["sync_status"] == "pending"
     assert data["last_run_status"] == "never_run"
     assert data["last_error"] is None
@@ -97,7 +100,9 @@ async def test_list_and_detail_automations(client, db_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_enable_disable_automation_marks_sync_pending(client, db_session_factory):
+async def test_enable_disable_automation_marks_sync_pending(
+    client, db_session_factory
+):
     await _seed_automation_devices(db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
     created = (await client.post("/api/automations", json=body)).json()
@@ -107,10 +112,62 @@ async def test_enable_disable_automation_marks_sync_pending(client, db_session_f
 
     assert enable_response.status_code == 200
     assert enable_response.json()["enabled"] is True
+    assert enable_response.json()["version"] == 2
     assert enable_response.json()["sync_status"] == "pending"
     assert disable_response.status_code == 200
     assert disable_response.json()["enabled"] is False
+    assert disable_response.json()["version"] == 3
     assert disable_response.json()["sync_status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_update_automation_bumps_version_and_rejects_stale_version(
+    client, db_session_factory
+):
+    await _seed_automation_devices(db_session_factory)
+    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+
+    update_body = {
+        "name": "Motion turns lights off",
+        "enabled": True,
+        "version": created["version"],
+        "trigger": {
+            "device_id": "motion-01",
+            "device_type": "motion",
+            "event": "occupancy_changed",
+            "state": {"occupancy": "unoccupied"},
+        },
+        "actions": [
+            {"device_id": "light-01", "device_type": "light", "command": "off"},
+            {"device_id": "light-02", "device_type": "light", "command": "off"},
+        ],
+    }
+
+    update_response = await client.put(
+        f"/api/automations/{created['id']}",
+        json=update_body,
+    )
+    stale_response = await client.put(
+        f"/api/automations/{created['id']}",
+        json=update_body,
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["version"] == 2
+    assert update_response.json()["actions"][0]["command"] == "off"
+    assert stale_response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_delete_automation_removes_rule(client, db_session_factory):
+    await _seed_automation_devices(db_session_factory)
+    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+
+    delete_response = await client.delete(f"/api/automations/{created['id']}")
+    detail_response = await client.get(f"/api/automations/{created['id']}")
+
+    assert delete_response.status_code == 204
+    assert detail_response.status_code == 404
 
 
 @pytest.mark.asyncio

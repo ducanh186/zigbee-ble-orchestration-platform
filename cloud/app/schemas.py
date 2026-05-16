@@ -259,6 +259,10 @@ class AutomationCreate(BaseModel):
     actions: list[dict[str, Any]] = Field(min_length=1)
 
 
+class AutomationUpdate(AutomationCreate):
+    version: int = Field(ge=1)
+
+
 class AutomationOut(BaseModel):
     id: str
     name: str
@@ -266,6 +270,7 @@ class AutomationOut(BaseModel):
     tenant_id: str
     site_id: str
     gateway_id: str
+    version: int
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
     sync_status: Literal["pending", "synced", "failed"]
