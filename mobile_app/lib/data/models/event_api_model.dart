@@ -1,5 +1,14 @@
 import '../../domain/models/event_log.dart';
 
+/// JSON wire-format model for `GET /api/events` responses.
+///
+/// Cloud emits the gateway event_type string verbatim (e.g.
+/// `occupancy_changed`, `toggle`, `automation.executed`,
+/// `automation.failed`, `gateway_online`); the mobile app keeps the string
+/// untouched here and lets [categoryForEventType] in the domain layer
+/// classify it for display. We deliberately do NOT add new event_type
+/// values on the gateway or cloud side — the notification center is a
+/// read-only view over what the platform already publishes.
 class EventApiModel {
   const EventApiModel({
     required this.id,
@@ -39,6 +48,11 @@ class EventApiModel {
   final String occurredAt;
   final String? source;
   final String? commandId;
+
+  /// Convenience accessor for the domain-side category. Equivalent to
+  /// [EventLog.category] but available before the API model is mapped to a
+  /// domain object — useful in repository-level filtering or analytics.
+  EventCategory get category => categoryForEventType(eventType);
 
   EventLog toDomain() {
     return EventLog(

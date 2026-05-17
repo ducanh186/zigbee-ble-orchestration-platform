@@ -98,7 +98,10 @@ class RemoteDeviceRepository implements DeviceRepository {
 
     final resolved = <SmartDevice>[];
     for (final device in devices) {
-      if (device.deviceType != 'light') {
+      // Lights expose reported power; motion sensors expose reported
+      // occupancy; the per-device state endpoint serves both and is the only
+      // path to occupancy today (see cloud/app/routers/devices.py).
+      if (device.deviceType != 'light' && device.deviceType != 'motion') {
         resolved.add(device.toDomain());
         continue;
       }
@@ -108,7 +111,11 @@ class RemoteDeviceRepository implements DeviceRepository {
         resolved.add(device.toDomain());
       } else {
         resolved.add(
-          device.toDomain(power: state.power, reportedAt: state.reportedAt),
+          device.toDomain(
+            power: state.power,
+            reportedAt: state.reportedAt,
+            occupancy: state.occupancy,
+          ),
         );
       }
     }

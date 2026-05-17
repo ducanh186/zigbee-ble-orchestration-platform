@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/event_log.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
+import '../widgets/notification_event_tile.dart';
 
+/// Mobile notification center.
+///
+/// Renders the cloud event stream as a newest-first list of
+/// [NotificationEventTile]s. Sorting is done client-side by the
+/// `occurred_at` string from the cloud (a `HH:mm MM/dd/YYYY` display
+/// format), which is monotonic enough for ordering even without parsing,
+/// because the cloud also returns events DESC from `/api/events`. The
+/// explicit sort here is defensive against test fixtures or repository
+/// implementations that don't preserve that order.
 class LogsView extends StatelessWidget {
   const LogsView({this.onBack, super.key});
 
@@ -16,6 +25,7 @@ class LogsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
+        final events = _newestFirst(viewModel.events);
         return CustomScrollView(
           slivers: [
             SliverAppBar(
@@ -47,20 +57,16 @@ class LogsView extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  if (viewModel.events.isEmpty)
+                  if (events.isEmpty)
                     const AppCard(child: Text('No event log yet.'))
                   else
                     AppCard(
                       padding: EdgeInsets.zero,
                       child: Column(
                         children: [
-                          for (
-                            var index = 0;
-                            index < viewModel.events.length;
-                            index++
-                          )
-                            _LogRow(
-                              event: viewModel.events[index],
+                          for (var index = 0; index < events.length; index++)
+                            NotificationEventTile(
+                              event: events[index],
                               showBorder: index != 0,
                             ),
                         ],
@@ -74,73 +80,52 @@ class LogsView extends StatelessWidget {
       },
     );
   }
-}
 
-class _LogRow extends StatelessWidget {
-  const _LogRow({required this.event, required this.showBorder});
+  /// Returns [events] sorted newest-first.
+  ///
+  /// The cloud emits `occurred_at` as a display string `HH:mm MM/dd/YYYY` (see
+  /// `TS_DISPLAY_FORMAT` in `cloud/app/schemas.py`). Lexical sort on that
+  /// string is wrong across dates, so the comparator parses each timestamp
+  /// into a `DateTime`. Unparseable strings fall back to the raw string sort
+  /// so the test fixture order remains predictable even with synthetic data.
+  List<EventLog> _newestFirst(List<EventLog> events) {
+    final sorted = List<EventLog>.of(events);
+    sorted.sort((a, b) {
+      final aDate = _parseOccurredAt(a.occurredAt);
+      final bDate = _parseOccurredAt(b.occurredAt);
+      if (aDate != null && bDate != null) {
+        return bDate.compareTo(aDate);
+      }
+      return b.occurredAt.compareTo(a.occurredAt);
+    });
+    return sorted;
+  }
 
-  final EventLog event;
-  final bool showBorder;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final icon = event.eventType.toLowerCase().contains('error')
-        ? Icons.error_outline
-        : Icons.check_circle_outline;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: showBorder
-            ? Border(top: BorderSide(color: palette.border))
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              event.occurredAt,
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontFamily: 'JetBrains Mono',
-                fontSize: 11,
-              ),
-            ),
-          ),
-          Icon(icon, color: palette.primary, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${event.eventType} ${event.deviceId ?? ''}'.trim(),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(event.message, style: const TextStyle(fontSize: 13)),
-                Text(
-                  [
-                    if (event.source != null) 'source=${event.source}',
-                    if (event.commandId != null)
-                      'command_id=${event.commandId}',
-                  ].join(' - '),
-                  style: TextStyle(
-                    color: palette.textSecondary,
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  /// Parses `HH:mm MM/dd/YYYY` (cloud display format) into a `DateTime`.
+  /// Returns `null` when the input doesn't match so the caller can fall back
+  /// to lexical comparison.
+  DateTime? _parseOccurredAt(String value) {
+    if (value.isEmpty) return null;
+    // Also accept ISO-8601 in case other code paths inject it.
+    final iso = DateTime.tryParse(value);
+    if (iso != null) return iso;
+    final parts = value.split(' ');
+    if (parts.length != 2) return null;
+    final time = parts[0].split(':');
+    final date = parts[1].split('/');
+    if (time.length != 2 || date.length != 3) return null;
+    final hour = int.tryParse(time[0]);
+    final minute = int.tryParse(time[1]);
+    final month = int.tryParse(date[0]);
+    final day = int.tryParse(date[1]);
+    final year = int.tryParse(date[2]);
+    if (hour == null ||
+        minute == null ||
+        month == null ||
+        day == null ||
+        year == null) {
+      return null;
+    }
+    return DateTime(year, month, day, hour, minute);
   }
 }

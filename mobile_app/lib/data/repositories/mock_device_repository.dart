@@ -5,6 +5,7 @@ import '../../domain/models/command_status.dart';
 import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
+import '../../domain/models/occupancy_state.dart';
 import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
 import '../models/device_state_api_model.dart';
@@ -46,6 +47,7 @@ class MockDeviceRepository implements DeviceRepository {
       isOnline: true,
       power: DevicePower.unknown,
       reportedAt: '07:16 05/07/2026',
+      occupancy: OccupancyState.occupied,
     ),
   ];
 

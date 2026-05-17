@@ -1,4 +1,5 @@
 import 'device_power.dart';
+import 'occupancy_state.dart';
 
 class SmartDevice {
   const SmartDevice({
@@ -10,6 +11,7 @@ class SmartDevice {
     this.eui64,
     this.roomId,
     this.reportedAt,
+    this.occupancy,
   });
 
   final String id;
@@ -21,7 +23,12 @@ class SmartDevice {
   final DevicePower power;
   final String? reportedAt;
 
+  /// Latest reported presence/occupancy for motion sensors. `null` for
+  /// non-motion devices and for motion devices that have not yet reported.
+  final OccupancyState? occupancy;
+
   bool get isLight => deviceType == 'light';
+  bool get isMotion => deviceType == 'motion';
   bool get isReachable => isOnline && power != DevicePower.unreachable;
   String get roomLabel =>
       roomId == null || roomId!.isEmpty ? 'No room' : roomId!;
@@ -35,6 +42,7 @@ class SmartDevice {
     bool? isOnline,
     DevicePower? power,
     String? reportedAt,
+    OccupancyState? occupancy,
   }) {
     return SmartDevice(
       id: id ?? this.id,
@@ -45,6 +53,7 @@ class SmartDevice {
       isOnline: isOnline ?? this.isOnline,
       power: power ?? this.power,
       reportedAt: reportedAt ?? this.reportedAt,
+      occupancy: occupancy ?? this.occupancy,
     );
   }
 }

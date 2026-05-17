@@ -1,4 +1,5 @@
 import '../../domain/models/device_power.dart';
+import '../../domain/models/occupancy_state.dart';
 import '../../domain/models/smart_device.dart';
 
 class DeviceApiModel {
@@ -32,6 +33,7 @@ class DeviceApiModel {
   SmartDevice toDomain({
     DevicePower power = DevicePower.unknown,
     String? reportedAt,
+    OccupancyState? occupancy,
   }) {
     return SmartDevice(
       id: id,
@@ -42,6 +44,7 @@ class DeviceApiModel {
       isOnline: isOnline,
       power: power,
       reportedAt: reportedAt,
+      occupancy: occupancy,
     );
   }
 }
