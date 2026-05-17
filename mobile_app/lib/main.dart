@@ -4,17 +4,21 @@ import 'package:provider/provider.dart';
 import 'app_runtime_config.dart';
 import 'data/repositories/mock_automation_repository.dart';
 import 'data/repositories/mock_device_repository.dart';
+import 'data/repositories/mock_ota_repository.dart';
 import 'data/repositories/remote_auth_repository.dart';
 import 'data/repositories/remote_automation_repository.dart';
 import 'data/repositories/remote_device_repository.dart';
+import 'data/repositories/remote_ota_repository.dart';
 import 'data/services/api_client.dart';
 import 'domain/repositories/automation_repository.dart';
 import 'domain/repositories/device_repository.dart';
+import 'domain/repositories/ota_repository.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/features/auth/view_models/auth_view_model.dart';
 import 'ui/features/auth/views/login_view.dart';
 import 'ui/features/automation/view_models/automation_view_model.dart';
 import 'ui/features/devices/view_models/device_dashboard_view_model.dart';
+import 'ui/features/settings/view_models/ota_progress_view_model.dart';
 import 'ui/features/shell/views/smart_building_shell.dart';
 
 const _useMockApi = bool.fromEnvironment('USE_MOCK_API', defaultValue: false);
@@ -31,6 +35,12 @@ void main() {
   final AutomationRepository automationRepository = _useMockApi
       ? MockAutomationRepository()
       : RemoteAutomationRepository(apiClient: apiClient);
+  // SCRUM-25: the cloud OTA router does not exist yet (depends on SCRUM-8).
+  // Until then the remote impl maps 404 to an empty list so the screen stays
+  // quiet in production. Mock mode shows representative campaigns.
+  final OtaRepository otaRepository = _useMockApi
+      ? MockOtaRepository()
+      : RemoteOtaRepository(apiClient: apiClient);
   final authViewModel = AuthViewModel(
     repository: RemoteAuthRepository(apiClient: apiClient),
   );
@@ -39,6 +49,7 @@ void main() {
     ZigbeeSmartBuildingApp(
       repository: repository,
       automationRepository: automationRepository,
+      otaRepository: otaRepository,
       apiBaseUrl: _apiBaseUrl,
       useMockApi: _useMockApi,
       authViewModelOverride: authViewModel,
@@ -52,12 +63,19 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     required this.automationRepository,
     required this.apiBaseUrl,
     required this.useMockApi,
+    this.otaRepository,
     this.authViewModelOverride,
     super.key,
   });
 
   final DeviceRepository repository;
   final AutomationRepository automationRepository;
+
+  /// Optional OTA progress source. When null the OTA settings section is
+  /// hidden. Production [main] always supplies one; the existing widget
+  /// tests omit it to keep their fixtures focused.
+  final OtaRepository? otaRepository;
+
   final String apiBaseUrl;
   final bool useMockApi;
 
@@ -82,6 +100,11 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
           create: (_) =>
               AutomationViewModel(repository: automationRepository)..load(),
         ),
+        if (otaRepository != null)
+          ChangeNotifierProvider(
+            create: (_) =>
+                OtaProgressViewModel(repository: otaRepository!)..load(),
+          ),
         ChangeNotifierProvider<AuthViewModel>.value(
           value: authViewModelOverride ?? _fallbackAuthViewModel(),
         ),
