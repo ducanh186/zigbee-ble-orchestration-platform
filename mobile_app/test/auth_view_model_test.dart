@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
@@ -26,7 +27,11 @@ class FailingAuthRepository implements AuthRepository {
     required String username,
     required String password,
   }) async {
-    throw Exception('401 unauthorized');
+    throw const ApiException(
+      statusCode: 401,
+      kind: ApiErrorKind.unauthorized,
+      message: 'invalid credentials',
+    );
   }
 
   @override
@@ -52,6 +57,9 @@ void main() {
     expect(viewModel.isAuthenticated, isFalse);
     expect(viewModel.session, isNull);
     expect(viewModel.errorMessage, isNotNull);
-    expect(viewModel.errorMessage, contains('401 unauthorized'));
+    // Surface a friendly message; never leak raw HTTP / exception text.
+    expect(viewModel.errorMessage, contains('Dang nhap that bai'));
+    expect(viewModel.errorMessage, isNot(contains('invalid credentials')));
+    expect(viewModel.errorMessage, isNot(contains('API 401')));
   });
 }

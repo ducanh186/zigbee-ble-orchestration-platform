@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/auth_session.dart';
 import '../../../../domain/repositories/auth_repository.dart';
 
@@ -37,7 +38,7 @@ class AuthViewModel extends ChangeNotifier {
       );
     } catch (error) {
       _session = null;
-      _errorMessage = 'Dang nhap that bai. $error';
+      _errorMessage = friendlyErrorMessage(error, context: 'Dang nhap that bai');
     } finally {
       _isLoading = false;
       notifyListeners();
