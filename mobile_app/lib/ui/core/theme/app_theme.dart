@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 enum AppThemeMode { light, dark, grey }
 
 class ThemeController extends ChangeNotifier {
-  AppThemeMode _mode = AppThemeMode.light;
+  AppThemeMode _mode = AppThemeMode.dark;
 
   AppThemeMode get mode => _mode;
 
@@ -35,22 +36,29 @@ class AppTheme {
       error: palette.error,
     );
 
+    final baseTextTheme = ThemeData(brightness: brightness).textTheme;
+    final interTextTheme = GoogleFonts.interTextTheme(
+      baseTextTheme,
+    ).apply(bodyColor: palette.textPrimary, displayColor: palette.textPrimary);
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: palette.background,
-      fontFamily: 'Inter',
+      textTheme: interTextTheme,
+      primaryTextTheme: interTextTheme,
       extensions: [palette],
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,
         backgroundColor: palette.background,
         foregroundColor: palette.textPrimary,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.inter(
           color: palette.textPrimary,
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
         ),
       ),
       cardTheme: CardThemeData(
@@ -139,40 +147,46 @@ class AppPalette extends ThemeExtension<AppPalette> {
     border: Color(0xFFE5E7EB),
   );
 
+  // Tokens aligned with the "Zigbee Smart Building Design System (Remix)"
+  // /colors_and_type.css. Dark surfaces are lifted ~3% versus the previous
+  // values so ambient eyes have less contrast burn while keeping AA legibility.
   static const dark = AppPalette(
-    background: Color(0xFF0F1115),
-    surface: Color(0xFF171A21),
-    surfaceElevated: Color(0xFF20242D),
-    primary: Color(0xFF7AA2FF),
-    primaryTint: Color(0x267AA2FF),
+    background: Color(0xFF161A21),
+    surface: Color(0xFF1F232C),
+    surfaceElevated: Color(0xFF2A2F3A),
+    primary: Color(0xFF8AAEFF),
+    primaryTint: Color(0x338AAEFF),
     primaryOn: Color(0xFF0F1115),
     success: Color(0xFF34D399),
-    successTint: Color(0x2634D399),
+    successTint: Color(0x2934D399),
     warning: Color(0xFFFBBF24),
-    warningTint: Color(0x26FBBF24),
+    warningTint: Color(0x2EFBBF24),
     error: Color(0xFFF87171),
-    errorTint: Color(0x26F87171),
+    errorTint: Color(0x29F87171),
     textPrimary: Color(0xFFF9FAFB),
-    textSecondary: Color(0xFFA1A1AA),
-    border: Color(0xFF2D3340),
+    textSecondary: Color(0xFFB0B3BC),
+    border: Color(0xFF383F4D),
   );
 
+  // The third mode in the design system is "cream / be sữa" — warm milk-beige,
+  // log-friendly. The enum value is still called `grey` to avoid churn in
+  // ThemeController + Settings widgets that toggle it.
   static const grey = AppPalette(
-    background: Color(0xFFF1F5F9),
-    surface: Color(0xFFFFFFFF),
-    surfaceElevated: Color(0xFFF8FAFC),
-    primary: Color(0xFF475569),
-    primaryTint: Color(0x1F475569),
+    background: Color(0xFFF0EBE0),
+    surface: Color(0xFFF8F4EB),
+    surfaceElevated: Color(0xFFFDFAF3),
+    primary: Color(0xFF6B5F4E),
+    primaryTint: Color(0x1F6B5F4E),
     primaryOn: Color(0xFFFFFFFF),
-    success: Color(0xFF16A34A),
-    successTint: Color(0x1F16A34A),
-    warning: Color(0xFFD97706),
-    warningTint: Color(0x1FD97706),
-    error: Color(0xFFDC2626),
-    errorTint: Color(0x1FDC2626),
-    textPrimary: Color(0xFF0F172A),
-    textSecondary: Color(0xFF64748B),
-    border: Color(0xFFE2E8F0),
+    success: Color(0xFF5E7A56),
+    successTint: Color(0x215E7A56),
+    warning: Color(0xFF9A7836),
+    warningTint: Color(0x249A7836),
+    error: Color(0xFFA35D55),
+    errorTint: Color(0x21A35D55),
+    textPrimary: Color(0xFF1F1A12),
+    textSecondary: Color(0xFF756B5D),
+    border: Color(0xFFDDD6C7),
   );
 
   @override

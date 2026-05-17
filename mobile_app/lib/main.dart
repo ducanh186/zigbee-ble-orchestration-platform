@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'app_runtime_config.dart';
@@ -10,6 +11,8 @@ import 'data/repositories/remote_device_repository.dart';
 import 'data/services/api_client.dart';
 import 'domain/repositories/automation_repository.dart';
 import 'domain/repositories/device_repository.dart';
+import 'l10n/app_localizations.dart';
+import 'ui/core/localization/locale_controller.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/features/auth/view_models/auth_view_model.dart';
 import 'ui/features/auth/views/login_view.dart';
@@ -22,10 +25,6 @@ const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://98.83.4.87:8000',
 );
-// Temporarily skip the login screen while the cloud `/auth/login` router
-// is not implemented. Override with `--dart-define=HIDE_LOGIN=false` once
-// cloud auth lands.
-const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: true);
 
 void main() {
   final apiClient = ApiClient(baseUrl: _apiBaseUrl);
@@ -46,7 +45,6 @@ void main() {
       apiBaseUrl: _apiBaseUrl,
       useMockApi: _useMockApi,
       authViewModelOverride: authViewModel,
-      hideLogin: _hideLogin,
     ),
   );
 }
@@ -58,7 +56,6 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     required this.apiBaseUrl,
     required this.useMockApi,
     this.authViewModelOverride,
-    this.hideLogin = false,
     super.key,
   });
 
@@ -71,17 +68,12 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   /// a real [AuthViewModel] backed by the in-memory repository.
   final AuthViewModel? authViewModelOverride;
 
-  /// When true, [_AuthGate] short-circuits and renders [SmartBuildingShell]
-  /// directly instead of gating on `AuthViewModel.isAuthenticated`. Driven by
-  /// the `HIDE_LOGIN` `--dart-define` flag in production; defaults to false in
-  /// tests so the auth flow remains exercisable.
-  final bool hideLogin;
-
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeController()),
+        ChangeNotifierProvider(create: (_) => LocaleController()),
         Provider(
           create: (_) =>
               AppRuntimeConfig(apiBaseUrl: apiBaseUrl, useMockApi: useMockApi),
@@ -98,13 +90,21 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
           value: authViewModelOverride ?? _fallbackAuthViewModel(),
         ),
       ],
-      child: Consumer<ThemeController>(
-        builder: (context, themeController, _) {
+      child: Consumer2<ThemeController, LocaleController>(
+        builder: (context, themeController, localeController, _) {
           return MaterialApp(
             title: 'Zigbee Smart Building',
             debugShowCheckedModeBanner: false,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: localeController.locale,
             theme: AppTheme.theme(themeController.mode),
-            home: _AuthGate(hideLogin: hideLogin),
+            home: const _AuthGate(),
           );
         },
       ),
@@ -115,24 +115,20 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     // Tests that omit [authViewModelOverride] still need a working auth view
     // model. Production always supplies one via [main].
     return AuthViewModel(
-      repository: RemoteAuthRepository(apiClient: ApiClient(baseUrl: apiBaseUrl)),
+      repository: RemoteAuthRepository(
+        apiClient: ApiClient(baseUrl: apiBaseUrl),
+      ),
     );
   }
 }
 
 /// Swaps between [LoginView] and [SmartBuildingShell] based on the current
-/// [AuthViewModel] session. When [hideLogin] is true the gate short-circuits
-/// and renders the shell unconditionally.
+/// [AuthViewModel] session.
 class _AuthGate extends StatelessWidget {
-  const _AuthGate({this.hideLogin = false});
-
-  final bool hideLogin;
+  const _AuthGate();
 
   @override
   Widget build(BuildContext context) {
-    if (hideLogin) {
-      return const SmartBuildingShell();
-    }
     final auth = context.watch<AuthViewModel>();
     if (!auth.isAuthenticated) {
       return const LoginView();
