@@ -6,8 +6,10 @@ import '../../../../domain/models/smart_device.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/error_banner.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../view_models/device_dashboard_view_model.dart';
+import '../widgets/occupancy_status_card.dart';
 
 class DevicesView extends StatelessWidget {
   const DevicesView({required this.onOpenLight, this.onBack, super.key});
@@ -19,6 +21,10 @@ class DevicesView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
+        final motionDevices = viewModel.devices
+            .where((device) => device.isMotion)
+            .toList(growable: false);
+
         return CustomScrollView(
           slivers: [
             SliverAppBar(
@@ -39,24 +45,40 @@ class DevicesView extends StatelessWidget {
                 ),
               ],
             ),
+            if (viewModel.errorMessage != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: ErrorBanner(
+                    message: viewModel.errorMessage!,
+                    onRetry: viewModel.load,
+                  ),
+                ),
+              ),
+            if (motionDevices.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionTitle(title: 'Occupancy'),
+                      const SizedBox(height: 8),
+                      for (final motion in motionDevices) ...[
+                        OccupancyStatusCard(device: motion),
+                        const SizedBox(height: 10),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               sliver: SliverList.separated(
-                itemCount:
-                    viewModel.devices.length +
-                    (viewModel.errorMessage == null ? 0 : 1),
+                itemCount: viewModel.devices.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
-                  if (viewModel.errorMessage != null && index == 0) {
-                    return ErrorBanner(
-                      message: viewModel.errorMessage!,
-                      onRetry: viewModel.load,
-                    );
-                  }
-                  final offset = viewModel.errorMessage == null
-                      ? index
-                      : index - 1;
-                  final device = viewModel.devices[offset];
+                  final device = viewModel.devices[index];
                   return _DeviceRow(
                     device: device,
                     onTap: device.isLight ? () => onOpenLight(device) : null,

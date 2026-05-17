@@ -98,31 +98,64 @@ class RemoteDeviceRepository implements DeviceRepository {
 
     final resolved = <SmartDevice>[];
     for (final device in devices) {
-      if (device.deviceType != 'light') {
+      // Lights expose reported power; motion sensors expose reported
+      // occupancy; the per-device state endpoint serves both and is the only
+      // path to occupancy today (see cloud/app/routers/devices.py).
+      if (device.deviceType != 'light' && device.deviceType != 'motion') {
         resolved.add(device.toDomain());
         continue;
       }
 
-      try {
-        final stateJson = await _apiClient.getJson(
-          '/api/devices/${device.id}/state',
-        );
-        final state = DeviceStateApiModel.fromJson(
-          Map<String, Object?>.from(stateJson as Map),
-        );
+      final state = await _fetchDeviceState(device.id);
+      if (state == null) {
+        resolved.add(device.toDomain());
+      } else {
         resolved.add(
-          device.toDomain(power: state.power, reportedAt: state.reportedAt),
+          device.toDomain(
+            power: state.power,
+            reportedAt: state.reportedAt,
+            occupancy: state.occupancy,
+          ),
         );
-      } on ApiException catch (error) {
-        if (error.statusCode == 404) {
-          resolved.add(device.toDomain());
-          continue;
-        }
-        rethrow;
       }
     }
 
     return resolved;
+  }
+
+  @override
+  Future<List<DeviceStateApiModel>> refreshDeviceStates(
+    List<String> deviceIds,
+  ) async {
+    // Cloud currently exposes only the per-device endpoint
+    // (`GET /api/devices/{id}/state`); see cloud/app/routers/devices.py.
+    // We fetch sequentially to keep the cloud load predictable; the typical
+    // light count per project is small (<20) and the dashboard tolerates a
+    // multi-hundred-ms refresh latency.
+    final states = <DeviceStateApiModel>[];
+    for (final deviceId in deviceIds) {
+      final state = await _fetchDeviceState(deviceId);
+      if (state != null) {
+        states.add(state);
+      }
+    }
+    return states;
+  }
+
+  Future<DeviceStateApiModel?> _fetchDeviceState(String deviceId) async {
+    try {
+      final stateJson = await _apiClient.getJson(
+        '/api/devices/$deviceId/state',
+      );
+      return DeviceStateApiModel.fromJson(
+        Map<String, Object?>.from(stateJson as Map),
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   @override
