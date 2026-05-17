@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/smart_device.dart';
+import '../../auth/view_models/auth_view_model.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../../automation/views/automation_rules_view.dart';
 import '../../home/views/home_view.dart';
@@ -78,11 +79,18 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
       0 => HomeView(onOpenLight: _openLight),
       1 => const AutomationRulesView(),
       2 => const ProvisioningView(),
-      _ => SettingsView(onOpenLight: _openLight),
+      _ => SettingsView(
+          onOpenLight: _openLight,
+          onLogout: _handleLogout,
+        ),
     };
   }
 
   void _openLight(SmartDevice device) {
     setState(() => _selectedLightId = device.id);
+  }
+
+  Future<void> _handleLogout() async {
+    await context.read<AuthViewModel>().logout();
   }
 }

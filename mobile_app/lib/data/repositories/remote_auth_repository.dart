@@ -26,20 +26,35 @@ class RemoteAuthRepository implements AuthRepository {
     if (rawAccessToken is! String || rawAccessToken.isEmpty) {
       throw const ApiException(
         statusCode: 200,
+        kind: ApiErrorKind.unknown,
         message: 'Auth response missing access_token',
       );
     }
     final userId = map['user_id'] as String?;
     final expiresAtRaw = map['expires_at'] as String?;
-    return AuthSession(
+    final session = AuthSession(
       accessToken: rawAccessToken,
       userId: userId,
       expiresAt: expiresAtRaw == null ? null : DateTime.tryParse(expiresAtRaw),
     );
+
+    // SCRUM-29: wire the bearer token into the shared ApiClient so
+    // subsequent authenticated calls (devices, automation, logs) carry it.
+    // Owning this side effect in the repository keeps the view model free
+    // of API-client knowledge.
+    _apiClient.setAccessToken(session.accessToken);
+
+    return session;
   }
 
   @override
   Future<void> logout() async {
-    await _apiClient.postJson('/auth/logout', <String, Object?>{});
+    try {
+      await _apiClient.postJson('/auth/logout', <String, Object?>{});
+    } finally {
+      // Always clear the token locally even if the server call fails so the
+      // client cannot accidentally reuse a revoked bearer.
+      _apiClient.setAccessToken(null);
+    }
   }
 }
