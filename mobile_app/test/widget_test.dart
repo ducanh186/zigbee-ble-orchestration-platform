@@ -3,22 +3,42 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
+import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
+import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/main.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
+import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_card.dart';
+
+class _PreAuthedRepository implements AuthRepository {
+  @override
+  Future<AuthSession> login({
+    required String username,
+    required String password,
+  }) async => const AuthSession(accessToken: 'test-token');
+
+  @override
+  Future<void> logout() async {}
+}
 
 void main() {
   Future<void> pumpDashboard(
     WidgetTester tester, {
     required bool useMockApi,
   }) async {
+    // SCRUM-29 wraps the app in an auth gate. Pre-authenticate the dashboard
+    // tests so they continue to render the shell on first frame.
+    final authViewModel = AuthViewModel(repository: _PreAuthedRepository());
+    await authViewModel.login(username: 'operator', password: 'password');
+
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
         repository: MockDeviceRepository(),
         automationRepository: MockAutomationRepository(),
         apiBaseUrl: useMockApi ? 'mock' : 'http://98.83.4.87:8000',
         useMockApi: useMockApi,
+        authViewModelOverride: authViewModel,
       ),
     );
 

@@ -12,9 +12,17 @@ import '../../logs/views/logs_view.dart';
 enum _SettingsSection { overview, devices, logs }
 
 class SettingsView extends StatefulWidget {
-  const SettingsView({required this.onOpenLight, super.key});
+  const SettingsView({
+    required this.onOpenLight,
+    this.onLogout,
+    super.key,
+  });
 
   final ValueChanged<SmartDevice> onOpenLight;
+
+  /// Optional logout action. When null the row falls back to its inert
+  /// placeholder behavior. Wired by [SmartBuildingShell] in production.
+  final VoidCallback? onLogout;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -38,6 +46,7 @@ class _SettingsViewState extends State<SettingsView> {
         onOpenLogs: () {
           setState(() => _section = _SettingsSection.logs);
         },
+        onLogout: widget.onLogout,
       ),
       _SettingsSection.devices => DevicesView(
         onOpenLight: widget.onOpenLight,
@@ -58,12 +67,14 @@ class _SettingsOverview extends StatelessWidget {
     required this.onToggleRuntime,
     required this.onOpenDevices,
     required this.onOpenLogs,
+    this.onLogout,
   });
 
   final bool runtimeExpanded;
   final VoidCallback onToggleRuntime;
   final VoidCallback onOpenDevices;
   final VoidCallback onOpenLogs;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -182,11 +193,17 @@ class _SettingsOverview extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               AppCard(
+                padding: onLogout == null
+                    ? const EdgeInsets.all(16)
+                    : EdgeInsets.zero,
                 child: _SettingsRow(
                   icon: Icons.logout,
                   iconColor: palette.error,
                   title: 'Logout',
-                  subtitle: 'Sign out placeholder',
+                  subtitle: onLogout == null
+                      ? 'Sign out placeholder'
+                      : 'End this operator session',
+                  onTap: onLogout,
                 ),
               ),
             ],
