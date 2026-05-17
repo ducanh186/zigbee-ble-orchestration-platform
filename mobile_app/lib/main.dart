@@ -22,6 +22,10 @@ const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://98.83.4.87:8000',
 );
+// Temporarily skip the login screen while the cloud `/auth/login` router
+// is not implemented. Override with `--dart-define=HIDE_LOGIN=false` once
+// cloud auth lands.
+const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: true);
 
 void main() {
   final apiClient = ApiClient(baseUrl: _apiBaseUrl);
@@ -42,6 +46,7 @@ void main() {
       apiBaseUrl: _apiBaseUrl,
       useMockApi: _useMockApi,
       authViewModelOverride: authViewModel,
+      hideLogin: _hideLogin,
     ),
   );
 }
@@ -53,6 +58,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     required this.apiBaseUrl,
     required this.useMockApi,
     this.authViewModelOverride,
+    this.hideLogin = false,
     super.key,
   });
 
@@ -64,6 +70,12 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   /// Optional injection point for tests. If null, the production tree wires
   /// a real [AuthViewModel] backed by the in-memory repository.
   final AuthViewModel? authViewModelOverride;
+
+  /// When true, [_AuthGate] short-circuits and renders [SmartBuildingShell]
+  /// directly instead of gating on `AuthViewModel.isAuthenticated`. Driven by
+  /// the `HIDE_LOGIN` `--dart-define` flag in production; defaults to false in
+  /// tests so the auth flow remains exercisable.
+  final bool hideLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +104,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
             title: 'Zigbee Smart Building',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.theme(themeController.mode),
-            home: const _AuthGate(),
+            home: _AuthGate(hideLogin: hideLogin),
           );
         },
       ),
@@ -109,12 +121,18 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
 }
 
 /// Swaps between [LoginView] and [SmartBuildingShell] based on the current
-/// [AuthViewModel] session.
+/// [AuthViewModel] session. When [hideLogin] is true the gate short-circuits
+/// and renders the shell unconditionally.
 class _AuthGate extends StatelessWidget {
-  const _AuthGate();
+  const _AuthGate({this.hideLogin = false});
+
+  final bool hideLogin;
 
   @override
   Widget build(BuildContext context) {
+    if (hideLogin) {
+      return const SmartBuildingShell();
+    }
     final auth = context.watch<AuthViewModel>();
     if (!auth.isAuthenticated) {
       return const LoginView();
