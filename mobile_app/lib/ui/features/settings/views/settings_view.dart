@@ -367,14 +367,14 @@ class _SettingsOverviewState extends State<_SettingsOverview> {
                           _SettingsInfoRow(
                             icon: Icons.info_outline,
                             label: l10n.settingsVersion,
-                            value: '0.8.2',
+                            value: '0.8.3',
                             mono: true,
                           ),
                           Divider(color: palette.border, height: 1),
                           _SettingsInfoRow(
                             icon: Icons.inventory_2_outlined,
                             label: l10n.settingsBuild,
-                            value: '802',
+                            value: '803',
                             mono: true,
                           ),
                           Divider(color: palette.border, height: 1),

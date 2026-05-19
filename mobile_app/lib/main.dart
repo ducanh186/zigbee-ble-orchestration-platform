@@ -25,6 +25,9 @@ const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://98.83.4.87:8000',
 );
+// Keep release builds usable until the cloud login flow is ready end-to-end.
+// Override with `--dart-define=HIDE_LOGIN=false` when validating auth.
+const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: true);
 
 void main() {
   final apiClient = ApiClient(baseUrl: _apiBaseUrl);
@@ -45,6 +48,7 @@ void main() {
       apiBaseUrl: _apiBaseUrl,
       useMockApi: _useMockApi,
       authViewModelOverride: authViewModel,
+      hideLogin: _hideLogin,
     ),
   );
 }
@@ -56,6 +60,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     required this.apiBaseUrl,
     required this.useMockApi,
     this.authViewModelOverride,
+    this.hideLogin = false,
     super.key,
   });
 
@@ -67,6 +72,9 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   /// Optional injection point for tests. If null, the production tree wires
   /// a real [AuthViewModel] backed by the in-memory repository.
   final AuthViewModel? authViewModelOverride;
+
+  /// When true, [_AuthGate] skips the login screen and opens the shell.
+  final bool hideLogin;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +112,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
             supportedLocales: AppLocalizations.supportedLocales,
             locale: localeController.locale,
             theme: AppTheme.theme(themeController.mode),
-            home: const _AuthGate(),
+            home: _AuthGate(hideLogin: hideLogin),
           );
         },
       ),
@@ -125,10 +133,15 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
 /// Swaps between [LoginView] and [SmartBuildingShell] based on the current
 /// [AuthViewModel] session.
 class _AuthGate extends StatelessWidget {
-  const _AuthGate();
+  const _AuthGate({this.hideLogin = false});
+
+  final bool hideLogin;
 
   @override
   Widget build(BuildContext context) {
+    if (hideLogin) {
+      return const SmartBuildingShell();
+    }
     final auth = context.watch<AuthViewModel>();
     if (!auth.isAuthenticated) {
       return const LoginView();
