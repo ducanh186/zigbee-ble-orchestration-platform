@@ -218,6 +218,14 @@ void main() {
     expect(find.text('Toggle'), findsOneWidget);
     await tester.tap(find.text('Turn off'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Hallway Light').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hallway Light').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Turn on').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Turn on').last);
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Save rule'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save rule'));
@@ -229,8 +237,15 @@ void main() {
     expect(draft.triggerDeviceId, 'pir-01');
     expect(draft.triggerDeviceType, AutomationDeviceType.motion);
     expect(draft.triggerState, {'occupancy': 'occupied'});
-    expect(draft.actionCommand, AutomationActionCommand.off);
-    expect(draft.targetLightIds, ['light-01']);
+    expect(draft.targetLightIds, ['light-01', 'light-02']);
+    expect(draft.targetActionCommands, {
+      'light-01': AutomationActionCommand.off,
+      'light-02': AutomationActionCommand.on,
+    });
+    expect(draft.actions.map((action) => action.command), [
+      AutomationActionCommand.off,
+      AutomationActionCommand.on,
+    ]);
   });
 
   testWidgets('automation rule delete button opens confirmation dialog', (

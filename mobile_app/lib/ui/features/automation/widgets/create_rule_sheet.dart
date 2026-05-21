@@ -46,6 +46,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   Map<String, Object?> _triggerState = const {};
   AutomationActionCommand? _actionCommand;
   Set<String> _targetIds = {};
+  Map<String, AutomationActionCommand> _targetActionCommands = {};
 
   @override
   void initState() {
@@ -136,7 +137,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             lights: lights,
                             selectedIds: _targetIds,
                             allowsMultipleTargets: _allowsMultipleTargets,
-                            actionCommand: _actionCommand,
+                            actionCommands: _targetActionCommands,
                             onToggle: _toggleTarget,
                             onActionChanged: _setActionCommand,
                           ),
@@ -152,14 +153,14 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                                 setState(() => _enabled = value),
                           ),
                           if (_triggerEvent != null &&
-                              _actionCommand != null) ...[
+                              _previewActionCommand != null) ...[
                             const SizedBox(height: 16),
                             _FieldLabel(label: 'Preview'),
                             const SizedBox(height: 6),
                             RulePreview(
                               triggerEvent: _triggerEvent!,
                               triggerState: _triggerState,
-                              actionCommand: _actionCommand!,
+                              actionCommand: _previewActionCommand!,
                               trigger: triggerDevice,
                               targets: targetDevices,
                             ),
@@ -199,8 +200,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         _triggerId != null &&
         _triggerDeviceType != null &&
         _triggerEvent != null &&
-        _actionCommand != null &&
-        _targetIds.isNotEmpty;
+        _targetIds.isNotEmpty &&
+        _targetIds.every(_targetActionCommands.containsKey);
   }
 
   void _setTemplate(AutomationRuleTemplate template) {
@@ -211,6 +212,9 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       _triggerEvent = template.triggerEvent;
       _triggerState = template.triggerState;
       _actionCommand = template.actionCommand;
+      _targetActionCommands = {
+        for (final targetId in _targetIds) targetId: template.actionCommand,
+      };
       if (_triggerId != null &&
           previousTriggerType != null &&
           previousTriggerType != template.triggerDeviceType) {
@@ -230,6 +234,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         _triggerEvent = null;
         _triggerState = const {};
         _actionCommand = null;
+        _targetActionCommands = {};
         return;
       }
 
@@ -267,18 +272,25 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       if (selected) {
         if (!_allowsMultipleTargets) {
           _targetIds = {deviceId};
+          _targetActionCommands = {deviceId: _defaultActionCommand};
         } else {
           _targetIds = {..._targetIds, deviceId};
+          _targetActionCommands = {
+            ..._targetActionCommands,
+            deviceId: _defaultActionCommand,
+          };
         }
       } else {
         _targetIds = _targetIds.where((id) => id != deviceId).toSet();
+        _targetActionCommands = Map.of(_targetActionCommands)..remove(deviceId);
       }
     });
   }
 
-  void _setActionCommand(AutomationActionCommand command) {
+  void _setActionCommand(String deviceId, AutomationActionCommand command) {
     setState(() {
       _actionCommand = command;
+      _targetActionCommands = {..._targetActionCommands, deviceId: command};
       if (_template != null && _template!.actionCommand != command) {
         _template = null;
       }
@@ -293,6 +305,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       _triggerEvent = null;
       _triggerState = const {};
       _actionCommand = null;
+      _targetActionCommands = {};
     }
     final validLightIds = lights.map((device) => device.id).toSet();
     final keptTargets = _targetIds
@@ -300,6 +313,10 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         .toSet();
     if (keptTargets.length != _targetIds.length) {
       _targetIds = keptTargets;
+      _targetActionCommands = {
+        for (final entry in _targetActionCommands.entries)
+          if (keptTargets.contains(entry.key)) entry.key: entry.value,
+      };
     }
   }
 
@@ -335,6 +352,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       _triggerEvent = AutomationTriggerEvent.switchToggle;
       _triggerState = const {};
       _actionCommand = AutomationActionCommand.toggle;
+      _syncMissingTargetActions();
       return;
     }
 
@@ -346,6 +364,28 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     _actionCommand = occupancy == 'unoccupied'
         ? AutomationActionCommand.off
         : AutomationActionCommand.on;
+    _syncMissingTargetActions();
+  }
+
+  void _syncMissingTargetActions() {
+    _targetActionCommands = {
+      for (final targetId in _targetIds)
+        targetId: _targetActionCommands[targetId] ?? _defaultActionCommand,
+    };
+  }
+
+  AutomationActionCommand get _defaultActionCommand {
+    return _actionCommand ?? AutomationActionCommand.toggle;
+  }
+
+  AutomationActionCommand? get _previewActionCommand {
+    for (final targetId in _targetIds) {
+      final command = _targetActionCommands[targetId];
+      if (command != null) {
+        return command;
+      }
+    }
+    return _actionCommand;
   }
 
   AutomationActionCommand _actionForTrigger(
@@ -369,14 +409,14 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     final triggerId = _triggerId;
     final triggerDeviceType = _triggerDeviceType;
     final triggerEvent = _triggerEvent;
-    final actionCommand = _actionCommand;
     if (triggerId == null ||
         triggerDeviceType == null ||
         triggerEvent == null ||
-        actionCommand == null ||
-        _targetIds.isEmpty) {
+        _targetIds.isEmpty ||
+        !_targetIds.every(_targetActionCommands.containsKey)) {
       return;
     }
+    final targetLightIds = _targetIds.toList(growable: false);
     final draft = AutomationRuleDraft(
       name: _nameController.text.trim(),
       enabled: _enabled,
@@ -385,8 +425,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       triggerDeviceType: triggerDeviceType,
       triggerEvent: triggerEvent,
       triggerState: _triggerState,
-      actionCommand: actionCommand,
-      targetLightIds: _targetIds.toList(growable: false),
+      actionCommand: _previewActionCommand,
+      targetLightIds: targetLightIds,
+      targetActionCommands: {
+        for (final targetId in targetLightIds)
+          targetId: _targetActionCommands[targetId]!,
+      },
     );
 
     final beforeIds = automation.rules.map((rule) => rule.id).toSet();
@@ -673,7 +717,7 @@ class _TargetSection extends StatelessWidget {
     required this.lights,
     required this.selectedIds,
     required this.allowsMultipleTargets,
-    required this.actionCommand,
+    required this.actionCommands,
     required this.onToggle,
     required this.onActionChanged,
   });
@@ -681,9 +725,10 @@ class _TargetSection extends StatelessWidget {
   final List<SmartDevice> lights;
   final Set<String> selectedIds;
   final bool allowsMultipleTargets;
-  final AutomationActionCommand? actionCommand;
+  final Map<String, AutomationActionCommand> actionCommands;
   final void Function(String deviceId, bool selected) onToggle;
-  final ValueChanged<AutomationActionCommand> onActionChanged;
+  final void Function(String deviceId, AutomationActionCommand command)
+  onActionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -734,8 +779,9 @@ class _TargetSection extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: _TargetActionSection(
-                      actionCommand: actionCommand,
-                      onChanged: onActionChanged,
+                      actionCommand: actionCommands[light.id],
+                      onChanged: (command) =>
+                          onActionChanged(light.id, command),
                     ),
                   ),
                 ],

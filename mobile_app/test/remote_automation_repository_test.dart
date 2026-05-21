@@ -222,6 +222,54 @@ void main() {
     ]);
   });
 
+  test('createRule posts per-target light action payload', () async {
+    Map<String, Object?>? capturedBody;
+    final repository = RemoteAutomationRepository(
+      apiClient: ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          capturedBody = Map<String, Object?>.from(
+            jsonDecode(request.body) as Map,
+          );
+          return http.Response(
+            jsonEncode({
+              'id': 'automation-mixed-actions',
+              'name': 'Motion controls lights differently',
+              'enabled': true,
+              'trigger': capturedBody!['trigger'],
+              'actions': capturedBody!['actions'],
+              'sync_status': 'pending',
+              'last_run_status': 'never_run',
+            }),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      ),
+    );
+
+    await repository.createRule(
+      const AutomationRuleDraft(
+        name: 'Motion controls lights differently',
+        enabled: true,
+        triggerDeviceId: 'pir-01',
+        triggerDeviceType: AutomationDeviceType.motion,
+        triggerEvent: AutomationTriggerEvent.occupancyChanged,
+        triggerState: {'occupancy': 'occupied'},
+        targetLightIds: ['light-01', 'light-02'],
+        targetActionCommands: {
+          'light-01': AutomationActionCommand.on,
+          'light-02': AutomationActionCommand.off,
+        },
+      ),
+    );
+
+    expect(capturedBody!['actions'], [
+      {'device_id': 'light-01', 'device_type': 'light', 'command': 'on'},
+      {'device_id': 'light-02', 'device_type': 'light', 'command': 'off'},
+    ]);
+  });
+
   test('createRule posts manual motion unoccupied payload', () async {
     Map<String, Object?>? capturedBody;
     final repository = RemoteAutomationRepository(

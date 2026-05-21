@@ -237,6 +237,7 @@ class AutomationRuleDraft {
     Map<String, Object?> triggerState = const {},
     AutomationActionCommand? actionCommand,
     required this.targetLightIds,
+    this.targetActionCommands = const {},
     this.template,
   }) : _triggerDeviceType = triggerDeviceType,
        _triggerEvent = triggerEvent,
@@ -248,6 +249,7 @@ class AutomationRuleDraft {
   final AutomationRuleTemplate? template;
   final String triggerDeviceId;
   final List<String> targetLightIds;
+  final Map<String, AutomationActionCommand> targetActionCommands;
   final AutomationDeviceType? _triggerDeviceType;
   final AutomationTriggerEvent? _triggerEvent;
   final Map<String, Object?> _triggerState;
@@ -294,7 +296,7 @@ class AutomationRuleDraft {
           (deviceId) => AutomationAction(
             deviceId: deviceId,
             deviceType: AutomationDeviceType.light,
-            command: actionCommand,
+            command: targetActionCommands[deviceId] ?? actionCommand,
           ),
         )
         .toList(growable: false);
