@@ -65,7 +65,17 @@ Xem kèm:
 OTA và registry/health/log vẫn tồn tại trong topic tree, nhưng **không**
 thuộc Phase 0 freeze. Z3Gateway v1 **không bắt buộc** hỗ trợ:
 `registry`, `gateway_health`, `gateway_log`, `ota_progress`, `ota_event`,
-`ota_manifest`, `ota_desired`.
+`ota_manifest`, `ota_desired`, hoặc `ota_cancel`.
+
+Với OTA, các tên task như `ota.start`, `ota.cancel`, `ota.progress`,
+`ota.complete` là operation/event vocabulary ở API/log/test. Chúng không thay
+thế topic contract `ota/campaigns/{id}/manifest`,
+`ota/devices/{id}/desired`, `ota/devices/{id}/cancel`,
+`ota/devices/{id}/progress`, và `ota/devices/{id}/event`.
+
+Không được đánh dấu OTA là end-to-end ready nếu `gateway/Z3GatewayHost/app/`
+chưa có runtime tải artifact, verify `sha256`/`size_bytes`, lưu `SB_OTA_DIR`,
+offer qua native Zigbee OTA, publish progress/event, cancel, và rollback.
 
 ---
 

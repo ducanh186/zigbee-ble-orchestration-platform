@@ -132,9 +132,26 @@ sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/reply
 ```text
 sb/v1/{tenant}/{site}/{gateway}/ota/campaigns/{campaign_id}/manifest
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/cancel
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/progress
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/event
 ```
+
+`ota.start`, `ota.cancel`, `ota.progress`, and `ota.complete` are operation/event
+names used by API, logs, tests, or payload fields. They are **not** MQTT topic
+names. The official MQTT routing contract remains the topic tree above:
+
+| Operation vocabulary | MQTT topic / payload mapping |
+| --- | --- |
+| `ota.start` | Cloud publishes `ota/campaigns/{campaign_id}/manifest`, then `ota/devices/{device_id}/desired` with `payload.action = "stage_and_offer"` |
+| `ota.cancel` | Cloud publishes `ota/devices/{device_id}/cancel` with `payload.action = "cancel"` |
+| `ota.progress` | Gateway publishes `ota/devices/{device_id}/progress` |
+| `ota.complete` | Gateway publishes `ota/devices/{device_id}/event` with `payload.event = "complete"` and final progress status `completed` |
+
+OTA is a planned/deferred capability in the current repo. Cloud must not claim a
+real rollout unless Z3Gateway C has implemented artifact download, SHA/size
+verification, local `SB_OTA_DIR` staging, native Zigbee OTA offer, progress/event
+publishing, cancel, and rollback behavior.
 
 ### Nhóm (Groups)
 
@@ -175,6 +192,7 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 | `commands/*/reply` | 1 | không | |
 | `ota/campaigns/*/manifest` | 1 | có | |
 | `ota/devices/*/desired` | 1 | có | |
+| `ota/devices/*/cancel` | 1 | không | Cancel intent; not retained to avoid replaying old cancels |
 | `ota/devices/*/progress` | 1 | có | |
 | `ota/devices/*/event` | 1 | không | |
 | `groups/*/reported` | 1 | có | |
@@ -405,6 +423,7 @@ sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/commands/+/request
 sb/v1/hust/lab01/gw-ubuntu-01/ota/campaigns/+/manifest
 sb/v1/hust/lab01/gw-ubuntu-01/ota/devices/+/desired
+sb/v1/hust/lab01/gw-ubuntu-01/ota/devices/+/cancel
 sb/v1/hust/lab01/gw-ubuntu-01/groups/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/scenes/+/desired
 ```

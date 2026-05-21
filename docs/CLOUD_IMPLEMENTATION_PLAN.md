@@ -91,6 +91,67 @@ commands
   INDEX(device_id, created_at DESC)
 ```
 
+### Planned OTA tables (do not migrate until contract is approved)
+
+The current Cloud code does **not** implement OTA tables or `/api/ota/*` routes.
+These tables are the minimum contract for a future OTA manager. Cloud is only an
+orchestrator; Gateway still needs the OTA runtime described in
+[OTA_CAMPAIGN_CONTRACT.md](./OTA_CAMPAIGN_CONTRACT.md).
+
+```
+ota_campaigns
+  id              TEXT PK
+  name            TEXT NOT NULL
+  artifact_url    TEXT NOT NULL
+  sha256          TEXT NOT NULL
+  size_bytes      INTEGER NOT NULL
+  file_version    INTEGER NOT NULL
+  manufacturer_id TEXT NOT NULL
+  image_type      TEXT NOT NULL
+  device_type     TEXT NOT NULL
+  status          TEXT NOT NULL
+                  -- draft | staged | running | canceling | completed | failed | rolled_back
+  rollout_policy  JSON NOT NULL
+  rollback_policy JSON NULL
+  created_at      DATETIME DEFAULT now
+  updated_at      DATETIME DEFAULT now
+  started_at      DATETIME NULL
+  completed_at    DATETIME NULL
+
+ota_targets
+  id                 TEXT PK
+  campaign_id        TEXT FK -> ota_campaigns.id
+  device_id          TEXT FK -> devices.id
+  gateway_id         TEXT NOT NULL
+  status             TEXT NOT NULL
+                     -- pending | staging | staged | offering | downloading | applying
+                     -- completed | failed | canceled | rollback_pending | rolled_back
+  progress_pct       INTEGER DEFAULT 0
+  retry_count        INTEGER DEFAULT 0
+  last_error         TEXT NULL
+  current_fw_version TEXT NULL
+  target_fw_version  TEXT NULL
+  updated_at         DATETIME DEFAULT now
+
+ota_events
+  id            INTEGER PK AUTOINCREMENT
+  campaign_id   TEXT FK -> ota_campaigns.id
+  device_id     TEXT FK -> devices.id NULLABLE
+  event_type    TEXT NOT NULL
+  payload_json  JSON NOT NULL
+  created_at    DATETIME DEFAULT now
+```
+
+`ota_events` must be append-only. Do not update old OTA event rows in place.
+
+Targeting order:
+
+1. Single device first.
+2. Explicit device list second.
+3. Device group only after a real `device_groups` model exists.
+
+Do not represent OTA group targeting as a free-form string.
+
 ## API Endpoints
 
 ### Group 1 — Must have (this sprint)
@@ -112,6 +173,9 @@ commands
 | POST | `/api/auth/login` | Stub / fake token |
 | GET | `/api/rooms` | List rooms |
 | GET | `/api/homes` | List homes |
+| POST | `/api/ota/campaigns` | Planned: create OTA campaign metadata after artifact validation |
+| POST | `/api/ota/campaigns/{id}/start` | Planned: publish manifest + target desired |
+| POST | `/api/ota/campaigns/{id}/cancel` | Planned: publish target cancel intent |
 | Full pagination / filtering | | |
 
 ## MQTT Integration
