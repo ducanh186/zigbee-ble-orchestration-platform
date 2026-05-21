@@ -104,6 +104,30 @@ powershell -File deploy\seed-remote.ps1
 powershell -File deploy\ssh.ps1
 ```
 
+## Credentials
+
+### Mobile app login (NOT YET FUNCTIONAL)
+
+The Flutter login screen calls `POST /auth/login` on the Cloud API, but **the cloud has no `/auth/*` router yet** (`cloud/app/routers/` ships only `automations`, `commands`, `devices`, `events`, `gateways`, `health`). Any username/password will currently return a 404 from the cloud and the app will display the friendly error `"Dang nhap that bai. ..."` from `friendlyErrorMessage` without crashing.
+
+Tracked as a blocker in `docs/automation-e2e-report-20260517.md` (M1 = BLOCKED). When the auth router lands, the contract documented in `mobile_app/lib/data/repositories/remote_auth_repository.dart` is the expected payload (`access_token`, `user_id`, `expires_at`).
+
+There is **no built-in test user, no hard-coded fallback, and no mock auth bypass**. To exercise the UI past the login gate before the cloud router exists, you currently need to add a mock `AuthRepository` or short-circuit `_AuthGate` in `mobile_app/lib/main.dart` — both are local-only changes and should not be committed.
+
+### Backend service credentials (dev/staging defaults)
+
+These come from `deploy/.env.deploy.example` and are already public in the repo. They are intended for the dev / staging EC2 stack only — change them before any production deployment.
+
+| Service | Username | Password | Notes |
+| --- | --- | --- | --- |
+| MQTT (gateway role) | `gateway` | `gateway123` | Used by the Z3Gateway C host |
+| MQTT (client role) | `client` | `client123` | Used by the Cloud API (`SB_MQTT_USERNAME` / `SB_MQTT_PASSWORD`) |
+| MQTT (monitor role) | `monitor` | `monitor123` | Read-only debugging account |
+| MQTT (bridge role) | `bridge` | `bridge123` | Reserved for broker bridging |
+| PostgreSQL | `sb_user` | `sb_pass` | Database `sb_cloud` on port 5432 |
+
+Override any of these by editing `deploy/.env.deploy` (the file is gitignored and not part of `.env.deploy.example`).
+
 ## Key Documentation
 
 | Document | Use it for |
@@ -128,8 +152,8 @@ prefix/<jira-ticket-id>-<short-description>
 Examples:
 
 ```text
-feature/SCRUM-43-mobile-automation-rule-management
-docs/SCRUM-43-automation-app-docs
+feature/3-mobile-automation-rule-management
+docs/43-automation-app-docs
 ```
 
 All work should merge into `main` through a pull request. Do not commit directly
