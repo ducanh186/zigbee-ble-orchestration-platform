@@ -40,6 +40,7 @@ void cli_json_command(sl_cli_command_arg_t *arguments);
 #include "app/device_monitor.h"
 #include "app/light_ctrl.h"
 #include "app/rule_engine.h"
+#include "app/automation_rule.h"
 
 // ===== Original Z3Gateway token dump constants =====
 #define MFGSAMP_NUM_EZSP_TOKENS 8
@@ -156,6 +157,10 @@ void emberAfMainInitCallback(void)
 
   // Rule engine init (Phase 4: local switch->light automation)
   ruleEngineInit();
+
+  // Automation rule table (Phase 2: cloud-pushed automations table; storage
+  // and ack only — rule execution will be wired in a later phase).
+  automationRuleInit();
 
   // Register "json" CLI command at runtime
   {

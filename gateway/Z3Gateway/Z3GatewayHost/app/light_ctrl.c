@@ -297,6 +297,76 @@ void lightCtrlLocalToggle(void)
 }
 
 // -------------------------------------------------------------------
+// Phase 3: gateway-driven automation rule action
+// -------------------------------------------------------------------
+// Mirrors lightCtrlLocalToggle() but resolves by device_id (eui64) and
+// supports on/off/toggle. Used exclusively by automation_rule.c to
+// execute cloud-pushed automation actions WITHOUT going through the
+// command lifecycle. Cloud will eventually see the state change via the
+// light's attribute report.
+// -------------------------------------------------------------------
+bool lightCtrlLocalActionByDeviceId(const char *device_id, const char *command)
+{
+  if (!device_id || !*device_id || !command || !*command) {
+    return false;
+  }
+
+  device_resolved_t resolved;
+  if (!deviceRegistryResolve(device_id, &resolved)) {
+    appLogLog("LIGHT", "auto_action_skip",
+              "\"device_id\":\"%s\",\"reason\":\"unknown_device\"",
+              device_id);
+    return false;
+  }
+  if (strcmp(resolved.device_type, "light") != 0) {
+    appLogLog("LIGHT", "auto_action_skip",
+              "\"device_id\":\"%s\",\"reason\":\"not_light\",\"type\":\"%s\"",
+              device_id, resolved.device_type);
+    return false;
+  }
+  if (s_track.active) {
+    appLogLog("LIGHT", "auto_action_skip",
+              "\"device_id\":\"%s\",\"reason\":\"command_in_flight\"",
+              device_id);
+    return false;
+  }
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    appLogLog("LIGHT", "auto_action_skip",
+              "\"device_id\":\"%s\",\"reason\":\"not_joined\"",
+              device_id);
+    return false;
+  }
+
+  EmberStatus st;
+  if (strcmp(command, "on") == 0) {
+    st = lightSendOnOff(true, resolved.endpoint, resolved.nodeId);
+  } else if (strcmp(command, "off") == 0) {
+    st = lightSendOnOff(false, resolved.endpoint, resolved.nodeId);
+  } else if (strcmp(command, "toggle") == 0) {
+    st = lightSendToggle(resolved.endpoint, resolved.nodeId);
+  } else {
+    appLogLog("LIGHT", "auto_action_skip",
+              "\"device_id\":\"%s\",\"reason\":\"bad_command\",\"cmd\":\"%s\"",
+              device_id, command);
+    return false;
+  }
+
+  if (st != EMBER_SUCCESS) {
+    appLogLog("LIGHT", "auto_action_fail",
+              "\"device_id\":\"%s\",\"cmd\":\"%s\",\"zstatus\":\"0x%02X\"",
+              device_id, command, (unsigned)st);
+    return false;
+  }
+
+  appLogLog("LIGHT", "auto_action_sent",
+            "\"device_id\":\"%s\",\"cmd\":\"%s\","
+            "\"node_id\":\"0x%04X\",\"ep\":%u",
+            device_id, command,
+            (unsigned)resolved.nodeId, (unsigned)resolved.endpoint);
+  return true;
+}
+
+// -------------------------------------------------------------------
 // Reply publisher (thin wrapper)
 // -------------------------------------------------------------------
 static void publishReply(const char *command_id, const char *device_id,

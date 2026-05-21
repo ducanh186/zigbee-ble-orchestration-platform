@@ -37,8 +37,13 @@ enum AutomationTriggerEvent {
     };
   }
 
+  // Canonical wire values per docs/AUTOMATION_MQTT_CONTRACT.md §4.3.
+  // Gateway's automation_rule.c only accepts `switch_toggle`; emitting the
+  // legacy `toggle` here makes rules fail sync with `unsupported_trigger`.
+  // `fromJson` above still parses `toggle` so cached/legacy responses keep
+  // working.
   String get wireValue => switch (this) {
-    AutomationTriggerEvent.switchToggle => 'toggle',
+    AutomationTriggerEvent.switchToggle => 'switch_toggle',
     AutomationTriggerEvent.occupancyChanged => 'occupancy_changed',
   };
 

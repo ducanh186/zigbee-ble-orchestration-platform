@@ -70,6 +70,30 @@ class FakeMQTTPublisher:
             }
         )
 
+    def publish_automation_desired(
+        self,
+        automation_id: str,
+        op: str,
+        version: int,
+        *,
+        name: str | None = None,
+        enabled: bool | None = None,
+        trigger: dict | None = None,
+        actions: list[dict] | None = None,
+    ) -> None:
+        self.published.append(
+            {
+                "kind": "automation_desired",
+                "automation_id": automation_id,
+                "op": op,
+                "version": version,
+                "name": name,
+                "enabled": enabled,
+                "trigger": trigger,
+                "actions": actions,
+            }
+        )
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -110,10 +134,12 @@ async def db_session_factory(monkeypatch):
 async def fake_mqtt(monkeypatch):
     fake = FakeMQTTPublisher()
     import cloud.app.mqtt_client as mqttmod
+    import cloud.app.routers.automations as automod
     import cloud.app.routers.commands as cmdmod
     import cloud.app.routers.gateways as gwmod
 
     monkeypatch.setattr(mqttmod, "mqtt_service", fake)
+    monkeypatch.setattr(automod, "mqtt_service", fake)
     monkeypatch.setattr(cmdmod, "mqtt_service", fake)
     monkeypatch.setattr(gwmod, "mqtt_service", fake)
     yield fake
