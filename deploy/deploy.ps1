@@ -248,23 +248,32 @@ export POSTGRES_USER='$pgUser'
 export POSTGRES_PASSWORD='$pgPass'
 export POSTGRES_DB='$pgDb'
 
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  echo 'ERROR: Docker Compose is not installed.'
+  exit 1
+fi
+
 # Build and start
-docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
-docker compose -f docker-compose.prod.yml up --build -d
+`$COMPOSE -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+`$COMPOSE -f docker-compose.prod.yml up --build -d
 
 echo ''
 echo 'Waiting for services to start...'
 sleep 10
 
-docker compose -f docker-compose.prod.yml ps
+`$COMPOSE -f docker-compose.prod.yml ps
 
 echo ''
-if curl -sf http://localhost:8000/health; then
+if docker exec sb-cloud-api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"; then
     echo ''
     echo 'API is healthy!'
 else
     echo 'WARNING: API not responding yet. Check logs with:'
-    echo '  docker compose -f docker-compose.prod.yml logs cloud-api'
+    echo "  `$COMPOSE -f docker-compose.prod.yml logs cloud-api"
 fi
 "@
 

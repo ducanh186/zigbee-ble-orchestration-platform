@@ -97,11 +97,6 @@ async def _validate_rule_template(
         state = trigger.get("state") or {}
         if not isinstance(state, dict) or state:
             raise HTTPException(status_code=422, detail="Switch trigger state is unsupported")
-        if any(command != "toggle" for command in action_commands):
-            raise HTTPException(
-                status_code=422,
-                detail="Switch toggle rules can only toggle light actions",
-            )
         return
 
     if event != "occupancy_changed":
@@ -110,17 +105,8 @@ async def _validate_rule_template(
     if not isinstance(state, dict):
         raise HTTPException(status_code=422, detail="Motion trigger state is required")
     occupancy = state.get("occupancy")
-    if occupancy == "occupied":
-        expected_command = "on"
-    elif occupancy == "unoccupied":
-        expected_command = "off"
-    else:
+    if occupancy not in {"occupied", "unoccupied"}:
         raise HTTPException(status_code=422, detail="Unsupported motion occupancy state")
-    if any(command != expected_command for command in action_commands):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Motion {occupancy} rules can only use light {expected_command}",
-        )
 
 
 @router.get("", response_model=list[AutomationOut])

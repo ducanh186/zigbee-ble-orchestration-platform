@@ -100,8 +100,8 @@ class _MetricRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            label: 'On',
-            value: viewModel.lightsOnCount,
+            label: 'Online',
+            value: viewModel.onlineCount,
             tone: BadgeTone.success,
           ),
         ),

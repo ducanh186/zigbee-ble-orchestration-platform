@@ -216,7 +216,7 @@ async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_fact
 
 
 @pytest.mark.asyncio
-async def test_rejects_unsupported_motion_action_template(client, db_session_factory):
+async def test_accepts_manual_motion_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
@@ -225,8 +225,32 @@ async def test_rejects_unsupported_motion_action_template(client, db_session_fac
 
     response = await client.post("/api/automations", json=body)
 
-    assert response.status_code == 422
-    assert "occupied" in response.json()["detail"]
+    assert response.status_code == 201
+    assert response.json()["actions"][0]["command"] == "off"
+
+
+@pytest.mark.asyncio
+async def test_accepts_manual_switch_light_action_choice(client, db_session_factory):
+    await _seed_automation_devices(db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json={
+            "name": "Switch turns on lights",
+            "enabled": True,
+            "trigger": {
+                "device_id": "switch-01",
+                "device_type": "switch",
+                "event": "switch_toggle",
+            },
+            "actions": [
+                {"device_id": "light-01", "device_type": "light", "command": "on"}
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["actions"][0]["command"] == "on"
 
 
 @pytest.mark.asyncio

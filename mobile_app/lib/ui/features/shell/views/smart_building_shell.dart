@@ -6,8 +6,9 @@ import '../../../../domain/models/smart_device.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../../automation/views/automation_rules_view.dart';
+import '../../device_detail/views/device_detail_view.dart';
 import '../../home/views/home_view.dart';
-import '../../light_detail/views/light_detail_view.dart';
+import '../../notifications/views/notification_center_view.dart';
 import '../../provisioning/views/provisioning_view.dart';
 import '../../settings/views/settings_view.dart';
 
@@ -20,7 +21,9 @@ class SmartBuildingShell extends StatefulWidget {
 
 class _SmartBuildingShellState extends State<SmartBuildingShell> {
   int _tabIndex = 0;
-  String? _selectedLightId;
+  String? _selectedDeviceId;
+  bool _showNotifications = false;
+  final Set<String> _readNotificationIds = <String>{};
   SettingsSection _settingsInitialSection = SettingsSection.overview;
 
   @override
@@ -29,24 +32,47 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
 
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
-        final selectedLight = _selectedLightId == null
+        final selectedDevice = _selectedDeviceId == null
             ? null
-            : viewModel.deviceById(_selectedLightId!);
+            : viewModel.deviceById(_selectedDeviceId!);
 
         return Scaffold(
           body: SafeArea(
-            child: selectedLight == null
+            child: _showNotifications
+                ? NotificationCenterView(
+                    events: viewModel.events,
+                    readEventIds: _readNotificationIds,
+                    onMarkRead: _markNotificationRead,
+                    onMarkAllRead: () => setState(() {
+                      _readNotificationIds.addAll(
+                        viewModel.events.map((event) => event.id),
+                      );
+                    }),
+                    onBack: () => setState(() => _showNotifications = false),
+                  )
+                : selectedDevice == null
                 ? _buildTabBody()
-                : LightDetailView(
-                    device: selectedLight,
-                    onBack: () => setState(() => _selectedLightId = null),
+                : DeviceDetailView(
+                    device: selectedDevice,
+                    onBack: () => setState(() => _selectedDeviceId = null),
                   ),
           ),
+          floatingActionButton: _showNotifications || selectedDevice != null
+              ? null
+              : _NotificationButton(
+                  unreadCount: viewModel.events
+                      .where(
+                        (event) => !_readNotificationIds.contains(event.id),
+                      )
+                      .length,
+                  onPressed: () => setState(() => _showNotifications = true),
+                ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tabIndex,
             onDestinationSelected: (index) {
               setState(() {
-                _selectedLightId = null;
+                _selectedDeviceId = null;
+                _showNotifications = false;
                 if (index != 3) {
                   _settingsInitialSection = SettingsSection.overview;
                 }
@@ -96,12 +122,16 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
   }
 
   void _openLight(SmartDevice device) {
-    setState(() => _selectedLightId = device.id);
+    setState(() {
+      _showNotifications = false;
+      _selectedDeviceId = device.id;
+    });
   }
 
   void _openDevices() {
     setState(() {
-      _selectedLightId = null;
+      _showNotifications = false;
+      _selectedDeviceId = null;
       _settingsInitialSection = SettingsSection.devices;
       _tabIndex = 3;
     });
@@ -109,5 +139,34 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
 
   Future<void> _handleLogout() async {
     await context.read<AuthViewModel>().logout();
+  }
+
+  void _markNotificationRead(String eventId) {
+    setState(() => _readNotificationIds.add(eventId));
+  }
+}
+
+class _NotificationButton extends StatelessWidget {
+  const _NotificationButton({
+    required this.unreadCount,
+    required this.onPressed,
+  });
+
+  final int unreadCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = FloatingActionButton.small(
+      tooltip: 'Notifications',
+      onPressed: onPressed,
+      child: const Icon(Icons.notifications_outlined),
+    );
+
+    if (unreadCount == 0) {
+      return button;
+    }
+
+    return Badge(label: Text('$unreadCount'), child: button);
   }
 }
