@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppThemeMode { light, dark, grey }
 
 class ThemeController extends ChangeNotifier {
+  static const _storageKey = 'app_theme_mode';
+
   AppThemeMode _mode = AppThemeMode.dark;
+
+  ThemeController() {
+    _load();
+  }
 
   AppThemeMode get mode => _mode;
 
@@ -13,7 +20,26 @@ class ThemeController extends ChangeNotifier {
       return;
     }
     _mode = mode;
+    _save(mode);
     notifyListeners();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_storageKey);
+    final mode = AppThemeMode.values
+        .where((value) => value.name == saved)
+        .firstOrNull;
+    if (mode == null || mode == _mode) {
+      return;
+    }
+    _mode = mode;
+    notifyListeners();
+  }
+
+  Future<void> _save(AppThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, mode.name);
   }
 }
 

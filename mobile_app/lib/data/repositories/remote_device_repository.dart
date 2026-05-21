@@ -129,7 +129,7 @@ class RemoteDeviceRepository implements DeviceRepository {
   Future<List<EventLog>> fetchEvents({String? deviceId}) async {
     final query = deviceId == null
         ? '?limit=30'
-        : '?device_id=$deviceId&limit=30';
+        : '?device_id=$deviceId&limit=3';
     final json = await _apiClient.getJson('/api/events/$query');
     return (json as List)
         .whereType<Map>()

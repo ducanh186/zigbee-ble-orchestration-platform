@@ -87,7 +87,14 @@ class AutomationViewModel extends ChangeNotifier {
 
     try {
       await _repository.deleteRule(ruleId);
-      _rules = _rules.where((rule) => rule.id != ruleId).toList();
+      final refreshedRules = await _repository.fetchRules();
+      if (refreshedRules.any((rule) => rule.id == ruleId)) {
+        _rules = refreshedRules;
+        _errorMessage =
+            'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.';
+        return;
+      }
+      _rules = refreshedRules;
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,

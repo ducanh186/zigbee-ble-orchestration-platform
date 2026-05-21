@@ -38,6 +38,7 @@ class CreateRuleSheet extends StatefulWidget {
 class _CreateRuleSheetState extends State<CreateRuleSheet> {
   final TextEditingController _nameController = TextEditingController();
   AutomationRuleTemplate? _template;
+  bool _isTemplateExpanded = false;
   bool _enabled = true;
   String? _triggerId;
   AutomationDeviceType? _triggerDeviceType;
@@ -105,40 +106,24 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                           const SizedBox(height: 6),
                           _NameField(controller: _nameController),
                           const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Quick template',
-                            hint: _template == null
-                                ? 'optional'
-                                : _template!.label,
-                          ),
-                          const SizedBox(height: 6),
-                          _TemplateGrid(
+                          _QuickTemplateSection(
                             selected: _template,
+                            isExpanded: _isTemplateExpanded,
+                            onToggleExpanded: () => setState(
+                              () => _isTemplateExpanded = !_isTemplateExpanded,
+                            ),
                             onChanged: _setTemplate,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Trigger device',
-                            required: true,
-                            hint: '${triggers.length} switch/motion available',
-                          ),
+                          _FieldLabel(label: 'Trigger device', required: true),
                           const SizedBox(height: 6),
                           _TriggerSection(
                             triggers: triggers,
                             selectedId: _triggerId,
-                            onChanged: _setTriggerDevice,
-                          ),
-                          const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Trigger state',
-                            required: true,
-                            hint: _triggerDeviceType?.label,
-                          ),
-                          const SizedBox(height: 6),
-                          _TriggerStateSection(
                             triggerDeviceType: _triggerDeviceType,
                             selectedState: _triggerState,
-                            onChanged: _setTriggerState,
+                            onDeviceChanged: _setTriggerDevice,
+                            onStateChanged: _setTriggerState,
                           ),
                           const SizedBox(height: 16),
                           _FieldLabel(
@@ -151,16 +136,10 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             lights: lights,
                             selectedIds: _targetIds,
                             allowsMultipleTargets: _allowsMultipleTargets,
+                            actionCommand: _actionCommand,
                             onToggle: _toggleTarget,
+                            onActionChanged: _setActionCommand,
                           ),
-                          const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Target action',
-                            required: true,
-                            hint: _actionCommand?.label,
-                          ),
-                          const SizedBox(height: 6),
-                          _TargetActionSection(actionCommand: _actionCommand),
                           const SizedBox(height: 16),
                           _FieldLabel(
                             label: 'Enabled',
@@ -274,7 +253,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       _triggerEvent = triggerDeviceType == AutomationDeviceType.switchDevice
           ? AutomationTriggerEvent.switchToggle
           : AutomationTriggerEvent.occupancyChanged;
-      _actionCommand = _actionForTrigger(triggerDeviceType, state);
+      _actionCommand ??= _actionForTrigger(triggerDeviceType, state);
       if (_template != null &&
           (_template!.triggerState.toString() != state.toString() ||
               _template!.actionCommand != _actionCommand)) {
@@ -293,6 +272,15 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         }
       } else {
         _targetIds = _targetIds.where((id) => id != deviceId).toSet();
+      }
+    });
+  }
+
+  void _setActionCommand(AutomationActionCommand command) {
+    setState(() {
+      _actionCommand = command;
+      if (_template != null && _template!.actionCommand != command) {
+        _template = null;
       }
     });
   }
@@ -521,6 +509,55 @@ class _NameField extends StatelessWidget {
   }
 }
 
+class _QuickTemplateSection extends StatelessWidget {
+  const _QuickTemplateSection({
+    required this.selected,
+    required this.isExpanded,
+    required this.onToggleExpanded,
+    required this.onChanged,
+  });
+
+  final AutomationRuleTemplate? selected;
+  final bool isExpanded;
+  final VoidCallback onToggleExpanded;
+  final ValueChanged<AutomationRuleTemplate> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _FieldLabel(
+                label: 'Quick template',
+                hint: selected?.label,
+              ),
+            ),
+            IconButton(
+              key: const Key('quick-template-toggle'),
+              tooltip: isExpanded
+                  ? 'Collapse quick template'
+                  : 'Expand quick template',
+              onPressed: onToggleExpanded,
+              icon: Icon(
+                isExpanded ? Icons.expand_less : Icons.expand_more,
+                color: palette.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        if (isExpanded) ...[
+          const SizedBox(height: 6),
+          _TemplateGrid(selected: selected, onChanged: onChanged),
+        ],
+      ],
+    );
+  }
+}
+
 class _TemplateGrid extends StatelessWidget {
   const _TemplateGrid({required this.selected, required this.onChanged});
 
@@ -557,12 +594,18 @@ class _TriggerSection extends StatelessWidget {
   const _TriggerSection({
     required this.triggers,
     required this.selectedId,
-    required this.onChanged,
+    required this.triggerDeviceType,
+    required this.selectedState,
+    required this.onDeviceChanged,
+    required this.onStateChanged,
   });
 
   final List<SmartDevice> triggers;
   final String? selectedId;
-  final ValueChanged<SmartDevice?> onChanged;
+  final AutomationDeviceType? triggerDeviceType;
+  final Map<String, Object?> selectedState;
+  final ValueChanged<SmartDevice?> onDeviceChanged;
+  final ValueChanged<Map<String, Object?>> onStateChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -597,11 +640,27 @@ class _TriggerSection extends StatelessWidget {
         for (final device in triggers)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: DevicePickerRow(
-              device: device,
-              selected: selectedId == device.id,
-              kind: DevicePickerKind.radio,
-              onChanged: (selected) => onChanged(selected ? device : null),
+            child: Column(
+              children: [
+                DevicePickerRow(
+                  device: device,
+                  selected: selectedId == device.id,
+                  kind: DevicePickerKind.radio,
+                  onChanged: (selected) =>
+                      onDeviceChanged(selected ? device : null),
+                ),
+                if (selectedId == device.id) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _TriggerStateSection(
+                      triggerDeviceType: triggerDeviceType,
+                      selectedState: selectedState,
+                      onChanged: onStateChanged,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
       ],
@@ -614,13 +673,17 @@ class _TargetSection extends StatelessWidget {
     required this.lights,
     required this.selectedIds,
     required this.allowsMultipleTargets,
+    required this.actionCommand,
     required this.onToggle,
+    required this.onActionChanged,
   });
 
   final List<SmartDevice> lights;
   final Set<String> selectedIds;
   final bool allowsMultipleTargets;
+  final AutomationActionCommand? actionCommand;
   final void Function(String deviceId, bool selected) onToggle;
+  final ValueChanged<AutomationActionCommand> onActionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -658,11 +721,25 @@ class _TargetSection extends StatelessWidget {
         for (final light in lights)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: DevicePickerRow(
-              device: light,
-              selected: selectedIds.contains(light.id),
-              kind: kind,
-              onChanged: (selected) => onToggle(light.id, selected),
+            child: Column(
+              children: [
+                DevicePickerRow(
+                  device: light,
+                  selected: selectedIds.contains(light.id),
+                  kind: kind,
+                  onChanged: (selected) => onToggle(light.id, selected),
+                ),
+                if (selectedIds.contains(light.id)) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _TargetActionSection(
+                      actionCommand: actionCommand,
+                      onChanged: onActionChanged,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
       ],
@@ -728,33 +805,37 @@ class _TriggerStateSection extends StatelessWidget {
 }
 
 class _TargetActionSection extends StatelessWidget {
-  const _TargetActionSection({required this.actionCommand});
+  const _TargetActionSection({
+    required this.actionCommand,
+    required this.onChanged,
+  });
 
   final AutomationActionCommand? actionCommand;
+  final ValueChanged<AutomationActionCommand> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final command = actionCommand;
-    if (command == null) {
-      return _DashedHint(
-        palette: palette,
-        label: 'Choose trigger state to set action',
-      );
-    }
 
-    final icon = switch (command) {
-      AutomationActionCommand.on => Icons.lightbulb_outline,
-      AutomationActionCommand.off => Icons.lightbulb,
-      AutomationActionCommand.toggle => Icons.swap_horiz,
-    };
     return _StateButtonRow(
       children: [
         _StateButton(
-          label: command.label,
-          icon: icon,
-          selected: true,
-          onTap: () {},
+          label: AutomationActionCommand.on.label,
+          icon: Icons.lightbulb_outline,
+          selected: command == AutomationActionCommand.on,
+          onTap: () => onChanged(AutomationActionCommand.on),
+        ),
+        _StateButton(
+          label: AutomationActionCommand.off.label,
+          icon: Icons.lightbulb,
+          selected: command == AutomationActionCommand.off,
+          onTap: () => onChanged(AutomationActionCommand.off),
+        ),
+        _StateButton(
+          label: AutomationActionCommand.toggle.label,
+          icon: Icons.swap_horiz,
+          selected: command == AutomationActionCommand.toggle,
+          onTap: () => onChanged(AutomationActionCommand.toggle),
         ),
       ],
     );
@@ -805,16 +886,12 @@ class _StateButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? palette.primary : palette.textSecondary,
-              ),
+              Icon(icon, size: 16, color: _contentColor(palette)),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.primary : palette.textPrimary,
+                  color: _contentColor(palette),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -824,6 +901,10 @@ class _StateButton extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _contentColor(AppPalette palette) {
+    return selected ? palette.primary : palette.textPrimary;
   }
 }
 

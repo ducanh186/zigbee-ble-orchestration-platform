@@ -46,6 +46,15 @@ class MockDeviceRepository implements DeviceRepository {
       power: DevicePower.unknown,
       reportedAt: '07:16 05/07/2026',
     ),
+    const SmartDevice(
+      id: 'switch-01',
+      deviceType: 'switch',
+      name: 'Lobby Switch',
+      roomId: 'lobby',
+      isOnline: true,
+      power: DevicePower.unknown,
+      reportedAt: '07:15 05/07/2026',
+    ),
   ];
 
   final List<EventLog> _events = [
@@ -65,6 +74,22 @@ class MockDeviceRepository implements DeviceRepository {
       occurredAt: '07:14 05/07/2026',
       source: 'gateway',
       commandId: 'cmd-demo',
+    ),
+    const EventLog(
+      id: '3',
+      deviceId: 'pir-01',
+      eventType: 'occupancy_changed',
+      message: 'occupied',
+      occurredAt: '07:13 05/07/2026',
+      source: 'gateway',
+    ),
+    const EventLog(
+      id: '4',
+      deviceId: 'switch-01',
+      eventType: 'toggle',
+      message: 'toggle',
+      occurredAt: '07:12 05/07/2026',
+      source: 'gateway',
     ),
   ];
 

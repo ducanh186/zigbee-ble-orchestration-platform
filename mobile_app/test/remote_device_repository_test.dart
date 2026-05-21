@@ -8,6 +8,38 @@ import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
 
 void main() {
+  test('fetchEvents for device reads three recent cloud event rows', () async {
+    final repository = RemoteDeviceRepository(
+      apiClient: ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(request.url.path, '/api/events/');
+          expect(request.url.query, 'device_id=pir-01&limit=3');
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 201,
+                'device_id': 'pir-01',
+                'event_type': 'occupancy_changed',
+                'payload': {'occupancy': 'occupied'},
+                'occurred_at': '07:20 05/21/2026',
+              },
+            ]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      ),
+    );
+
+    final events = await repository.fetchEvents(deviceId: 'pir-01');
+
+    expect(events, hasLength(1));
+    expect(events.single.deviceId, 'pir-01');
+    expect(events.single.eventType, 'occupancy_changed');
+  });
+
   test('derives gateway online status from cloud event logs', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(

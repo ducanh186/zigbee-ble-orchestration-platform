@@ -82,9 +82,7 @@ class _DevicesViewState extends State<DevicesView> {
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
                         device: device,
-                        onTap: device.isLight
-                            ? () => widget.onOpenLight(device)
-                            : null,
+                        onTap: () => widget.onOpenLight(device),
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -261,6 +259,8 @@ class _DeviceRow extends StatelessWidget {
                   label: device.isOnline ? 'ONLINE' : 'OFFLINE',
                   tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
                 ),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right, size: 18, color: palette.textSecondary),
         ],
       ),
     );

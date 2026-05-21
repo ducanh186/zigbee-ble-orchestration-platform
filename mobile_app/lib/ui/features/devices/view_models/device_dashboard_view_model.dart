@@ -19,6 +19,9 @@ class DeviceDashboardViewModel extends ChangeNotifier {
 
   List<SmartDevice> _devices = [];
   List<EventLog> _events = [];
+  final Map<String, List<EventLog>> _deviceEvents = {};
+  final Set<String> _loadingEventDeviceIds = {};
+  final Map<String, String> _deviceEventErrors = {};
   bool _isLoading = false;
   String? _errorMessage;
   CloudStatus _cloudStatus = const CloudStatus.unknown(
@@ -44,6 +47,18 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       lights.where((device) => !device.isReachable).length;
   bool get hasPendingCommand => _lastCommand?.status.isPending ?? false;
 
+  List<EventLog> eventsForDevice(String deviceId) {
+    return List.unmodifiable(_deviceEvents[deviceId] ?? const <EventLog>[]);
+  }
+
+  bool isLoadingDeviceEvents(String deviceId) {
+    return _loadingEventDeviceIds.contains(deviceId);
+  }
+
+  String? deviceEventsError(String deviceId) {
+    return _deviceEventErrors[deviceId];
+  }
+
   SmartDevice? deviceById(String deviceId) {
     for (final device in _devices) {
       if (device.id == deviceId) {
@@ -64,6 +79,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       final events = await _repository.fetchEvents();
       _devices = devices;
       _events = events;
+      _deviceEvents.clear();
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
       _errorMessage = friendlyErrorMessage(
@@ -72,6 +88,23 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadDeviceEvents(String deviceId) async {
+    _loadingEventDeviceIds.add(deviceId);
+    _deviceEventErrors.remove(deviceId);
+    notifyListeners();
+
+    try {
+      _deviceEvents[deviceId] = await _repository.fetchEvents(
+        deviceId: deviceId,
+      );
+    } catch (error) {
+      _deviceEventErrors[deviceId] = 'Cannot read cloud event logs';
+    } finally {
+      _loadingEventDeviceIds.remove(deviceId);
       notifyListeners();
     }
   }

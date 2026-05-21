@@ -87,13 +87,13 @@ class _SettingsOverview extends StatefulWidget {
 }
 
 class _SettingsOverviewState extends State<_SettingsOverview> {
-  bool _operatorExpanded = true;
-  bool _appearanceExpanded = true;
-  bool _themeExpanded = true;
-  bool _languageExpanded = true;
-  bool _cloudExpanded = true;
-  bool _workspaceExpanded = true;
-  bool _aboutExpanded = true;
+  bool _operatorExpanded = false;
+  bool _appearanceExpanded = false;
+  bool _themeExpanded = false;
+  bool _languageExpanded = false;
+  bool _cloudExpanded = false;
+  bool _workspaceExpanded = false;
+  bool _aboutExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -242,14 +242,6 @@ class _SettingsOverviewState extends State<_SettingsOverview> {
                                     },
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  l10n.settingsLanguageHint,
-                                  style: TextStyle(
-                                    color: palette.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -367,14 +359,14 @@ class _SettingsOverviewState extends State<_SettingsOverview> {
                           _SettingsInfoRow(
                             icon: Icons.info_outline,
                             label: l10n.settingsVersion,
-                            value: '0.8.3',
+                            value: '0.8.6',
                             mono: true,
                           ),
                           Divider(color: palette.border, height: 1),
                           _SettingsInfoRow(
                             icon: Icons.inventory_2_outlined,
                             label: l10n.settingsBuild,
-                            value: '803',
+                            value: '806',
                             mono: true,
                           ),
                           Divider(color: palette.border, height: 1),
