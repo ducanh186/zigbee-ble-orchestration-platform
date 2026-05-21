@@ -91,6 +91,10 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
                     const SizedBox(height: 12),
                     _DeviceInfoCard(device: current),
                   ],
+                  if (current.isMotion) ...[
+                    const SizedBox(height: 18),
+                    _OccupancyTimeline(events: recentEvents),
+                  ],
                   const SizedBox(height: 18),
                   const SectionTitle(title: 'Recent events'),
                   const SizedBox(height: 8),
@@ -177,6 +181,7 @@ class _DeviceHeroCard extends StatelessWidget {
                           ? BadgeTone.success
                           : BadgeTone.warning,
                     ),
+              if (device.isMotion) _OccupancyBadge(status: device.occupancy),
               if (device.reportedAt != null)
                 Text(
                   device.reportedAt!,
@@ -252,6 +257,8 @@ class _DeviceInfoCard extends StatelessWidget {
             value: device.isOnline ? 'online' : 'offline',
           ),
           _InfoRow(label: 'Room', value: device.roomLabel),
+          if (device.isMotion)
+            _InfoRow(label: 'Occupancy', value: device.occupancy.label),
           if (device.eui64 != null)
             _InfoRow(label: 'EUI64', value: device.eui64!),
           if (device.reportedAt != null)
@@ -259,6 +266,102 @@ class _DeviceInfoCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _OccupancyBadge extends StatelessWidget {
+  const _OccupancyBadge({required this.status});
+
+  final OccupancyState status;
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusBadge(
+      label: status.label,
+      tone: switch (status) {
+        OccupancyState.occupied => BadgeTone.success,
+        OccupancyState.unoccupied => BadgeTone.neutral,
+        OccupancyState.unknown => BadgeTone.warning,
+      },
+    );
+  }
+}
+
+class _OccupancyTimeline extends StatelessWidget {
+  const _OccupancyTimeline({required this.events});
+
+  final List<EventLog> events;
+
+  @override
+  Widget build(BuildContext context) {
+    final occupancyEvents = events.where(_isOccupancyEvent).toList();
+    final latest = occupancyEvents.isEmpty ? null : occupancyEvents.first;
+
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle(title: 'Occupancy timeline'),
+          const SizedBox(height: 8),
+          const Text(
+            'Latest occupancy',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Text(
+            latest == null ? 'No event yet' : _occupancyLabel(latest),
+            style: TextStyle(color: context.palette.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          if (occupancyEvents.isEmpty)
+            Text(
+              'No occupancy event for this sensor.',
+              style: TextStyle(color: context.palette.textSecondary),
+            )
+          else
+            for (final event in occupancyEvents)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 74,
+                      child: Text(
+                        event.occurredAt,
+                        style: TextStyle(
+                          color: context.palette.textSecondary,
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.sensors,
+                      color: context.palette.primary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_occupancyLabel(event))),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  static bool _isOccupancyEvent(EventLog event) {
+    final combined = '${event.eventType} ${event.message}'.toLowerCase();
+    return combined.contains('occup');
+  }
+
+  static String _occupancyLabel(EventLog event) {
+    final status = OccupancyState.fromValue(event.message);
+    if (status != OccupancyState.unknown) {
+      return status.label;
+    }
+    return event.message;
   }
 }
 

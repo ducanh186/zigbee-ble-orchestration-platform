@@ -45,6 +45,7 @@ class MockDeviceRepository implements DeviceRepository {
       isOnline: true,
       power: DevicePower.unknown,
       reportedAt: '07:16 05/07/2026',
+      state: {'occupancy': 'occupied'},
     ),
     const SmartDevice(
       id: 'switch-01',

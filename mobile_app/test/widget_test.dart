@@ -290,9 +290,44 @@ void main() {
 
     expect(find.text('Device detail'), findsOneWidget);
     expect(find.text('Lab Motion'), findsOneWidget);
-    expect(find.text('RECENT EVENTS'), findsOneWidget);
-    expect(find.text('occupied'), findsOneWidget);
+    expect(find.text('OCCUPIED'), findsWidgets);
+    expect(
+      find.text('OCCUPANCY TIMELINE', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Latest occupancy', skipOffstage: false), findsOneWidget);
+    expect(find.text('RECENT EVENTS', skipOffstage: false), findsOneWidget);
+    expect(find.text('occupancy_changed', skipOffstage: false), findsOneWidget);
     expect(repository.requestedDeviceIds, contains('pir-01'));
+  });
+
+  testWidgets('notification center categorizes and tracks unread events', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    expect(find.byTooltip('Notifications'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Notifications'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notification Center'), findsOneWidget);
+    expect(find.text('Unread 4'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Automation'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Other'), findsOneWidget);
+
+    await tester.tap(find.text('Mark read').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Unread 3'), findsOneWidget);
+
+    await tester.tap(find.text('Mark all read'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unread 0'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Automation'));
+    await tester.pumpAndSettle();
+    expect(find.text('occupancy_changed'), findsOneWidget);
+    expect(find.text('LIGHT'), findsNothing);
   });
 
   testWidgets('device detail keeps verbose cloud event payloads compact', (

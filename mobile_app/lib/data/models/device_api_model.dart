@@ -6,12 +6,18 @@ class DeviceApiModel {
     required this.id,
     required this.deviceType,
     required this.isOnline,
+    this.state = const <String, Object?>{},
     this.eui64,
     this.roomId,
     this.name,
   });
 
   factory DeviceApiModel.fromJson(Map<String, Object?> json) {
+    final stateRaw = json['state'];
+    final state = stateRaw is Map
+        ? Map<String, Object?>.from(stateRaw)
+        : const <String, Object?>{};
+
     return DeviceApiModel(
       id: json['id'] as String,
       deviceType: json['device_type'] as String,
@@ -19,6 +25,7 @@ class DeviceApiModel {
       roomId: json['room_id'] as String?,
       name: json['name'] as String?,
       isOnline: json['is_online'] as bool? ?? false,
+      state: state,
     );
   }
 
@@ -28,11 +35,18 @@ class DeviceApiModel {
   final String? roomId;
   final String? name;
   final bool isOnline;
+  final Map<String, Object?> state;
 
   SmartDevice toDomain({
     DevicePower power = DevicePower.unknown,
     String? reportedAt,
+    Map<String, Object?>? state,
   }) {
+    final resolvedState = <String, Object?>{
+      ...this.state,
+      if (state != null) ...state,
+    };
+
     return SmartDevice(
       id: id,
       deviceType: deviceType,
@@ -42,6 +56,7 @@ class DeviceApiModel {
       isOnline: isOnline,
       power: power,
       reportedAt: reportedAt,
+      state: resolvedState,
     );
   }
 }

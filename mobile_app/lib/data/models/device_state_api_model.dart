@@ -4,6 +4,7 @@ class DeviceStateApiModel {
   const DeviceStateApiModel({
     required this.deviceId,
     required this.power,
+    required this.state,
     this.reportedAt,
   });
 
@@ -17,11 +18,13 @@ class DeviceStateApiModel {
     return DeviceStateApiModel(
       deviceId: json['device_id'] as String,
       power: DevicePower.fromJson(state['power'], reachable: reachable),
+      state: state,
       reportedAt: json['reported_at'] as String?,
     );
   }
 
   final String deviceId;
   final DevicePower power;
+  final Map<String, Object?> state;
   final String? reportedAt;
 }

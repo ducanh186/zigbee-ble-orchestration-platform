@@ -98,11 +98,6 @@ class RemoteDeviceRepository implements DeviceRepository {
 
     final resolved = <SmartDevice>[];
     for (final device in devices) {
-      if (device.deviceType != 'light') {
-        resolved.add(device.toDomain());
-        continue;
-      }
-
       try {
         final stateJson = await _apiClient.getJson(
           '/api/devices/${device.id}/state',
@@ -111,7 +106,11 @@ class RemoteDeviceRepository implements DeviceRepository {
           Map<String, Object?>.from(stateJson as Map),
         );
         resolved.add(
-          device.toDomain(power: state.power, reportedAt: state.reportedAt),
+          device.toDomain(
+            power: state.power,
+            reportedAt: state.reportedAt,
+            state: state.state,
+          ),
         );
       } on ApiException catch (error) {
         if (error.statusCode == 404) {
