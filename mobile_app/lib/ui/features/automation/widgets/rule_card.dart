@@ -14,6 +14,7 @@ class RuleCard extends StatelessWidget {
     required this.rule,
     required this.template,
     this.onEnabledChanged,
+    this.onDelete,
     this.highlight = false,
     super.key,
   });
@@ -21,6 +22,7 @@ class RuleCard extends StatelessWidget {
   final AutomationRule rule;
   final AutomationRuleTemplate template;
   final ValueChanged<bool>? onEnabledChanged;
+  final VoidCallback? onDelete;
   final bool highlight;
 
   @override
@@ -91,10 +93,22 @@ class RuleCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Switch(
-                  value: rule.enabled,
-                  onChanged: onEnabledChanged,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Delete rule',
+                      icon: const Icon(Icons.delete_outline, size: 19),
+                      color: palette.error,
+                      onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    Switch(
+                      value: rule.enabled,
+                      onChanged: onEnabledChanged,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ],
                 ),
               ],
             ),

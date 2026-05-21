@@ -35,34 +35,83 @@ void main() {
     expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
   });
 
-  test('createRule surfaces friendly error without leaking raw exception',
-      () async {
-    final repository = _FakeAutomationRepository(createError: 'network down');
+  test(
+    'createRule surfaces friendly error without leaking raw exception',
+    () async {
+      final repository = _FakeAutomationRepository(createError: 'network down');
+      final viewModel = AutomationViewModel(repository: repository);
+
+      await viewModel.createRule(_draft());
+
+      expect(viewModel.rules, isEmpty);
+      expect(viewModel.errorMessage, isNotNull);
+      expect(
+        viewModel.errorMessage,
+        contains('Khong tao duoc automation rule'),
+      );
+      // Raw repository exception text must not be surfaced to the user.
+      expect(viewModel.errorMessage, isNot(contains('network down')));
+    },
+  );
+
+  test('deleteRule removes the rule from the list', () async {
+    final repository = _FakeAutomationRepository(
+      initialRules: [
+        _rule(syncStatus: AutomationSyncStatus.synced),
+        _rule(id: 'automation-02', syncStatus: AutomationSyncStatus.synced),
+      ],
+    );
     final viewModel = AutomationViewModel(repository: repository);
 
-    await viewModel.createRule(_draft());
+    await viewModel.load();
+    await viewModel.deleteRule('automation-01');
 
-    expect(viewModel.rules, isEmpty);
-    expect(viewModel.errorMessage, isNotNull);
-    expect(viewModel.errorMessage, contains('Khong tao duoc automation rule'));
-    // Raw repository exception text must not be surfaced to the user.
-    expect(viewModel.errorMessage, isNot(contains('network down')));
+    expect(repository.deletedRuleIds, ['automation-01']);
+    expect(viewModel.rules.map((rule) => rule.id), ['automation-02']);
+    expect(viewModel.errorMessage, isNull);
   });
+
+  test(
+    'deleteRule keeps the rule and surfaces friendly error on failure',
+    () async {
+      final repository = _FakeAutomationRepository(
+        initialRules: [_rule(syncStatus: AutomationSyncStatus.synced)],
+        deleteError: 'delete failed',
+      );
+      final viewModel = AutomationViewModel(repository: repository);
+
+      await viewModel.load();
+      await viewModel.deleteRule('automation-01');
+
+      expect(viewModel.rules.single.id, 'automation-01');
+      expect(
+        viewModel.errorMessage,
+        contains('Khong xoa duoc automation rule'),
+      );
+      expect(viewModel.errorMessage, isNot(contains('delete failed')));
+    },
+  );
 }
 
 AutomationRuleDraft _draft() {
   return const AutomationRuleDraft(
     name: 'Motion turns on lab lights',
     enabled: true,
-    template: AutomationRuleTemplate.motionOccupiedTurnsOnLights,
     triggerDeviceId: 'pir-01',
+    triggerDeviceType: AutomationDeviceType.motion,
+    triggerEvent: AutomationTriggerEvent.occupancyChanged,
+    triggerState: {'occupancy': 'occupied'},
+    actionCommand: AutomationActionCommand.on,
     targetLightIds: ['light-01'],
   );
 }
 
-AutomationRule _rule({required AutomationSyncStatus syncStatus}) {
+AutomationRule _rule({
+  String id = 'automation-01',
+  required AutomationSyncStatus syncStatus,
+}) {
   return AutomationRule(
-    id: 'automation-01',
+    id: id,
     name: 'Motion turns on lab lights',
     enabled: true,
     trigger: const AutomationTrigger(
@@ -91,17 +140,21 @@ class _FakeAutomationRepository implements AutomationRepository {
     AutomationRule? createdRule,
     AutomationRule? fetchedRule,
     String? createError,
+    String? deleteError,
   }) : _rules = List.of(initialRules ?? []),
        _createdRule = createdRule,
        _fetchedRule = fetchedRule,
-       _createError = createError;
+       _createError = createError,
+       _deleteError = deleteError;
 
   final List<AutomationRule> _rules;
   final AutomationRule? _createdRule;
   final AutomationRule? _fetchedRule;
   final String? _createError;
+  final String? _deleteError;
   final List<AutomationRuleDraft> createdDrafts = [];
   final List<String> fetchedRuleIds = [];
+  final List<String> deletedRuleIds = [];
 
   @override
   Future<List<AutomationRule>> fetchRules() async => List.unmodifiable(_rules);
@@ -129,4 +182,13 @@ class _FakeAutomationRepository implements AutomationRepository {
 
   @override
   Future<AutomationRule> disableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    if (_deleteError != null) {
+      throw Exception(_deleteError);
+    }
+    deletedRuleIds.add(ruleId);
+    _rules.removeWhere((rule) => rule.id == ruleId);
+  }
 }

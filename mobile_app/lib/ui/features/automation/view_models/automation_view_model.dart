@@ -81,6 +81,23 @@ class AutomationViewModel extends ChangeNotifier {
     await _updateEnabled(ruleId, enabled: false);
   }
 
+  Future<void> deleteRule(String ruleId) async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteRule(ruleId);
+      _rules = _rules.where((rule) => rule.id != ruleId).toList();
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong xoa duoc automation rule',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
+
   Future<void> _updateEnabled(String ruleId, {required bool enabled}) async {
     _errorMessage = null;
     notifyListeners();

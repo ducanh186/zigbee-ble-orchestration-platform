@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
+import 'package:zigbee_smart_building/domain/models/automation_rule.dart';
 import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
 import 'package:zigbee_smart_building/domain/models/event_log.dart';
+import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
 import 'package:zigbee_smart_building/main.dart';
@@ -44,6 +46,7 @@ void main() {
     WidgetTester tester, {
     required bool useMockApi,
     DeviceRepository? repository,
+    AutomationRepository? automationRepository,
   }) async {
     // SCRUM-29 wraps the app in an auth gate. Pre-authenticate the dashboard
     // tests so they continue to render the shell on first frame.
@@ -53,7 +56,8 @@ void main() {
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
         repository: repository ?? MockDeviceRepository(),
-        automationRepository: MockAutomationRepository(),
+        automationRepository:
+            automationRepository ?? MockAutomationRepository(),
         apiBaseUrl: useMockApi ? 'mock' : 'http://98.83.4.87:8000',
         useMockApi: useMockApi,
         authViewModelOverride: authViewModel,
@@ -100,6 +104,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATE RULE'), findsOneWidget);
+    expect(find.text('QUICK TEMPLATE'), findsOneWidget);
     expect(find.text('Switch toggles one light'), findsOneWidget);
     expect(find.text('Save rule'), findsOneWidget);
     // Template "Motion becomes occupied" now also appears in the grid,
@@ -116,6 +121,64 @@ void main() {
 
     expect(find.text('Provisioning'), findsWidgets);
     expect(find.text('Provisioning placeholder'), findsOneWidget);
+  });
+
+  testWidgets('automation create sheet saves a manual rule without template', (
+    tester,
+  ) async {
+    final automationRepository = _WidgetAutomationRepository();
+    await pumpDashboard(
+      tester,
+      useMockApi: true,
+      automationRepository: automationRepository,
+    );
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New rule').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, 'Manual motion rule');
+    await tester.ensureVisible(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Occupied'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Occupied'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Lab Light 01').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Light 01').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save rule'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save rule'));
+    await tester.pumpAndSettle();
+
+    expect(automationRepository.createdDrafts, hasLength(1));
+    final draft = automationRepository.createdDrafts.single;
+    expect(draft.template, isNull);
+    expect(draft.triggerDeviceId, 'pir-01');
+    expect(draft.triggerDeviceType, AutomationDeviceType.motion);
+    expect(draft.triggerState, {'occupancy': 'occupied'});
+    expect(draft.actionCommand, AutomationActionCommand.on);
+    expect(draft.targetLightIds, ['light-01']);
+  });
+
+  testWidgets('automation rule delete button opens confirmation dialog', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete rule').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete rule?'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
   });
 
   testWidgets('settings owns devices logs account logout and runtime toggle', (
@@ -419,4 +482,46 @@ void main() {
     expect(AppPalette.grey.textSecondary, const Color(0xFF756B5D));
     expect(AppPalette.grey.border, const Color(0xFFDDD6C7));
   });
+}
+
+class _WidgetAutomationRepository implements AutomationRepository {
+  final List<AutomationRule> _rules = [];
+  final List<AutomationRuleDraft> createdDrafts = [];
+  final List<String> deletedRuleIds = [];
+
+  @override
+  Future<List<AutomationRule>> fetchRules() async => List.unmodifiable(_rules);
+
+  @override
+  Future<AutomationRule> fetchRule(String ruleId) async {
+    return _rules.firstWhere((rule) => rule.id == ruleId);
+  }
+
+  @override
+  Future<AutomationRule> createRule(AutomationRuleDraft draft) async {
+    createdDrafts.add(draft);
+    final rule = AutomationRule(
+      id: 'automation-widget-01',
+      name: draft.name,
+      enabled: draft.enabled,
+      trigger: draft.trigger,
+      actions: draft.actions,
+      syncStatus: AutomationSyncStatus.synced,
+      lastRunStatus: AutomationLastRunStatus.neverRun,
+    );
+    _rules.add(rule);
+    return rule;
+  }
+
+  @override
+  Future<AutomationRule> enableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<AutomationRule> disableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    deletedRuleIds.add(ruleId);
+    _rules.removeWhere((rule) => rule.id == ruleId);
+  }
 }
