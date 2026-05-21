@@ -276,6 +276,7 @@ class AutomationOut(BaseModel):
     tenant_id: str
     site_id: str
     gateway_id: str
+    version: int
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
     version: int

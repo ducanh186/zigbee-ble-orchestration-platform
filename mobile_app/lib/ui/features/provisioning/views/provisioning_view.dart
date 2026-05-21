@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
@@ -10,10 +11,11 @@ class ProvisioningView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return CustomScrollView(
       slivers: [
-        const SliverAppBar(title: Text('Provisioning'), pinned: true),
+        SliverAppBar(title: Text(l10n.provisioningTab), pinned: true),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           sliver: SliverList.list(

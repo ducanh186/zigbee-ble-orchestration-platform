@@ -1,6 +1,6 @@
-z3.pem
 **/*.md
 !**/README.md
+!docs/automation-e2e-*.md
 CLAUDE.md
 .claude/
 .codex/

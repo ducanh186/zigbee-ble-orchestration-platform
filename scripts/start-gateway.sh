@@ -24,7 +24,7 @@
 set -eu
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$REPO_ROOT/gateway/Z3Gateway/Z3GatewayHost/build/debug/Z3Gateway"
+BIN="$REPO_ROOT/gateway/Z3GatewayHost/build/debug/Z3Gateway"
 UART="${UART:-/dev/ttyACM0}"
 BAUD="${BAUD:-115200}"
 LOG="${LOG:-/tmp/z3gw.log}"

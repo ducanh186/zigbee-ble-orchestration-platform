@@ -4,13 +4,14 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
+from cloud.app.mqtt_client import mqtt_service
 from cloud.app.models import Automation, Device
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
@@ -222,6 +223,7 @@ async def create_automation(
         tenant_id=settings.tenant_id,
         site_id=settings.site_id,
         gateway_id=settings.gateway_id,
+        version=1,
         trigger=body.trigger,
         actions=body.actions,
         version=1,

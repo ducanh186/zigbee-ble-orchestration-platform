@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/automation_rule.dart';
 import '../../../../domain/repositories/automation_repository.dart';
 
@@ -34,8 +35,10 @@ class AutomationViewModel extends ChangeNotifier {
     try {
       _rules = await _repository.fetchRules();
     } catch (error) {
-      _errorMessage =
-          'Khong tai duoc automation rules. Kiem tra Cloud API hoac mang. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong tai duoc automation rules',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -60,8 +63,10 @@ class AutomationViewModel extends ChangeNotifier {
         await _pollRule(created.id);
       }
     } catch (error) {
-      _errorMessage =
-          'Khong tao duoc automation rule. Cloud API tra loi loi: $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong tao duoc automation rule',
+      );
     } finally {
       _isSaving = false;
       notifyListeners();
@@ -86,7 +91,10 @@ class AutomationViewModel extends ChangeNotifier {
           : await _repository.disableRule(ruleId);
       _upsert(rule);
     } catch (error) {
-      _errorMessage = 'Khong cap nhat duoc automation rule. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong cap nhat duoc automation rule',
+      );
     } finally {
       notifyListeners();
     }

@@ -33,10 +33,10 @@ static EmberStatus lightSendOnOff(bool wantOn, uint8_t dstEp,
   uint8_t cmdId = wantOn ? ZCL_ON_COMMAND_ID : ZCL_OFF_COMMAND_ID;
 
   emberAfFillExternalBuffer(
-    (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
-    ZCL_ON_OFF_CLUSTER_ID,
-    cmdId,
-    "");
+  (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
+  ZCL_ON_OFF_CLUSTER_ID,
+  cmdId,
+  "");
 
   emberAfSetCommandEndpoints(COORD_EP_CONTROL, dstEp);
 
@@ -244,10 +244,10 @@ bool emberAfMessageSentCallback(EmberOutgoingMessageType type,
 static EmberStatus lightSendToggle(uint8_t dstEp, EmberNodeId nodeId)
 {
   emberAfFillExternalBuffer(
-    (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
-    ZCL_ON_OFF_CLUSTER_ID,
-    ZCL_TOGGLE_COMMAND_ID,
-    "");
+  (uint8_t)(ZCL_CLUSTER_SPECIFIC_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
+  ZCL_ON_OFF_CLUSTER_ID,
+  ZCL_TOGGLE_COMMAND_ID,
+  "");
 
   emberAfSetCommandEndpoints(COORD_EP_CONTROL, dstEp);
 

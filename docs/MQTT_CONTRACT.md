@@ -285,7 +285,7 @@ mới — đây là kênh duy nhất mà dashboard/cloud DeviceState đọc đ�
 trạng thái hiện tại của motion sensor. Hai topic cùng fire trong một lần
 PIR transition: `event` (no-retain, lịch sử) + `reported` (retain, current
 state). Implementation: `appMqttPublishMotionReported()` trong
-`gateway/Z3Gateway/Z3GatewayHost/app/app_mqtt.c`.
+`gateway/Z3GatewayHost/app/app_mqtt.c`.
 
 Topic event:
 

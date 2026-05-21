@@ -334,7 +334,7 @@ string opaque.
 
 Action ở `automations/.../event` **không cần** tạo `command_id` ở v1 — gateway
 thực thi local ZCL frame trực tiếp (giống đường `lightCtrlLocalToggle()`
-hiện tại trong `gateway/Z3Gateway/Z3GatewayHost/app/light_ctrl.c`). Vì vậy
+hiện tại trong `gateway/Z3GatewayHost/app/light_ctrl.c`). Vì vậy
 `actions[].command_id = null`.
 
 v2 (future) có thể nối automation action với existing command lifecycle —

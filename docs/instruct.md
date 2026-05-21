@@ -40,7 +40,7 @@ Nguồn chính xác của kiến trúc: [README.md](../README.md), [docs/plan.md
 |---|---|---|
 | End devices | Z3Light, Z3Switch, Z3_Occupancy_Sensor (board EFR32MG12) | Zigbee cluster servers/clients. Z3Light expose On/Off + Level Control. Z3Switch bắn On/Off commands. |
 | Coordinator/NCP | Một board EFR32MG12 flash bootloader + NCP firmware | Chỉ là Zigbee radio. Expose EZSP qua UART ở 115200 baud. **Không** chạy logic ứng dụng. |
-| Gateway host | `gateway/Z3Gateway/Z3GatewayHost/` (binary trên Ubuntu) | Sở hữu UART (`/dev/ttyACM0`), form Zigbee network, nói MQTT, giữ command lifecycle, quan sát + forward state. |
+| Gateway host | `gateway/Z3GatewayHost/` (binary trên Ubuntu) | Sở hữu UART (`/dev/ttyACM0`), form Zigbee network, nói MQTT, giữ command lifecycle, quan sát + forward state. |
 | MQTT broker | `sb-mosquitto` (podman), dùng `mqtt/config/mosquitto.conf` | Auth, ACL, optional bridge đến prod broker qua `mqtt/config/conf.d/bridge.conf`. |
 | Cloud backend | `cloud/app/` FastAPI + Postgres | REST API, dịch command, lưu device/state/command, sub/pub MQTT. |
 
@@ -158,7 +158,7 @@ REPO/
 │   ├─ Z3Switch/
 │   └─ Z3_Occupancy_Sensor/
 ├─ gateway/
-│   └─ Z3Gateway/Z3GatewayHost/
+│   └─ Z3GatewayHost/
 │       ├─ app.c                 — entry point Z3Gateway framework
 │       ├─ app/                  — code gateway custom
 │       │   ├─ app_mqtt.c/h      — MQTT client (libmosquitto)
@@ -201,9 +201,9 @@ Nguồn chính xác vs file sinh tự động:
 | `end_devices/**/*.slcp`, `config/zcl/*.zap`, `app.c`, `app/*.c` | Nguồn chính — sửa ở đây |
 | `end_devices/**/autogen/` | Sinh bởi SSv5 từ `.slcp` + `.zap` — không sửa tay |
 | `artifact/**/*.s37`, `*.hex`, `*.gbl` | Artifact build — regenerate bằng SSv5 |
-| `gateway/Z3Gateway/Z3GatewayHost/app/*` | Nguồn chính |
-| `gateway/Z3Gateway/Z3GatewayHost/autogen/` | Sinh bởi SSv5 Z3Gateway sample — tránh sửa tay |
-| `gateway/Z3Gateway/Z3GatewayHost/build/debug/Z3Gateway` | Artifact build (binary host) |
+| `gateway/Z3GatewayHost/app/*` | Nguồn chính |
+| `gateway/Z3GatewayHost/autogen/` | Sinh bởi SSv5 Z3Gateway sample — tránh sửa tay |
+| `gateway/Z3GatewayHost/build/debug/Z3Gateway` | Artifact build (binary host) |
 
 ---
 
@@ -269,7 +269,7 @@ SSv5 không auto-regenerate đè lên file sửa tay:
 
 ```bash
 # 1. Copy source đã sửa từ repo này sang bản copy trong SSv5 workspace
-cp gateway/Z3Gateway/Z3GatewayHost/app/*.c \
+cp gateway/Z3GatewayHost/app/*.c \
    ~/SimplicityStudio/v5_workspace/Z3GatewayHost2/app/
 
 # 2. Build ở đó
@@ -277,7 +277,7 @@ cp gateway/Z3Gateway/Z3GatewayHost/app/*.c \
 
 # 3. Copy binary trở lại vào cây build/debug của repo này
 cp ~/SimplicityStudio/v5_workspace/Z3GatewayHost2/build/debug/Z3Gateway \
-   gateway/Z3Gateway/Z3GatewayHost/build/debug/Z3Gateway
+  gateway/Z3GatewayHost/build/debug/Z3Gateway
 ```
 
 Lưu ý:
@@ -423,7 +423,7 @@ qua Zigbee direct binding, không qua legacy wildcard relay).
 Nếu cần chạy thủ công, đây là dạng inline tương đương:
 
 ```bash
-cd "$REPO/gateway/Z3Gateway/Z3GatewayHost/build/debug"
+cd "$REPO/gateway/Z3GatewayHost/build/debug"
 ( sleep infinity | env SB_MQTT_HOST=localhost SB_MQTT_PORT=1883 \
                        SB_MQTT_USERNAME=gateway SB_MQTT_PASSWORD=gateway123 \
                        SB_AUTOMATION_SWITCH_HOOK=1 \
@@ -668,7 +668,7 @@ một chuỗi tăng đơn điệu:
 4. `executed` — APS-level TX success (lưu ý: TX-level, không phải xác
    nhận bulb đã đổi trạng thái; xem block comment quanh
    `emberAfMessageSentCallback` trong
-   [light_ctrl.c](../gateway/Z3Gateway/Z3GatewayHost/app/light_ctrl.c)).
+  [light_ctrl.c](../gateway/Z3GatewayHost/app/light_ctrl.c)).
 
 Terminal failure là `failed` (kèm field `reason`) hoặc `timeout` (do
 cloud `command_timeout.py` sweep phát ra khi không có terminal status
@@ -739,7 +739,7 @@ RAM của gateway rỗng. Nguyên nhân:
 
 - Gateway vừa restart; registry rỗng đến khi attribute report đầu tiên
   từ đèn đến (auto-pair trigger trong
-  [telemetry_rx.c](../gateway/Z3Gateway/Z3GatewayHost/app/telemetry_rx.c)).
+  [telemetry_rx.c](../gateway/Z3GatewayHost/app/telemetry_rx.c)).
 - Đèn chưa bao giờ join network Zigbee của gateway này. Verify bằng cách
   xem `@DBG PRE_CMD` trong log gateway khi bấm bất cứ device nào. Nếu
   không hiện gì, device đang ở network khác — rejoin về coordinator này.
@@ -923,7 +923,7 @@ phía trên, đây là chỗ tra cứu nguồn gốc.
 ### Gateway — motion reported publish
 
 - `appMqttPublishMotionReported()` mới trong
-  `gateway/Z3Gateway/Z3GatewayHost/app/app_mqtt.c`: mỗi lần PIR
+  `gateway/Z3GatewayHost/app/app_mqtt.c`: mỗi lần PIR
   transition, gateway publish thêm `devices/motion/{eui}/reported`
   (QoS 1, retained) với payload `state.occupancy = "occupied"|"unoccupied"`,
   `state.reachable = true`. Cloud `_handle_reported` ghi `DeviceState`
