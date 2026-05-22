@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     gateway_id: str = "gw-ubuntu-01"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    # How long (seconds) a device may go without a reported/event/registry
+    # before the offline reaper marks `is_online=False`. Devices that have
+    # never reported (`last_seen_at IS NULL`) are also marked offline so
+    # seed rows and probes don't masquerade as live hardware.
+    device_offline_after_seconds: int = 300
+    # How often the reaper task wakes up to scan for stale devices.
+    device_offline_scan_interval_seconds: int = 60
 
     model_config = {"env_prefix": "SB_", "env_file": ".env", "extra": "ignore"}
 

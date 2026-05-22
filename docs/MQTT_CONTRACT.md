@@ -150,6 +150,19 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/desired
 sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 ```
 
+### Automation rules
+
+```text
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/reported
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/event
+```
+
+Cloud publish `desired` (retained) cho mỗi mutation rule (upsert / delete
+tombstone); gateway publish `reported` (retained) làm sync ack và `event`
+(no-retain) khi rule fire. Chi tiết payload, enum, identity/version model
+xem [AUTOMATION_MQTT_CONTRACT.md](./AUTOMATION_MQTT_CONTRACT.md).
+
 ## Retain và QoS
 
 > **Demo vs production:** Bảng dưới liệt kê QoS của **kiến trúc thực tế** (production).
@@ -181,6 +194,9 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 | `groups/*/desired` | 1 | không | |
 | `scenes/*/desired` | 1 | không | |
 | `scenes/*/event` | 1 | không | |
+| `automations/*/desired` | 1 | có | Cloud → gateway. `op=upsert` hoặc `op=delete` (tombstone). Xem [AUTOMATION_MQTT_CONTRACT.md](./AUTOMATION_MQTT_CONTRACT.md). |
+| `automations/*/reported` | 1 | có | Gateway → cloud sync ack (`synced`/`failed`/`deleted`). |
+| `automations/*/event` | 1 | không | Gateway → cloud execution events (rule fired, run_id). |
 
 **LWT cho `gateway/online`:**
 
@@ -263,7 +279,15 @@ Gateway publish event này khi trạng thái occupancy của motion sensor đổ
 từ giá trị trước đó. Reported state vẫn nằm ở
 `devices/motion/{id}/reported`; event dùng để cloud lưu lịch sử.
 
-Topic:
+Gateway đồng thời publish bản retained tại
+`devices/motion/{id}/reported` với payload `state.occupancy` cùng giá trị
+mới — đây là kênh duy nhất mà dashboard/cloud DeviceState đọc để hiển thị
+trạng thái hiện tại của motion sensor. Hai topic cùng fire trong một lần
+PIR transition: `event` (no-retain, lịch sử) + `reported` (retain, current
+state). Implementation: `appMqttPublishMotionReported()` trong
+`gateway/Z3GatewayHost/app/app_mqtt.c`.
+
+Topic event:
 
 ```text
 sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/00124b0001aa22cc/event
@@ -396,6 +420,8 @@ sb/v1/hust/lab01/gw-ubuntu-01/commands/+/reply
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/online
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/health
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/event
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/reported
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/event
 ```
 
 ### Gateway (nhận từ cloud)
@@ -407,6 +433,7 @@ sb/v1/hust/lab01/gw-ubuntu-01/ota/campaigns/+/manifest
 sb/v1/hust/lab01/gw-ubuntu-01/ota/devices/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/groups/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/scenes/+/desired
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/desired
 ```
 
 ### Debug (chỉ dùng ngắn hạn, không dùng production)

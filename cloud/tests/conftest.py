@@ -70,28 +70,27 @@ class FakeMQTTPublisher:
             }
         )
 
-    def publish_automation_rule(
+    def publish_automation_desired(
         self,
         automation_id: str,
-        payload: dict[str, Any],
+        op: str,
+        version: int,
         *,
-        deleted: bool = False,
+        name: str | None = None,
+        enabled: bool | None = None,
+        trigger: dict | None = None,
+        actions: list[dict] | None = None,
     ) -> None:
         self.published.append(
             {
-                "topic": (
-                    f"sb/v1/hust/lab01/gw-ubuntu-01/desired/automation/{automation_id}"
-                ),
-                "qos": 0,
-                "retain": True,
-                "payload": {
-                    "schema": "sb.v1",
-                    "tenant_id": "hust",
-                    "site_id": "lab01",
-                    "gateway_id": "gw-ubuntu-01",
-                    "source": "cloud",
-                    "payload": payload | {"deleted": deleted},
-                },
+                "kind": "automation_desired",
+                "automation_id": automation_id,
+                "op": op,
+                "version": version,
+                "name": name,
+                "enabled": enabled,
+                "trigger": trigger,
+                "actions": actions,
             }
         )
 

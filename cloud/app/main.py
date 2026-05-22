@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
+from cloud.app.device_lifecycle import run_offline_reaper
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.routers import automations, commands, devices, events, gateways, health
 
@@ -35,15 +36,20 @@ async def lifespan(app: FastAPI):
         run_timeout_worker(async_session, stop_event),
         name="command-timeout-worker",
     )
+    reaper_task = asyncio.create_task(
+        run_offline_reaper(async_session, stop_event),
+        name="device-offline-reaper",
+    )
 
     yield
 
     # -- Shutdown --
     stop_event.set()
-    try:
-        await asyncio.wait_for(timeout_task, timeout=3.0)
-    except asyncio.TimeoutError:
-        timeout_task.cancel()
+    for task in (timeout_task, reaper_task):
+        try:
+            await asyncio.wait_for(task, timeout=3.0)
+        except asyncio.TimeoutError:
+            task.cancel()
     mqtt_service.disconnect()
     logger.info("MQTT client stopped")
 

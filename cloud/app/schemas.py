@@ -195,12 +195,13 @@ class DeviceOut(BaseModel):
     room_id: str | None
     name: str | None
     is_online: bool
+    last_seen_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("created_at", "updated_at")
+    @field_serializer("last_seen_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
 
@@ -259,8 +260,14 @@ class AutomationCreate(BaseModel):
     actions: list[dict[str, Any]] = Field(min_length=1)
 
 
-class AutomationUpdate(AutomationCreate):
-    version: int = Field(ge=1)
+class AutomationUpdate(BaseModel):
+    """PUT body. All fields optional; only provided fields are mutated."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    enabled: bool | None = None
+    version: int | None = Field(default=None, ge=1)
+    trigger: dict[str, Any] | None = None
+    actions: list[dict[str, Any]] | None = Field(default=None, min_length=1)
 
 
 class AutomationOut(BaseModel):
@@ -273,7 +280,7 @@ class AutomationOut(BaseModel):
     version: int
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
-    sync_status: Literal["pending", "synced", "failed"]
+    sync_status: Literal["pending", "synced", "failed", "deleted"]
     last_run_status: Literal["never_run", "executed", "failed", "timeout"]
     last_error: str | None
     created_at: datetime

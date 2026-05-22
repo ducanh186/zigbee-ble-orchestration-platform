@@ -49,6 +49,8 @@ class WebdevHandler(BaseHTTPRequestHandler):
 
     def serve_static(self, path: str, head_only: bool = False) -> None:
         relative = path.lstrip("/") or "index.html"
+        if relative.startswith("static/"):
+            relative = relative[len("static/"):]
         candidate = (ROOT / relative).resolve()
         if ROOT not in candidate.parents and candidate != ROOT:
             self.send_error(403)

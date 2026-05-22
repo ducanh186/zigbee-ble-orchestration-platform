@@ -111,6 +111,13 @@ $(OUTPUT_DIR)/project/app/rule_engine.o: app/rule_engine.c
 CDEPS += $(OUTPUT_DIR)/project/app/rule_engine.d
 OBJS += $(OUTPUT_DIR)/project/app/rule_engine.o
 
+$(OUTPUT_DIR)/project/app/automation_rule.o: app/automation_rule.c
+	@echo 'Building app/automation_rule.c'
+	@mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/automation_rule.c
+CDEPS += $(OUTPUT_DIR)/project/app/automation_rule.d
+OBJS += $(OUTPUT_DIR)/project/app/automation_rule.o
+
 ####################################################################
 # Rules                                                            #
 ####################################################################

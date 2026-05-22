@@ -7,6 +7,7 @@
 
 #include "app_mqtt.h"
 #include "app_log.h"
+#include "automation_rule.h"
 #include "cmd_handler.h"
 
 #include <mosquitto.h>
@@ -48,9 +49,12 @@ static const char *sMqttPassword = MQTT_PASSWORD_DEFAULT;
 #define MQTT_PREFIX  "sb/v1/" MQTT_TENANT "/" MQTT_SITE "/" MQTT_GW_ID
 
 // ===== Inbound command queue =====
+// Sized for the larger of (a) a command request envelope and (b) an automation
+// desired envelope with the contract max of 4 actions (≈ 800-900 bytes worst
+// case). See docs/AUTOMATION_MQTT_CONTRACT.md §11.
 #define MQTT_Q_SIZE         8
 #define MQTT_Q_TOPIC_MAX    160
-#define MQTT_Q_PAYLOAD_MAX  512
+#define MQTT_Q_PAYLOAD_MAX  1024
 
 typedef struct {
   char topic[MQTT_Q_TOPIC_MAX];
@@ -119,9 +123,35 @@ static void mqttQueueInit(void)
 }
 
 // Called on mosquitto thread.  Returns true if enqueued.
+//
+// Drop policy: a payload that would exceed MQTT_Q_PAYLOAD_MAX is rejected
+// outright -- silently truncating produces invalid JSON that downstream
+// parsers can mis-handle.  Topics are similarly guarded (any non-malicious
+// MQTT_PREFIX/automations/{id}/desired stays well under MQTT_Q_TOPIC_MAX,
+// but we still defend by rejecting if the topic alone would overflow).
 static bool mqttQueuePush(const char *topic, const void *payload,
                           int payloadLen, int qos)
 {
+  if (payloadLen < 0) return false;
+  if (payloadLen >= MQTT_Q_PAYLOAD_MAX) {
+    emberAfCorePrintln("MQTT: payload_too_large %d >= %d, dropped [%s]",
+                       payloadLen, MQTT_Q_PAYLOAD_MAX,
+                       topic ? topic : "?");
+    appLogLog("mqtt", "payload_too_large",
+              "\"len\":%d,\"cap\":%d,\"topic\":\"%s\"",
+              payloadLen, MQTT_Q_PAYLOAD_MAX,
+              topic ? topic : "");
+    return false;
+  }
+  size_t tlen = topic ? strlen(topic) : 0;
+  if (tlen >= MQTT_Q_TOPIC_MAX) {
+    emberAfCorePrintln("MQTT: topic_too_long %zu >= %d, dropped",
+                       tlen, MQTT_Q_TOPIC_MAX);
+    appLogLog("mqtt", "topic_too_long",
+              "\"len\":%zu,\"cap\":%d", tlen, MQTT_Q_TOPIC_MAX);
+    return false;
+  }
+
   bool ok = false;
   pthread_mutex_lock(&sCmdQ.lock);
 
@@ -129,17 +159,11 @@ static bool mqttQueuePush(const char *topic, const void *payload,
   if (next != sCmdQ.tail) {
     MqttQEntry_t *e = &sCmdQ.entries[sCmdQ.head];
 
-    // Copy topic (ensure null-terminated)
-    size_t tlen = strlen(topic);
-    if (tlen >= MQTT_Q_TOPIC_MAX) tlen = MQTT_Q_TOPIC_MAX - 1;
     memcpy(e->topic, topic, tlen);
     e->topic[tlen] = '\0';
 
-    // Copy payload (may not be null-terminated from mosquitto)
-    int plen = payloadLen;
-    if (plen >= MQTT_Q_PAYLOAD_MAX) plen = MQTT_Q_PAYLOAD_MAX - 1;
-    if (plen > 0) memcpy(e->payload, payload, (size_t)plen);
-    e->payload[plen] = '\0';
+    if (payloadLen > 0) memcpy(e->payload, payload, (size_t)payloadLen);
+    e->payload[payloadLen] = '\0';
 
     e->qos = qos;
     sCmdQ.head = next;
@@ -207,6 +231,20 @@ static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
     emberAfCorePrintln("MQTT: subscribed to " MQTT_PREFIX "/commands/+/request");
     appLogLog("mqtt", "subscribed",
               "\"topic\":\"" MQTT_PREFIX "/commands/+/request\",\"qos\":1");
+  }
+
+  // Subscribe to automation desired (cloud -> gateway, retained).
+  // See docs/AUTOMATION_MQTT_CONTRACT.md §4.
+  int sa = mosquitto_subscribe(mosq, NULL,
+               MQTT_PREFIX "/automations/+/desired", 1);
+  if (sa != MOSQ_ERR_SUCCESS) {
+    emberAfCorePrintln("MQTT: auto subscribe failed: %s", mosquitto_strerror(sa));
+    appLogLog("mqtt", "auto_sub_fail", "\"rc\":%d,\"text\":\"%s\"",
+              sa, mosquitto_strerror(sa));
+  } else {
+    emberAfCorePrintln("MQTT: subscribed to " MQTT_PREFIX "/automations/+/desired");
+    appLogLog("mqtt", "subscribed",
+              "\"topic\":\"" MQTT_PREFIX "/automations/+/desired\",\"qos\":1");
   }
 }
 
@@ -359,9 +397,33 @@ void appMqttTick(void)
     emberAfCorePrintln("MQTT: processing [%s]", entry.topic);
     appLogLog("mqtt", "rx_process", "topic=%s", entry.topic);
 
-    // Route to the sb/v1 command handler: parser -> dispatcher -> device module.
-    // (Legacy `@CMD`-over-stdio remains available via `cmdHandleLine` for CLI.)
-    cmdHandleMqttPayload(entry.topic, entry.payload);
+    // Route by exact topic shape:
+    //   .../automations/{id}/desired -> automation_rule handler.
+    //   .../commands/{id}/request    -> command handler (sb/v1 device cmds).
+    // Anything else (e.g. /automations/{id}/reported -- which we shouldn't
+    // even subscribe to -- or unknown suffixes) is dropped here, NOT routed
+    // back into the desired parser.
+    bool isAutomationDesired = false;
+    {
+      const char *m = strstr(entry.topic, "/automations/");
+      size_t tn = strlen(entry.topic);
+      static const char DESIRED_SUFFIX[] = "/desired";
+      size_t sl = sizeof(DESIRED_SUFFIX) - 1;
+      if (m != NULL
+       && tn >= sl
+       && memcmp(entry.topic + tn - sl, DESIRED_SUFFIX, sl) == 0) {
+        isAutomationDesired = true;
+      }
+    }
+
+    if (isAutomationDesired) {
+      automationRuleHandleMqttPayload(entry.topic, entry.payload);
+    } else if (strstr(entry.topic, "/commands/") != NULL) {
+      cmdHandleMqttPayload(entry.topic, entry.payload);
+    } else {
+      appLogLog("mqtt", "drop_unknown_topic",
+                "\"topic\":\"%s\"", entry.topic);
+    }
   }
 
   // Phase 5: periodic gateway/health publish (30 s, only while connected).
@@ -609,4 +671,150 @@ void appMqttPublishCommandReply(const char *command_id,
 
   // QoS 1, retain=false (per MQTT_CONTRACT.md)
   appMqttPublish(topicSuffix, envelope, 1, false);
+}
+
+void appMqttPublishMotionOccupancyEvent(uint16_t nodeId,
+                                        const char *eui64Str,
+                                        const char *occupancy)
+{
+  if (!sMosq || !eui64Str || !*eui64Str || !occupancy || !*occupancy) return;
+
+  // Inner payload per docs/MQTT_CONTRACT.md "Sự kiện motion occupancy changed".
+  char inner[300];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"motion\","
+    "\"event\":\"occupancy_changed\","
+    "\"occupancy\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\"",
+    eui64Str, occupancy, eui64Str, (unsigned)nodeId);
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix),
+           "devices/motion/%s/event", eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, false);
+}
+
+void appMqttPublishMotionReported(uint16_t nodeId,
+                                  const char *eui64Str,
+                                  const char *occupancy)
+{
+  if (!sMosq || !eui64Str || !*eui64Str || !occupancy || !*occupancy) return;
+
+  // Mirrors appMqttPublishDeviceReportedFull's shape but with the motion-
+  // specific state.occupancy field that buildMotionStateVisual reads on the
+  // dashboard. Cannot reuse that helper directly because its state object is
+  // hardcoded to {power, level, reachable}.
+  char inner[320];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"motion\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"state\":{\"occupancy\":\"%s\",\"reachable\":true}",
+    eui64Str, eui64Str, (unsigned)nodeId, occupancy);
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix),
+           "devices/motion/%s/reported", eui64Str);
+
+  // QoS 1, retain=true so the dashboard reflects current state on connect.
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttPublishAutomationEvent(const char *automation_id,
+                                   const char *inner_payload_json)
+{
+  if (!sMosq || !automation_id || !*automation_id
+   || !inner_payload_json) return;
+
+  // Envelope is built using the shared helper. correlation_id is set to
+  // "auto_<automation_id>" per contract §3 / §6.
+  // We override buildEnvelope() here only by extending it with a
+  // correlation_id field — simplest path is to assemble inline.
+  uint64_t ts = epochMs();
+  uint32_t id = ++sMsgId;
+
+  char envelope[1024];
+  int n = snprintf(envelope, sizeof(envelope),
+    "{\"schema\":\"sb.v1\","
+     "\"msg_id\":\"%lu\","
+     "\"ts\":%llu,"
+     "\"tenant_id\":\"" MQTT_TENANT "\","
+     "\"site_id\":\"" MQTT_SITE "\","
+     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"source\":\"gateway\","
+     "\"correlation_id\":\"auto_%s\","
+     "\"payload\":{%s}}",
+    (unsigned long)id, (unsigned long long)ts,
+    automation_id, inner_payload_json);
+
+  if (n < 0 || (size_t)n >= sizeof(envelope)) {
+    emberAfCorePrintln("MQTT: automation event too large, dropped [%s]",
+                       automation_id);
+    appLogLog("AUTO", "event_too_large",
+              "\"id\":\"%s\",\"needed\":%d", automation_id, n);
+    return;
+  }
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix),
+           "automations/%s/event", automation_id);
+
+  // QoS 1, retain=false per contract §6.
+  appMqttPublish(topicSuffix, envelope, 1, false);
+}
+
+void appMqttPublishAutomationReported(const char *automation_id,
+                                      uint32_t version,
+                                      const char *sync_status,
+                                      const char *last_error)
+{
+  if (!sMosq || !automation_id || !*automation_id || !sync_status) return;
+
+  uint64_t ts = epochMs();
+  uint32_t id = ++sMsgId;
+
+  char errField[96];
+  if (last_error && *last_error) {
+    snprintf(errField, sizeof(errField), "\"%s\"", last_error);
+  } else {
+    snprintf(errField, sizeof(errField), "null");
+  }
+
+  // Inner payload + envelope built inline so we keep the same emit style as
+  // appMqttPublishCommandReply (no shared envelope helper for non-trivial
+  // payloads — the gateway is intentionally light on indirection).
+  char envelope[512];
+  snprintf(envelope, sizeof(envelope),
+    "{\"schema\":\"sb.v1\","
+     "\"msg_id\":\"%lu\","
+     "\"ts\":%llu,"
+     "\"tenant_id\":\"" MQTT_TENANT "\","
+     "\"site_id\":\"" MQTT_SITE "\","
+     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"source\":\"gateway\","
+     "\"correlation_id\":\"auto_%s\","
+     "\"payload\":{\"automation_id\":\"%s\","
+                  "\"version\":%lu,"
+                  "\"sync_status\":\"%s\","
+                  "\"last_error\":%s}}",
+    (unsigned long)id, (unsigned long long)ts,
+    automation_id, automation_id,
+    (unsigned long)version, sync_status, errField);
+
+  char topicSuffix[96];
+  snprintf(topicSuffix, sizeof(topicSuffix),
+           "automations/%s/reported", automation_id);
+
+  // Retained per docs/AUTOMATION_MQTT_CONTRACT.md §5.
+  appMqttPublish(topicSuffix, envelope, 1, true);
 }
