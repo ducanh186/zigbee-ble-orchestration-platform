@@ -1,7 +1,7 @@
 name: zigbee_smart_building
 description: Operator mobile app for Zigbee Smart Building LIGHT control.
 publish_to: 'none'
-version: 0.8.3+803
+version: 0.8.7+807
 
 environment:
   sdk: ^3.11.4
@@ -16,6 +16,7 @@ dependencies:
   intl: any
   provider: ^6.1.5+1
   google_fonts: ^6.2.1
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

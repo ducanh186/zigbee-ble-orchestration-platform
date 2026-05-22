@@ -82,9 +82,7 @@ class _DevicesViewState extends State<DevicesView> {
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
                         device: device,
-                        onTap: device.isLight
-                            ? () => widget.onOpenLight(device)
-                            : null,
+                        onTap: () => widget.onOpenLight(device),
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -255,14 +253,38 @@ class _DeviceRow extends StatelessWidget {
               ],
             ),
           ),
-          device.isLight
-              ? StatusBadge.forPower(device.power)
-              : StatusBadge(
-                  label: device.isOnline ? 'ONLINE' : 'OFFLINE',
-                  tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
-                ),
+          _DeviceStatusBadge(device: device),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right, size: 18, color: palette.textSecondary),
         ],
       ),
+    );
+  }
+}
+
+class _DeviceStatusBadge extends StatelessWidget {
+  const _DeviceStatusBadge({required this.device});
+
+  final SmartDevice device;
+
+  @override
+  Widget build(BuildContext context) {
+    if (device.isLight) {
+      return StatusBadge.forPower(device.power);
+    }
+    if (device.isMotion) {
+      return StatusBadge(
+        label: device.occupancy.label,
+        tone: switch (device.occupancy) {
+          OccupancyState.occupied => BadgeTone.success,
+          OccupancyState.unoccupied => BadgeTone.neutral,
+          OccupancyState.unknown => BadgeTone.warning,
+        },
+      );
+    }
+    return StatusBadge(
+      label: device.isOnline ? 'ONLINE' : 'OFFLINE',
+      tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
     );
   }
 }

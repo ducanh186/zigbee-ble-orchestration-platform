@@ -147,11 +147,6 @@ async def _validate_rule_template(
         state = trigger.get("state") or {}
         if not isinstance(state, dict) or state:
             raise HTTPException(status_code=422, detail="Switch trigger state is unsupported")
-        if any(command != "toggle" for command in action_commands):
-            raise HTTPException(
-                status_code=422,
-                detail="Switch toggle rules can only toggle light actions",
-            )
         return
 
     if event != "occupancy_changed":
@@ -160,17 +155,8 @@ async def _validate_rule_template(
     if not isinstance(state, dict):
         raise HTTPException(status_code=422, detail="Motion trigger state is required")
     occupancy = state.get("occupancy")
-    if occupancy == "occupied":
-        expected_command = "on"
-    elif occupancy == "unoccupied":
-        expected_command = "off"
-    else:
+    if occupancy not in {"occupied", "unoccupied"}:
         raise HTTPException(status_code=422, detail="Unsupported motion occupancy state")
-    if any(command != expected_command for command in action_commands):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Motion {occupancy} rules can only use light {expected_command}",
-        )
 
 
 @router.get("", response_model=list[AutomationOut])
@@ -226,7 +212,6 @@ async def create_automation(
         version=1,
         trigger=body.trigger,
         actions=body.actions,
-        version=1,
         sync_status="pending",
         last_run_status="never_run",
         last_error=None,
@@ -282,6 +267,8 @@ async def update_automation(
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    if body.version is not None and body.version != rule.version:
+        raise HTTPException(status_code=409, detail="Automation version conflict")
 
     # If trigger or actions change, re-validate the resulting rule body. We
     # validate against the *merged* values so partial updates still get the

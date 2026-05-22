@@ -60,6 +60,16 @@ class ApiClient {
     });
   }
 
+  Future<Object?> deleteJson(String path) async {
+    return _send(() async {
+      final response = await _httpClient.delete(
+        _uri(path),
+        headers: _headers(),
+      );
+      return _decode(response);
+    });
+  }
+
   /// Wraps a request lambda to normalize transport-level exceptions into a
   /// typed [ApiException]. HTTP-level errors are already handled by [_decode].
   Future<Object?> _send(Future<Object?> Function() request) async {

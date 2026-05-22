@@ -57,14 +57,14 @@ class AutomationVisuals {
     AutomationRuleTemplate.switchTogglesLights,
   ];
 
-  static String triggerEventLabel(AutomationRuleTemplate template) {
-    return switch (template) {
-      AutomationRuleTemplate.motionOccupiedTurnsOnLights =>
-        'occupancy changes: occupied',
-      AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
-        'occupancy changes: unoccupied',
-      AutomationRuleTemplate.switchTogglesOneLight ||
-      AutomationRuleTemplate.switchTogglesLights => 'toggles',
+  static String triggerEventLabel(
+    AutomationTriggerEvent event,
+    Map<String, Object?> state,
+  ) {
+    return switch (event) {
+      AutomationTriggerEvent.occupancyChanged =>
+        'occupancy changes: ${state['occupancy'] ?? 'occupied'}',
+      AutomationTriggerEvent.switchToggle => 'toggles',
     };
   }
 }

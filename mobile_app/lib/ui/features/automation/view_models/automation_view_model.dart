@@ -81,6 +81,30 @@ class AutomationViewModel extends ChangeNotifier {
     await _updateEnabled(ruleId, enabled: false);
   }
 
+  Future<void> deleteRule(String ruleId) async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteRule(ruleId);
+      final refreshedRules = await _repository.fetchRules();
+      if (refreshedRules.any((rule) => rule.id == ruleId)) {
+        _rules = refreshedRules;
+        _errorMessage =
+            'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.';
+        return;
+      }
+      _rules = refreshedRules;
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong xoa duoc automation rule',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
+
   Future<void> _updateEnabled(String ruleId, {required bool enabled}) async {
     _errorMessage = null;
     notifyListeners();

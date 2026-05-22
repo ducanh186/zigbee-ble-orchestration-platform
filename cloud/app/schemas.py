@@ -265,6 +265,7 @@ class AutomationUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     enabled: bool | None = None
+    version: int | None = Field(default=None, ge=1)
     trigger: dict[str, Any] | None = None
     actions: list[dict[str, Any]] | None = Field(default=None, min_length=1)
 
@@ -279,7 +280,6 @@ class AutomationOut(BaseModel):
     version: int
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
-    version: int
     sync_status: Literal["pending", "synced", "failed", "deleted"]
     last_run_status: Literal["never_run", "executed", "failed", "timeout"]
     last_error: str | None

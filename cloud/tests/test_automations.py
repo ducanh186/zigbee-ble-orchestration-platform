@@ -83,13 +83,10 @@ async def test_create_automation_persists_pending_rule(
     assert data["sync_status"] == "pending"
     assert data["last_run_status"] == "never_run"
     assert data["last_error"] is None
-    assert fake_mqtt.published[-1]["topic"].endswith(
-        f"/desired/automation/{data['id']}"
-    )
-    assert fake_mqtt.published[-1]["retain"] is True
-    assert fake_mqtt.published[-1]["payload"]["payload"]["id"] == data["id"]
-    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 1
-    assert fake_mqtt.published[-1]["payload"]["payload"]["deleted"] is False
+    pub = _auto_pubs(fake_mqtt)[-1]
+    assert pub["automation_id"] == data["id"]
+    assert pub["op"] == "upsert"
+    assert pub["version"] == 1
 
 
 @pytest.mark.asyncio
@@ -125,8 +122,9 @@ async def test_enable_disable_automation_marks_sync_pending(
     assert disable_response.json()["enabled"] is False
     assert disable_response.json()["version"] == 3
     assert disable_response.json()["sync_status"] == "pending"
-    assert fake_mqtt.published[-1]["payload"]["payload"]["enabled"] is False
-    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 3
+    pub = _auto_pubs(fake_mqtt)[-1]
+    assert pub["enabled"] is False
+    assert pub["version"] == 3
 
 
 @pytest.mark.asyncio
@@ -164,15 +162,14 @@ async def test_update_automation_bumps_version_and_rejects_stale_version(
     assert update_response.status_code == 200
     assert update_response.json()["version"] == 2
     assert update_response.json()["actions"][0]["command"] == "off"
-    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 2
-    assert fake_mqtt.published[-1]["payload"]["payload"]["trigger"]["state"] == {
-        "occupancy": "unoccupied"
-    }
+    pub = _auto_pubs(fake_mqtt)[-1]
+    assert pub["version"] == 2
+    assert pub["trigger"]["state"] == {"occupancy": "unoccupied"}
     assert stale_response.status_code == 409
 
 
 @pytest.mark.asyncio
-async def test_delete_automation_publishes_tombstone_and_removes_rule(
+async def test_delete_automation_publishes_tombstone_and_marks_pending(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
@@ -181,14 +178,15 @@ async def test_delete_automation_publishes_tombstone_and_removes_rule(
     delete_response = await client.delete(f"/api/automations/{created['id']}")
     detail_response = await client.get(f"/api/automations/{created['id']}")
 
-    assert delete_response.status_code == 204
-    assert detail_response.status_code == 404
-    assert fake_mqtt.published[-1]["topic"].endswith(
-        f"/desired/automation/{created['id']}"
-    )
-    assert fake_mqtt.published[-1]["payload"]["payload"]["id"] == created["id"]
-    assert fake_mqtt.published[-1]["payload"]["payload"]["version"] == 2
-    assert fake_mqtt.published[-1]["payload"]["payload"]["deleted"] is True
+    assert delete_response.status_code == 200
+    deleted = delete_response.json()
+    assert deleted["sync_status"] == "pending"
+    assert deleted["version"] == 2
+    assert detail_response.status_code == 200
+    pub = _auto_pubs(fake_mqtt)[-1]
+    assert pub["automation_id"] == created["id"]
+    assert pub["op"] == "delete"
+    assert pub["version"] == 2
 
 
 @pytest.mark.asyncio
@@ -327,7 +325,7 @@ async def test_update_normalizes_legacy_toggle_event(
 
 
 @pytest.mark.asyncio
-async def test_rejects_unsupported_motion_action_template(client, db_session_factory):
+async def test_accepts_manual_motion_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
@@ -336,8 +334,32 @@ async def test_rejects_unsupported_motion_action_template(client, db_session_fac
 
     response = await client.post("/api/automations", json=body)
 
-    assert response.status_code == 422
-    assert "occupied" in response.json()["detail"]
+    assert response.status_code == 201
+    assert response.json()["actions"][0]["command"] == "off"
+
+
+@pytest.mark.asyncio
+async def test_accepts_manual_switch_light_action_choice(client, db_session_factory):
+    await _seed_automation_devices(db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json={
+            "name": "Switch turns on lights",
+            "enabled": True,
+            "trigger": {
+                "device_id": "switch-01",
+                "device_type": "switch",
+                "event": "switch_toggle",
+            },
+            "actions": [
+                {"device_id": "light-01", "device_type": "light", "command": "on"}
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["actions"][0]["command"] == "on"
 
 
 @pytest.mark.asyncio

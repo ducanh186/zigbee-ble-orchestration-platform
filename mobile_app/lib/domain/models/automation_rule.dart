@@ -236,23 +236,62 @@ class AutomationRuleDraft {
   const AutomationRuleDraft({
     required this.name,
     required this.enabled,
-    required this.template,
     required this.triggerDeviceId,
+    AutomationDeviceType? triggerDeviceType,
+    AutomationTriggerEvent? triggerEvent,
+    Map<String, Object?> triggerState = const {},
+    AutomationActionCommand? actionCommand,
     required this.targetLightIds,
-  });
+    this.targetActionCommands = const {},
+    this.template,
+  }) : _triggerDeviceType = triggerDeviceType,
+       _triggerEvent = triggerEvent,
+       _triggerState = triggerState,
+       _actionCommand = actionCommand;
 
   final String name;
   final bool enabled;
-  final AutomationRuleTemplate template;
+  final AutomationRuleTemplate? template;
   final String triggerDeviceId;
   final List<String> targetLightIds;
+  final Map<String, AutomationActionCommand> targetActionCommands;
+  final AutomationDeviceType? _triggerDeviceType;
+  final AutomationTriggerEvent? _triggerEvent;
+  final Map<String, Object?> _triggerState;
+  final AutomationActionCommand? _actionCommand;
+
+  AutomationDeviceType get triggerDeviceType {
+    return _triggerDeviceType ?? _templateOrThrow.triggerDeviceType;
+  }
+
+  AutomationTriggerEvent get triggerEvent {
+    return _triggerEvent ?? _templateOrThrow.triggerEvent;
+  }
+
+  Map<String, Object?> get triggerState {
+    return _triggerEvent == null && _triggerState.isEmpty
+        ? _templateOrThrow.triggerState
+        : _triggerState;
+  }
+
+  AutomationActionCommand get actionCommand {
+    return _actionCommand ?? _templateOrThrow.actionCommand;
+  }
+
+  AutomationRuleTemplate get _templateOrThrow {
+    final selectedTemplate = template;
+    if (selectedTemplate == null) {
+      throw StateError('AutomationRuleDraft needs explicit fields or template');
+    }
+    return selectedTemplate;
+  }
 
   AutomationTrigger get trigger {
     return AutomationTrigger(
       deviceId: triggerDeviceId,
-      deviceType: template.triggerDeviceType,
-      event: template.triggerEvent,
-      state: template.triggerState,
+      deviceType: triggerDeviceType,
+      event: triggerEvent,
+      state: triggerState,
     );
   }
 
@@ -262,7 +301,7 @@ class AutomationRuleDraft {
           (deviceId) => AutomationAction(
             deviceId: deviceId,
             deviceType: AutomationDeviceType.light,
-            command: template.actionCommand,
+            command: targetActionCommands[deviceId] ?? actionCommand,
           ),
         )
         .toList(growable: false);

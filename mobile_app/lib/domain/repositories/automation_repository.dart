@@ -10,4 +10,6 @@ abstract class AutomationRepository {
   Future<AutomationRule> enableRule(String ruleId);
 
   Future<AutomationRule> disableRule(String ruleId);
+
+  Future<void> deleteRule(String ruleId);
 }
