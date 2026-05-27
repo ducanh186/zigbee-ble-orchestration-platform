@@ -12,12 +12,13 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 
-from cloud.app.models import Command
+from cloud.app.models import Command, ProvisioningSession
 from cloud.app.schemas import TERMINAL_STATUSES
 
 logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL_SEC = 1.0
+PROVISIONING_TERMINAL_STATUSES = {"joined", "failed", "expired", "cancelled"}
 
 
 async def sweep_once(session_factory) -> int:
@@ -34,10 +35,21 @@ async def sweep_once(session_factory) -> int:
         if not expired:
             return 0
         ids = [c.id for c in expired]
+        reason = "cloud-side timeout expired"
         await session.execute(
             update(Command)
             .where(Command.id.in_(ids))
-            .values(status="timeout", reason="cloud-side timeout expired")
+            .values(status="timeout", reason=reason)
+        )
+        await session.execute(
+            update(ProvisioningSession)
+            .where(
+                ProvisioningSession.command_id.in_(ids),
+                ProvisioningSession.status.notin_(
+                    list(PROVISIONING_TERMINAL_STATUSES)
+                ),
+            )
+            .values(status="failed", reason=reason)
         )
         await session.commit()
         for c in expired:

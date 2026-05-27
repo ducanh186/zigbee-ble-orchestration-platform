@@ -15,6 +15,8 @@ from cloud.app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+PROVISIONING_TERMINAL_STATUSES = {"joined", "failed", "expired", "cancelled"}
+
 
 def _now_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000)
@@ -277,7 +279,12 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Command, Device, DeviceState
+            from cloud.app.models import (
+                Command,
+                Device,
+                DeviceState,
+                ProvisioningSession,
+            )
             from sqlalchemy import select, update
 
             async with self._db_session_factory() as session:
@@ -309,6 +316,23 @@ class MQTTService:
                 logger.info(
                     "Updated command %s status=%s", command_id, new_status
                 )
+
+                prov_result = await session.execute(
+                    select(ProvisioningSession).where(
+                        ProvisioningSession.command_id == command_id,
+                        ProvisioningSession.status.notin_(
+                            list(PROVISIONING_TERMINAL_STATUSES)
+                        ),
+                    )
+                )
+                prov = prov_result.scalar_one_or_none()
+                if prov is not None and new_status in TERMINAL_STATUSES:
+                    if new_status == "executed":
+                        prov.status = "permit_open"
+                        prov.reason = None
+                    else:
+                        prov.status = "failed"
+                        prov.reason = inner.get("reason") or new_status
 
                 # When a light command is executed, infer the new device state
                 # so the dashboard can show updated status immediately.
