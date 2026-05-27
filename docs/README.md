@@ -7,6 +7,7 @@ For the operational runbook see [`instruct.md`](./instruct.md).
 ## Contracts (frozen, do not break)
 
 - [`MQTT_CONTRACT.md`](./MQTT_CONTRACT.md) — topic namespace, envelope, per-device-type payloads.
+- [`PROVISIONING_CONTRACT.md`](./PROVISIONING_CONTRACT.md) — secure install-code join flow across Mobile App, Cloud, and Gateway.
 - [`AUTOMATION_MQTT_CONTRACT.md`](./AUTOMATION_MQTT_CONTRACT.md) — automation rule desired / reported / event channels (extends `MQTT_CONTRACT.md`).
 - [`OTA_CAMPAIGN_CONTRACT.md`](./OTA_CAMPAIGN_CONTRACT.md) — OTA rollout metadata flow.
 - [`DEVICE_CAPABILITY_MATRIX.md`](./DEVICE_CAPABILITY_MATRIX.md) — per-`device_type` capabilities (v1 freeze).

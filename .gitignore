@@ -1,6 +1,8 @@
 **/*.md
 !**/README.md
 !docs/automation-e2e-*.md
+docs/automation-e2e-plan.md
+docs/automation-e2e-report-*.md
 CLAUDE.md
 .claude/
 .codex/

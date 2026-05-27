@@ -52,6 +52,11 @@ Xem kèm:
 | `commands/{command_id}/request` | `sb_command_handle_request()` | Cloud ra một lệnh rời rạc (có `command_id`, `correlation_id`) |
 | `devices/{type}/{id}/desired` | `device_dispatch_desired()` | Cloud muốn trạng thái mong muốn cho device |
 
+> Op `gateway.prepare_join` (trong `commands/.../request`): stage install code cho
+> một `eui64` rồi mở permit-join, phục vụ secure provisioning. Gateway publish
+> `gateway/event provisioning_joined|provisioning_failed` khi xong. Chi tiết:
+> [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md).
+
 ### Z3Gateway C → MQTT (uplink — publish lên broker)
 
 | Nguồn bên trong | MQTT topic | Ý nghĩa |
@@ -65,7 +70,17 @@ Xem kèm:
 OTA và registry/health/log vẫn tồn tại trong topic tree, nhưng **không**
 thuộc Phase 0 freeze. Z3Gateway v1 **không bắt buộc** hỗ trợ:
 `registry`, `gateway_health`, `gateway_log`, `ota_progress`, `ota_event`,
-`ota_manifest`, `ota_desired`.
+`ota_manifest`, `ota_desired`, hoặc `ota_cancel`.
+
+Với OTA, các tên task như `ota.start`, `ota.cancel`, `ota.progress`,
+`ota.complete` là operation/event vocabulary ở API/log/test. Chúng không thay
+thế topic contract `ota/campaigns/{id}/manifest`,
+`ota/devices/{id}/desired`, `ota/devices/{id}/cancel`,
+`ota/devices/{id}/progress`, và `ota/devices/{id}/event`.
+
+Không được đánh dấu OTA là end-to-end ready nếu `gateway/Z3GatewayHost/app/`
+chưa có runtime tải artifact, verify `sha256`/`size_bytes`, lưu `SB_OTA_DIR`,
+offer qua native Zigbee OTA, publish progress/event, cancel, và rollback.
 
 ---
 
