@@ -472,3 +472,137 @@ async def test_prepare_join_reply_failure_marks_session_failed(
 
     assert session.status == "failed"
     assert session.reason == "join failed"
+
+
+@pytest.mark.asyncio
+async def test_gateway_provisioning_joined_marks_session_and_creates_device(
+    db_session_factory,
+):
+    import asyncio
+
+    from sqlalchemy import select
+
+    from cloud.app.models import Device, Event, Home, ProvisioningSession, Room
+    from cloud.app.mqtt_client import MQTTService
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id="room-1", home_id="home-1", name="R"))
+        s.add(
+            ProvisioningSession(
+                id="prov-join",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                model="EFR32MG12_LIGHT_KIT",
+                status="permit_open",
+            )
+        )
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+    service._handle_gateway_event(
+        {
+            "schema": "sb.v1",
+            "msg_id": "prov-joined-1",
+            "ts": 1776064500000,
+            "tenant_id": "hust",
+            "site_id": "lab01",
+            "gateway_id": settings.gateway_id,
+            "source": "gateway",
+            "payload": {
+                "event": "provisioning_joined",
+                "eui64": VALID_EUI64,
+                "device_type": "light",
+                "nwk_addr": "0x4F2A",
+            },
+        }
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as s:
+        session = await s.get(ProvisioningSession, "prov-join")
+        device = await s.get(Device, VALID_EUI64)
+        events = (
+            await s.execute(
+                select(Event).where(Event.event_type == "provisioning_joined")
+            )
+        ).scalars().all()
+
+    assert session.status == "joined"
+    assert session.install_code == ""
+    assert session.reason is None
+    assert device is not None
+    assert device.id == VALID_EUI64
+    assert device.eui64 == VALID_EUI64
+    assert device.device_type == "light"
+    assert device.room_id == "room-1"
+    assert device.is_online is True
+    assert len(events) == 1
+
+
+@pytest.mark.asyncio
+async def test_gateway_provisioning_failed_marks_active_session_failed(
+    db_session_factory,
+):
+    import asyncio
+
+    from cloud.app.models import Home, ProvisioningSession, Room
+    from cloud.app.mqtt_client import MQTTService
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id="room-1", home_id="home-1", name="R"))
+        s.add(
+            ProvisioningSession(
+                id="prov-fail",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="permit_open",
+            )
+        )
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+    service._handle_gateway_event(
+        {
+            "schema": "sb.v1",
+            "msg_id": "prov-failed-1",
+            "ts": 1776064500000,
+            "tenant_id": "hust",
+            "site_id": "lab01",
+            "gateway_id": settings.gateway_id,
+            "source": "gateway",
+            "payload": {
+                "event": "provisioning_failed",
+                "eui64": VALID_EUI64,
+                "reason": "install code rejected",
+            },
+        }
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as s:
+        session = await s.get(ProvisioningSession, "prov-fail")
+
+    assert session.status == "failed"
+    assert session.reason == "install code rejected"
