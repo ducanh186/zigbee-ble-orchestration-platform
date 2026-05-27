@@ -10,19 +10,153 @@ import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
 import 'package:zigbee_smart_building/ui/features/provisioning/views/provisioning_view.dart';
 
 void main() {
-  testWidgets('renders wizard shell with start disabled until device payload exists', (
+  const validQrJson =
+      '{"version":1,"eui64":"A8D417FEFF570B00","install_code":"83FED3407A939723A5C639B26916D505C3B5","device_type":"light","model":"EFR32MG12_LIGHT_KIT"}';
+
+  testWidgets(
+    'renders wizard shell with start disabled until device payload exists',
+    (tester) async {
+      await tester.pumpWidget(_wrap(const ProvisioningView()));
+
+      expect(find.text('Gateway ID'), findsOneWidget);
+      expect(find.text('Room ID'), findsOneWidget);
+      expect(find.text('Device identity required'), findsOneWidget);
+
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const Key('provisioning-start-button')),
+      );
+      final startButton = tester.widget<FilledButton>(
+        find.byKey(const Key('provisioning-start-button')),
+      );
+      expect(startButton.onPressed, isNull);
+    },
+  );
+
+  testWidgets('manual QR JSON populates identity and enables start', (
     tester,
   ) async {
-    await tester.pumpWidget(_wrap(const ProvisioningView()));
+    final repository = _FakeProvisioningRepository();
 
-    expect(find.text('Gateway ID'), findsOneWidget);
-    expect(find.text('Room ID'), findsOneWidget);
+    await tester.pumpWidget(
+      _wrap(
+        const ProvisioningView(pollInterval: Duration.zero),
+        repository: repository,
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('provisioning-manual-qr-field')),
+      validQrJson,
+    );
+    await tester.tap(find.byKey(const Key('provisioning-apply-manual-button')));
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(tester, find.text('A8D417FEFF570B00'));
+    expect(find.text('A8D417FEFF570B00'), findsOneWidget);
+    expect(find.text('EFR32MG12_LIGHT_KIT'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-room-field')),
+      delta: -240,
+    );
+    await tester.enterText(
+      find.byKey(const Key('provisioning-room-field')),
+      'lab',
+    );
+    await tester.pump();
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-start-button')),
+    );
+    await tester.tap(find.byKey(const Key('provisioning-start-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.createCount, 1);
+    expect(repository.createdPayload?.eui64, 'A8D417FEFF570B00');
+    await _scrollUntilVisible(tester, find.text('JOINED'), delta: -240);
+    expect(find.text('JOINED'), findsOneWidget);
+  });
+
+  testWidgets(
+    'invalid manual QR JSON keeps start disabled and does not call Cloud',
+    (tester) async {
+      final repository = _FakeProvisioningRepository();
+
+      await tester.pumpWidget(
+        _wrap(
+          const ProvisioningView(pollInterval: Duration.zero),
+          repository: repository,
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('provisioning-manual-qr-field')),
+        '{"version":1,"eui64":"bad"}',
+      );
+      await tester.tap(
+        find.byKey(const Key('provisioning-apply-manual-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('eui64 must be 16 hex characters'),
+        findsOneWidget,
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.byKey(const Key('provisioning-start-button')),
+      );
+      final startButton = tester.widget<FilledButton>(
+        find.byKey(const Key('provisioning-start-button')),
+      );
+      expect(startButton.onPressed, isNull);
+      expect(repository.createCount, 0);
+    },
+  );
+
+  testWidgets('scan QR populates identity and clear removes it before start', (
+    tester,
+  ) async {
+    final repository = _FakeProvisioningRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        ProvisioningView(
+          pollInterval: Duration.zero,
+          qrScanLauncher: (_) async => validQrJson,
+        ),
+        repository: repository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('provisioning-scan-button')));
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(tester, find.text('A8D417FEFF570B00'));
+    expect(find.text('A8D417FEFF570B00'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-clear-payload-button')),
+      delta: -240,
+    );
+    await tester.tap(
+      find.byKey(const Key('provisioning-clear-payload-button')),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Device identity required'), findsOneWidget);
-
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-start-button')),
+    );
     final startButton = tester.widget<FilledButton>(
       find.byKey(const Key('provisioning-start-button')),
     );
     expect(startButton.onPressed, isNull);
+    expect(repository.createCount, 0);
   });
 
   testWidgets('starts provisioning and displays polled terminal status', (
@@ -41,10 +175,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ProvisioningView(
-          initialPayload: payload,
-          pollInterval: Duration.zero,
-        ),
+        ProvisioningView(initialPayload: payload, pollInterval: Duration.zero),
         repository: repository,
       ),
     );
@@ -54,12 +185,17 @@ void main() {
       'lab',
     );
     await tester.pump();
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-start-button')),
+    );
     await tester.tap(find.byKey(const Key('provisioning-start-button')));
     await tester.pumpAndSettle();
 
     expect(repository.createdGatewayId, 'gw-ubuntu-01');
     expect(repository.createdRoomId, 'lab');
     expect(repository.createdPayload, payload);
+    await _scrollUntilVisible(tester, find.text('JOINED'), delta: -240);
     expect(find.text('JOINED'), findsOneWidget);
     expect(find.text('EFR32MG12_LIGHT_KIT'), findsOneWidget);
   });
@@ -79,10 +215,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ProvisioningView(
-          initialPayload: payload,
-          pollInterval: Duration.zero,
-        ),
+        ProvisioningView(initialPayload: payload, pollInterval: Duration.zero),
         repository: repository,
       ),
     );
@@ -92,22 +225,26 @@ void main() {
       'lab',
     );
     await tester.pump();
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-start-button')),
+    );
     await tester.tap(find.byKey(const Key('provisioning-start-button')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('provisioning-cancel-button')));
+    await tester.ensureVisible(
+      find.byKey(const Key('provisioning-cancel-button')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('provisioning-cancel-button')));
     await tester.pumpAndSettle();
 
     expect(repository.cancelledSessionId, 'session-01');
+    await _scrollUntilVisible(tester, find.text('CANCELLED'), delta: -240);
     expect(find.text('CANCELLED'), findsOneWidget);
   });
 }
 
-Widget _wrap(
-  Widget child, {
-  ProvisioningRepository? repository,
-}) {
+Widget _wrap(Widget child, {ProvisioningRepository? repository}) {
   return Provider<ProvisioningRepository>.value(
     value: repository ?? _FakeProvisioningRepository(),
     child: MaterialApp(
@@ -115,6 +252,19 @@ Widget _wrap(
       home: Scaffold(body: child),
     ),
   );
+}
+
+Future<void> _scrollUntilVisible(
+  WidgetTester tester,
+  Finder finder, {
+  double delta = 240,
+}) async {
+  await tester.scrollUntilVisible(
+    finder,
+    delta,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
 }
 
 class _FakeProvisioningRepository implements ProvisioningRepository {
@@ -131,6 +281,7 @@ class _FakeProvisioningRepository implements ProvisioningRepository {
   String? createdRoomId;
   ProvisioningQrPayload? createdPayload;
   String? cancelledSessionId;
+  int createCount = 0;
 
   @override
   Future<ProvisioningSession> createSession({
@@ -138,6 +289,7 @@ class _FakeProvisioningRepository implements ProvisioningRepository {
     required String roomId,
     required ProvisioningQrPayload payload,
   }) async {
+    createCount += 1;
     createdGatewayId = gatewayId;
     createdRoomId = roomId;
     createdPayload = payload;

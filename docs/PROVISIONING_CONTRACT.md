@@ -69,6 +69,11 @@ App validate **local** trước khi gửi: parse được JSON, `version` hỗ t
 `eui64` đúng hex/độ dài, `install_code` đúng hex, `device_type` hợp lệ. App
 **không** kiểm CRC install code (để Cloud/Gateway lo) nhưng có thể check độ dài.
 
+SCRUM-77 chỉ dùng QR/manual input như kênh out-of-band. BLE/Zigbee Direct không
+nằm trong request/response của contract này; nếu làm BLE provisioning thì tách
+thành sprint riêng vì cần BLE GATT services, secure session và commissioning
+flow riêng.
+
 ---
 
 ## 4. REST contract (App ↔ Cloud)
