@@ -5,12 +5,15 @@ import 'package:provider/provider.dart';
 import 'app_runtime_config.dart';
 import 'data/repositories/mock_automation_repository.dart';
 import 'data/repositories/mock_device_repository.dart';
+import 'data/repositories/mock_provisioning_repository.dart';
 import 'data/repositories/remote_auth_repository.dart';
 import 'data/repositories/remote_automation_repository.dart';
 import 'data/repositories/remote_device_repository.dart';
+import 'data/repositories/remote_provisioning_repository.dart';
 import 'data/services/api_client.dart';
 import 'domain/repositories/automation_repository.dart';
 import 'domain/repositories/device_repository.dart';
+import 'domain/repositories/provisioning_repository.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/core/localization/locale_controller.dart';
 import 'ui/core/theme/app_theme.dart';
@@ -37,6 +40,9 @@ void main() {
   final AutomationRepository automationRepository = _useMockApi
       ? MockAutomationRepository()
       : RemoteAutomationRepository(apiClient: apiClient);
+  final ProvisioningRepository provisioningRepository = _useMockApi
+      ? MockProvisioningRepository()
+      : RemoteProvisioningRepository(apiClient: apiClient);
   final authViewModel = AuthViewModel(
     repository: RemoteAuthRepository(apiClient: apiClient),
   );
@@ -45,6 +51,7 @@ void main() {
     ZigbeeSmartBuildingApp(
       repository: repository,
       automationRepository: automationRepository,
+      provisioningRepository: provisioningRepository,
       apiBaseUrl: _apiBaseUrl,
       useMockApi: _useMockApi,
       authViewModelOverride: authViewModel,
@@ -59,6 +66,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
     required this.automationRepository,
     required this.apiBaseUrl,
     required this.useMockApi,
+    this.provisioningRepository,
     this.authViewModelOverride,
     this.hideLogin = false,
     super.key,
@@ -66,6 +74,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
 
   final DeviceRepository repository;
   final AutomationRepository automationRepository;
+  final ProvisioningRepository? provisioningRepository;
   final String apiBaseUrl;
   final bool useMockApi;
 
@@ -93,6 +102,15 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) =>
               AutomationViewModel(repository: automationRepository)..load(),
+        ),
+        Provider<ProvisioningRepository>(
+          create: (_) =>
+              provisioningRepository ??
+              (useMockApi
+                  ? MockProvisioningRepository()
+                  : RemoteProvisioningRepository(
+                      apiClient: ApiClient(baseUrl: apiBaseUrl),
+                    )),
         ),
         ChangeNotifierProvider<AuthViewModel>.value(
           value: authViewModelOverride ?? _fallbackAuthViewModel(),
