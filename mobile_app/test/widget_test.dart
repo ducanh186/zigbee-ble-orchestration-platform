@@ -180,7 +180,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Provisioning'), findsWidgets);
-    expect(find.text('Provisioning placeholder'), findsOneWidget);
+    expect(find.text('PROVISIONING WIZARD'), findsOneWidget);
+    expect(find.text('Device identity required'), findsOneWidget);
   });
 
   testWidgets('automation create sheet saves a manual rule without template', (

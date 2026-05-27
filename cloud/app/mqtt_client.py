@@ -15,6 +15,8 @@ from cloud.app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+PROVISIONING_TERMINAL_STATUSES = {"joined", "failed", "expired", "cancelled"}
+
 
 def _now_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000)
@@ -292,7 +294,12 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Command, Device, DeviceState
+            from cloud.app.models import (
+                Command,
+                Device,
+                DeviceState,
+                ProvisioningSession,
+            )
             from sqlalchemy import select, update
 
             async with self._db_session_factory() as session:
@@ -324,6 +331,23 @@ class MQTTService:
                 logger.info(
                     "Updated command %s status=%s", command_id, new_status
                 )
+
+                prov_result = await session.execute(
+                    select(ProvisioningSession).where(
+                        ProvisioningSession.command_id == command_id,
+                        ProvisioningSession.status.notin_(
+                            list(PROVISIONING_TERMINAL_STATUSES)
+                        ),
+                    )
+                )
+                prov = prov_result.scalar_one_or_none()
+                if prov is not None and new_status in TERMINAL_STATUSES:
+                    if new_status == "executed":
+                        prov.status = "permit_open"
+                        prov.reason = None
+                    else:
+                        prov.status = "failed"
+                        prov.reason = inner.get("reason") or new_status
 
                 # When a light command is executed, infer the new device state
                 # so the dashboard can show updated status immediately.
@@ -605,7 +629,13 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Automation, Event
+            from cloud.app.models import (
+                Automation,
+                Device,
+                Event,
+                ProvisioningSession,
+            )
+            from sqlalchemy import select
 
             payload = dict(inner)
             payload["gateway_id"] = envelope.get("gateway_id")
@@ -621,6 +651,52 @@ class MQTTService:
                         occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                     )
                 )
+
+                if event in ("provisioning_joined", "provisioning_failed"):
+                    eui64 = payload.get("eui64")
+                    gateway_id = envelope.get("gateway_id")
+                    if isinstance(eui64, str) and isinstance(gateway_id, str):
+                        prov_result = await session.execute(
+                            select(ProvisioningSession)
+                            .where(
+                                ProvisioningSession.eui64 == eui64,
+                                ProvisioningSession.gateway_id == gateway_id,
+                                ProvisioningSession.status.notin_(
+                                    list(PROVISIONING_TERMINAL_STATUSES)
+                                ),
+                            )
+                            .order_by(ProvisioningSession.created_at.desc())
+                            .limit(1)
+                        )
+                        prov = prov_result.scalar_one_or_none()
+                        if prov is not None:
+                            if event == "provisioning_joined":
+                                device = await session.get(Device, eui64)
+                                if device is None:
+                                    device = Device(
+                                        id=eui64,
+                                        device_type=payload.get(
+                                            "device_type", prov.device_type
+                                        ),
+                                        eui64=eui64,
+                                        room_id=prov.room_id,
+                                        name=prov.model or eui64,
+                                        is_online=True,
+                                    )
+                                    session.add(device)
+                                else:
+                                    device.device_type = payload.get(
+                                        "device_type", device.device_type
+                                    )
+                                    device.eui64 = eui64
+                                    device.room_id = prov.room_id
+                                    device.is_online = True
+                                prov.status = "joined"
+                                prov.reason = None
+                                prov.install_code = ""
+                            else:
+                                prov.status = "failed"
+                                prov.reason = payload.get("reason") or "failed"
 
                 if isinstance(rule_id, str) and rule_id:
                     rule = await session.get(Automation, rule_id)
