@@ -171,3 +171,31 @@ class Automation(Base):
             "created_at",
         ),
     )
+
+class ProvisioningSession(Base):
+    """Secure install-code join session tracked by the cloud API."""
+
+    __tablename__ = "provisioning_sessions"
+
+    id = Column(String, primary_key=True)
+    gateway_id = Column(String, nullable=False)
+    room_id = Column(String, ForeignKey("rooms.id"), nullable=False)
+    eui64 = Column(String, nullable=False)
+    install_code = Column(String, nullable=False)
+    device_type = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", server_default="pending")
+    reason = Column(String, nullable=True)
+    command_id = Column(String, ForeignKey("commands.id"), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_provisioning_sessions_eui64_status", "eui64", "status"),
+        Index(
+            "ix_provisioning_sessions_gateway_created",
+            "gateway_id",
+            "created_at",
+        ),
+    )
