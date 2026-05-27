@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from cloud.app.config import settings
 from cloud.app.schemas import (
     ProvisioningDevicePayload,
     ProvisioningErrorCode,
@@ -170,3 +171,165 @@ async def test_session_out_maps_from_orm(db_session_factory):
     dumped = out.model_dump()
     assert "install_code" not in dumped
     assert dumped["session_id"] == "prov-9"
+
+
+# --- REST API (SCRUM-71) -----------------------------------------------------
+
+async def _seed_room(db_session_factory, room_id: str = "room-1"):
+    from cloud.app.models import Home, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id=room_id, home_id="home-1", name="R"))
+        await s.commit()
+
+
+def _create_body(**overrides):
+    body = {
+        "gateway_id": settings.gateway_id,
+        "room_id": "room-1",
+        "device": {
+            "eui64": VALID_EUI64,
+            "install_code": VALID_INSTALL_CODE,
+            "device_type": "light",
+            "model": "EFR32MG12_LIGHT_KIT",
+        },
+    }
+    body.update(overrides)
+    return body
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_api_persists_and_hides_install_code(
+    client, db_session_factory, fake_mqtt
+):
+    from sqlalchemy import select
+
+    from cloud.app.models import ProvisioningSession
+
+    await _seed_room(db_session_factory)
+
+    r = await client.post("/api/provisioning/sessions", json=_create_body())
+
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["session_id"]
+    assert data["status"] == "pending"
+    assert data["gateway_id"] == settings.gateway_id
+    assert data["room_id"] == "room-1"
+    assert data["eui64"] == VALID_EUI64
+    assert data["device_type"] == "light"
+    assert data["model"] == "EFR32MG12_LIGHT_KIT"
+    assert data["expires_at"] is not None
+    assert "install_code" not in data
+    assert fake_mqtt.published == []
+
+    async with db_session_factory() as s:
+        row = (
+            await s.execute(
+                select(ProvisioningSession).where(
+                    ProvisioningSession.id == data["session_id"]
+                )
+            )
+        ).scalar_one()
+        assert row.install_code == VALID_INSTALL_CODE
+        assert row.status == "pending"
+        assert row.command_id is None
+
+
+@pytest.mark.asyncio
+async def test_get_provisioning_session_api(client, db_session_factory):
+    await _seed_room(db_session_factory)
+    created = (
+        await client.post("/api/provisioning/sessions", json=_create_body())
+    ).json()
+
+    r = await client.get(f"/api/provisioning/sessions/{created['session_id']}")
+
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["session_id"] == created["session_id"]
+    assert data["status"] == "pending"
+    assert "install_code" not in data
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_unknown_gateway_404(client, fake_mqtt):
+    r = await client.post(
+        "/api/provisioning/sessions",
+        json=_create_body(gateway_id="unknown-gateway"),
+    )
+
+    assert r.status_code == 404
+    assert r.json()["detail"]["error_code"] == ProvisioningErrorCode.GATEWAY_NOT_FOUND
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_unknown_room_404(client, fake_mqtt):
+    r = await client.post("/api/provisioning/sessions", json=_create_body())
+
+    assert r.status_code == 404
+    assert r.json()["detail"]["error_code"] == ProvisioningErrorCode.ROOM_NOT_FOUND
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_duplicate_active_409(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    first = await client.post("/api/provisioning/sessions", json=_create_body())
+    assert first.status_code == 201, first.text
+
+    second = await client.post("/api/provisioning/sessions", json=_create_body())
+
+    assert second.status_code == 409
+    assert (
+        second.json()["detail"]["error_code"]
+        == ProvisioningErrorCode.SESSION_ALREADY_ACTIVE
+    )
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
+async def test_delete_provisioning_session_cancels_non_terminal(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    created = (
+        await client.post("/api/provisioning/sessions", json=_create_body())
+    ).json()
+
+    r = await client.delete(f"/api/provisioning/sessions/{created['session_id']}")
+
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
+async def test_delete_provisioning_session_rejects_terminal(
+    client, db_session_factory
+):
+    from cloud.app.models import Home, ProvisioningSession, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id="room-1", home_id="home-1", name="R"))
+        s.add(
+            ProvisioningSession(
+                id="prov-joined",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="joined",
+            )
+        )
+        await s.commit()
+
+    r = await client.delete("/api/provisioning/sessions/prov-joined")
+
+    assert r.status_code == 409
