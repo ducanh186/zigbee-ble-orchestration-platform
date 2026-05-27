@@ -9,6 +9,7 @@
 // (see device_discovery.c).  TC-join itself does not write here directly.
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "app/framework/include/af.h"
 
@@ -42,6 +43,13 @@ bool deviceRegistryUpdateNodeId(const char *eui64Str, EmberNodeId nodeId);
 // Check if a nodeId is already registered (under any EUI64).
 // Returns true and fills out->device_type if found.
 bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out);
+
+// Reverse-resolve a Zigbee short address to its EUI64 (big-endian hex string).
+// Used as a fallback when emberLookupEui64ByNodeId() returns failure (the NCP
+// address table can be empty for a node that the gateway already classified
+// via ZDO discovery). Returns true on hit; `out` is NUL-terminated 16-hex EUI.
+// `outLen` must be >= 17.
+bool deviceRegistryGetEuiBeStrByNodeId(EmberNodeId nodeId, char *out, size_t outLen);
 
 // Number of populated slots.
 uint32_t deviceRegistryCount(void);

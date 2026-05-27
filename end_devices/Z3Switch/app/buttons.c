@@ -64,9 +64,17 @@ void buttonsTick(void)
     }
 
     if (bindCount == 0) {
+#if SWITCH_AUTO_FIND_BIND
       emberAfCorePrintln("BTN: PB1 -> NO BINDINGS! Press PB1 on Light, then run find-bind");
-      // Auto-trigger find-and-bind since no binding exists
       netMgrStartFindBind();
+#else
+      // Auto find-bind disabled. In normal operation Find-and-Bind during
+      // commissioning leaves the switch -> gateway binding in NVM3; switch
+      // presses reach the gateway and cloud automation rule fires the light.
+      // If the binding table is empty, the user must re-commission with
+      // SWITCH_AUTO_FIND_BIND=1 (see app_config.h).
+      emberAfCorePrintln("BTN: PB1 -> no bindings; rebuild with SWITCH_AUTO_FIND_BIND=1 to commission");
+#endif
       return;
     }
 

@@ -6,6 +6,7 @@
 #include "device_registry.h"
 #include "device_discovery.h"
 #include "rule_engine.h"
+#include "automation_rule.h"
 #include "app/framework/include/af.h"
 #include "app_zcl_fallback.h"
 
@@ -139,6 +140,102 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
     return false;
   }
 
+  // --- Occupancy Sensing Cluster (0x0406) — Phase 3 ---
+  // PIR motion sensors report attribute 0x0000 (Occupancy) as a bitmap8,
+  // where bit 0 = occupied. We emit a contract-compliant
+  // `occupancy_changed` event when the value transitions, then feed the
+  // change into the cloud-pushed automation rule table.
+  //
+  // Per-device de-dup is kept simple: a small static `last_occupancy_by_node`
+  // array tracks the last value we saw per sender nodeId so unchanged
+  // re-reports don't spam events. This is not a full state machine — just
+  // enough to avoid duplicate trigger firings on every periodic report.
+  if (clusterId == ZCL_OCCUPANCY_SENSING_CLUSTER_ID) {
+    #define MOTION_DEDUP_MAX 4
+    static struct {
+      EmberNodeId nodeId;
+      bool        valid;
+      bool        occupied;
+    } s_motionDedup[MOTION_DEDUP_MAX];
+
+    while (i + 3 <= bufLen) {
+      uint16_t attrId = u16le(&buffer[i]);
+      uint8_t type = buffer[i + 2];
+      i += 3;
+
+      // Attribute 0x0000 = Occupancy, bitmap8 (0x18).
+      if (attrId == 0x0000 && type == ZCL_BITMAP8_ATTRIBUTE_TYPE) {
+        if (i + 1 > bufLen) break;
+        uint8_t bits = buffer[i];
+        i += 1;
+        bool occupied = (bits & 0x01) != 0;
+
+        EmberNodeId sender = emberGetSender();
+
+        // Dedup against last value for this node.
+        int slot = -1;
+        int firstFree = -1;
+        for (int s = 0; s < MOTION_DEDUP_MAX; s++) {
+          if (s_motionDedup[s].valid && s_motionDedup[s].nodeId == sender) {
+            slot = s; break;
+          }
+          if (firstFree < 0 && !s_motionDedup[s].valid) firstFree = s;
+        }
+        bool changed = true;
+        if (slot >= 0) {
+          changed = (s_motionDedup[slot].occupied != occupied);
+        } else if (firstFree >= 0) {
+          slot = firstFree;
+        } else {
+          // table full; treat as changed (best-effort, no eviction)
+          slot = 0;
+        }
+        s_motionDedup[slot].nodeId   = sender;
+        s_motionDedup[slot].valid    = true;
+        s_motionDedup[slot].occupied = occupied;
+
+        if (!changed) break;
+
+        char euiStr[20];
+        bool haveEui = false;
+        EmberEUI64 eui;
+        if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
+          eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+          haveEui = true;
+        } else if (deviceRegistryGetEuiBeStrByNodeId(sender, euiStr,
+                                                    sizeof(euiStr))) {
+          // NCP address table did not have an entry for `sender`, but the
+          // device_registry remembers EUI64↔nodeId from ZDO discovery. Use
+          // that so motion reports are still routed to the rule engine.
+          appLogLog("MOTION", "eui_via_registry",
+                    "\"node_id\":\"0x%04X\",\"eui64\":\"%s\"",
+                    (unsigned)sender, euiStr);
+          haveEui = true;
+        }
+        if (haveEui) {
+          const char *occStr = occupied ? "occupied" : "unoccupied";
+          emberAfCorePrintln("MOTION: %s from 0x%04X (%s)",
+                             occStr, (unsigned)sender, euiStr);
+          appLogLog("MOTION", "event",
+                    "\"device_id\":\"%s\",\"occupancy\":\"%s\"",
+                    euiStr, occStr);
+
+          appMqttPublishMotionOccupancyEvent(sender, euiStr, occStr);
+
+          // Retained reported state so the dashboard reflects current
+          // occupancy via DeviceState (event-only would never populate it).
+          appMqttPublishMotionReported(sender, euiStr, occStr);
+
+          // Phase 3 automation hook.
+          automationRuleOnMotionOccupancyChanged(euiStr, occStr);
+        }
+      } else {
+        break;
+      }
+    }
+    return false;
+  }
+
   // --- Power Configuration / Battery (0x0001) ---
   if (clusterId == ZCL_POWER_CONFIGURATION_CLUSTER_ID) {
     while (i + 3 <= bufLen) {
@@ -214,8 +311,14 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
       // Publish switch event to MQTT (Phase 3.2)
       appMqttPublishDeviceEvent(sender, euiStr, "switch", "toggle");
 
-      // Phase 4: Feed into rule engine for local automation
+      // Phase 4: Feed into LEGACY rule engine (gated by
+      // SB_RULES_SWITCH_TO_LIGHT; default = OFF).
       ruleEngineOnSwitchEvent(euiStr);
+
+      // Phase 3: Feed into cloud-pushed automation table. If legacy is
+      // enabled, automationRuleOnSwitchToggle internally skips action
+      // execution to avoid double-toggling the light.
+      automationRuleOnSwitchToggle(euiStr);
     } else {
       emberAfCorePrintln("SWITCH: toggle event from 0x%04X but EUI64 unknown",
                          (unsigned)sender);

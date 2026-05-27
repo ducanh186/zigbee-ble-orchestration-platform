@@ -120,6 +120,62 @@ void main() {
     },
   );
 
+  test(
+    'createRule emits canonical "switch_toggle" event for switch templates',
+    () async {
+      Map<String, Object?>? capturedBody;
+      final repository = RemoteAutomationRepository(
+        apiClient: ApiClient(
+          baseUrl: 'http://98.83.4.87:8000',
+          httpClient: MockClient((request) async {
+            expect(request.method, 'POST');
+            expect(request.url.path, '/api/automations');
+            capturedBody = Map<String, Object?>.from(
+              jsonDecode(request.body) as Map,
+            );
+            return http.Response(
+              jsonEncode({
+                'id': 'automation-switch-01',
+                'name': 'Hallway switch toggles ceiling light',
+                'enabled': true,
+                'trigger': capturedBody!['trigger'],
+                'actions': capturedBody!['actions'],
+                'sync_status': 'pending',
+                'last_run_status': 'never_run',
+                'last_error': null,
+                'created_at': '2026-05-21T08:00:00Z',
+                'updated_at': '2026-05-21T08:00:00Z',
+              }),
+              201,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
+
+      await repository.createRule(
+        const AutomationRuleDraft(
+          name: 'Hallway switch toggles ceiling light',
+          enabled: true,
+          template: AutomationRuleTemplate.switchTogglesOneLight,
+          triggerDeviceId: 'switch-01',
+          targetLightIds: ['light-01'],
+        ),
+      );
+
+      final trigger = capturedBody!['trigger'] as Map<String, Object?>;
+      expect(
+        trigger['event'],
+        'switch_toggle',
+        reason:
+            'Switch rule wire payload must use canonical "switch_toggle"; '
+            'gateway rejects "toggle" with unsupported_trigger.',
+      );
+      expect(trigger['device_type'], 'switch');
+      expect(trigger['device_id'], 'switch-01');
+    },
+  );
+
   test('createRule posts manual switch toggle payload', () async {
     Map<String, Object?>? capturedBody;
     final repository = RemoteAutomationRepository(
@@ -164,7 +220,7 @@ void main() {
       'trigger': {
         'device_id': 'switch-01',
         'device_type': 'switch',
-        'event': 'toggle',
+        'event': 'switch_toggle',
       },
       'actions': [
         {'device_id': 'light-01', 'device_type': 'light', 'command': 'toggle'},

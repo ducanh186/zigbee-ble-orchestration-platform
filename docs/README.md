@@ -1,26 +1,32 @@
-# Documentation
+# Documentation Index
 
-This folder contains all documentation relating to this project.
+This folder is the documentation for the IoT Smart Building / Zigbee orchestration platform. Production architecture: **single-process Z3Gateway C with direct MQTT integration**.
+
+For the operational runbook see [`instruct.md`](./instruct.md).
+
+## Contracts (frozen, do not break)
+
+- [`MQTT_CONTRACT.md`](./MQTT_CONTRACT.md) — topic namespace, envelope, per-device-type payloads.
+- [`PROVISIONING_CONTRACT.md`](./PROVISIONING_CONTRACT.md) — secure install-code join flow across Mobile App, Cloud, and Gateway.
+- [`AUTOMATION_MQTT_CONTRACT.md`](./AUTOMATION_MQTT_CONTRACT.md) — automation rule desired / reported / event channels (extends `MQTT_CONTRACT.md`).
+- [`OTA_CAMPAIGN_CONTRACT.md`](./OTA_CAMPAIGN_CONTRACT.md) — OTA rollout metadata flow.
+- [`DEVICE_CAPABILITY_MATRIX.md`](./DEVICE_CAPABILITY_MATRIX.md) — per-`device_type` capabilities (v1 freeze).
+- [`ADAPTER_ACTION_MAP.md`](./ADAPTER_ACTION_MAP.md) — MQTT → Z3Gateway C action mapping.
 
 ## Architecture
 
-The production architecture is **Z3Gateway C single-process** with **direct MQTT integration**.
-See [plan.md](./plan.md) for the frozen architecture and [UART_FRAME_FORMAT.md](./UART_FRAME_FORMAT.md)
-for boundary definitions.
+- [`plan.md`](./plan.md) — current architecture plan (Z3Gateway-native, single process).
+- [`UART_FRAME_FORMAT.md`](./UART_FRAME_FORMAT.md) — host ↔ NCP boundary and process layout.
 
-## Key Documents
+## Hardware / firmware
 
-| File | Content |
-|---|---|
-| [MQTT_CONTRACT.md](./MQTT_CONTRACT.md) | MQTT topic tree, envelope, QoS, retain |
-| [UART_FRAME_FORMAT.md](./UART_FRAME_FORMAT.md) | Native boundary + application architecture |
-| [ADAPTER_ACTION_MAP.md](./ADAPTER_ACTION_MAP.md) | MQTT ↔ Z3Gateway C action mapping |
-| [DEVICE_CAPABILITY_MATRIX.md](./DEVICE_CAPABILITY_MATRIX.md) | device_type × capability freeze |
-| [AUTOMATION_CONTRACT.md](./AUTOMATION_CONTRACT.md) | Automation rule contract and SCRUM-51 implementation audit note |
-| [OTA_CAMPAIGN_CONTRACT.md](./OTA_CAMPAIGN_CONTRACT.md) | Planned OTA campaign contract, artifact staging prerequisites, Gateway capability checklist |
-| [SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md](./SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md) | SCRUM-51 evidence gap audit and SCRUM-8 definition of ready |
-| [CLOUD_IMPLEMENTATION_PLAN.md](./CLOUD_IMPLEMENTATION_PLAN.md) | Cloud DB schema + API design |
-| [AUTOMATION_USER_GUIDE.md](./AUTOMATION_USER_GUIDE.md) | User guide for the Automation feature |
-| [plan.md](./plan.md) | Gateway architecture plan (frozen) |
-| [FLASHING.md](./FLASHING.md) | Firmware flashing instructions |
-| [FIRMWARE_ARTIFACTS.md](./FIRMWARE_ARTIFACTS.md) | Pre-built firmware binaries |
+- [`FLASHING.md`](./FLASHING.md) — how to flash every board, build matrix, artifact inventory, tracking policy.
+
+## Runbook
+
+- [`instruct.md`](./instruct.md) — end-to-end bring-up, vận hành, debug. Session notes appended over time.
+
+## Automation feature docs
+
+- [`AUTOMATION_APP_DESIGN_BRIEF.md`](./AUTOMATION_APP_DESIGN_BRIEF.md) — mobile screen design brief.
+- [`AUTOMATION_USER_GUIDE.md`](./AUTOMATION_USER_GUIDE.md) — end-user / demo guide.

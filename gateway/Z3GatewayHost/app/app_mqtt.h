@@ -74,6 +74,49 @@ void appMqttPublishGatewayHealth(uint64_t uptime_ms, bool mqttConnected,
 // fields (without surrounding braces) -- caller must format it correctly.
 void appMqttPublishGatewayEvent(const char *eventName, const char *extraJson);
 
+// Publish a retained automation reported envelope on topic
+// `automations/{automation_id}/reported` (QoS 1, retained).
+// See docs/AUTOMATION_MQTT_CONTRACT.md §5.
+//   automation_id : non-empty
+//   version       : the version this ack corresponds to (0 if unknown)
+//   sync_status   : "synced" | "failed" | "deleted"
+//   last_error    : optional short ASCII reason, NULL/empty -> JSON null
+void appMqttPublishAutomationReported(const char *automation_id,
+                                      uint32_t version,
+                                      const char *sync_status,
+                                      const char *last_error);
+
+// Publish a non-retained automation event envelope on topic
+// `automations/{automation_id}/event` (QoS 1, no retain).
+// See docs/AUTOMATION_MQTT_CONTRACT.md §6.
+//
+// `inner_payload_json` is the inner payload **without** the outer braces.
+// Caller is responsible for emitting `automation_id`, `event`, `run_id`,
+// `version`, `trigger`, `actions`, `status`, `last_error` keys in that
+// JSON fragment. This split keeps the envelope helper reusable while
+// letting automation_rule.c compose the variable-shape body.
+void appMqttPublishAutomationEvent(const char *automation_id,
+                                   const char *inner_payload_json);
+
+// Publish a motion occupancy_changed event per docs/MQTT_CONTRACT.md.
+// Topic: `devices/motion/{eui64}/event` (QoS 1, no retain).
+// `occupancy` must be "occupied" or "unoccupied".
+void appMqttPublishMotionOccupancyEvent(uint16_t nodeId,
+                                        const char *eui64Str,
+                                        const char *occupancy);
+
+// Publish a motion reported state envelope per docs/MQTT_CONTRACT.md §motion.
+// Topic: `devices/motion/{eui64}/reported` (QoS 1, retained).
+// Mirrors light/switch reported shape (state.<something> + reachable=true) so
+// the cloud's _handle_reported populates DeviceState and the dashboard's
+// buildMotionStateVisual reads `state.occupancy`. Without this, motion devices
+// only ever show as offline-with-no-state on the UI even when they are
+// actively detecting motion (events go to a different table).
+// `occupancy` must be "occupied" or "unoccupied".
+void appMqttPublishMotionReported(uint16_t nodeId,
+                                  const char *eui64Str,
+                                  const char *occupancy);
+
 // Publish a command_reply message on topic commands/{command_id}/reply.
 // Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).
 // `device_id` may be NULL/empty (e.g. parse_fail before we extracted it);

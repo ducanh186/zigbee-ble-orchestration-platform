@@ -1,0 +1,32 @@
+{
+  "device_name": "Z3_Occupancy_Sensor",
+  "description": "Zigbee 3.0 occupancy sensor application (Router) with PIR sensor, button input, and network manager. Uses NVM3 persistent storage.",
+  "zigbee_device_type": "Router",
+  "target": {
+    "mcu": "EFR32MG12P332F1024GL125",
+    "board": "BRD4162A (EFR32MG12 2.4 GHz 19 dBm Radio Board)",
+    "mainboard": "BRD4001A (Wireless Starter Kit Mainboard)"
+  },
+  "build": {
+    "sdk": "Gecko SDK v4.5.0",
+    "sdk_id": "com.silabs.sdk.stack.super:4.5.0._1927637552",
+    "toolchain": "GNU ARM 10.3.1-2021.07 (Ubuntu gcc-arm-none-eabi)",
+    "toolchain_id": "gcc-arm-none-eabi:10.3-2021.07-4",
+    "build_config": "LINK_LIBRARIES (links against precompiled SDK libraries)",
+    "ide": "CLI make (Studio-generated makefile, Linux-adapted)"
+  },
+  "firmware_version": "source-only, no version tag yet",
+  "source_commit": "5bc9eb1 (2026-05-19)",
+  "source_path": "end_devices/Z3_Occupancy_Sensor/",
+  "binaries": {
+    "status": "READY",
+    "expected_outputs": [
+      "Z3_Occupancy_Sensor.s37 (Motorola S-record, primary flash image)",
+      "Z3_Occupancy_Sensor.hex (Intel HEX, alternative flash image)",
+      "Z3_Occupancy_Sensor.axf (ELF, debug)"
+    ],
+    "flash_command": "commander flash artifact/Z3_Occupancy_Sensor/Z3_Occupancy_Sensor.s37 --device EFR32MG12P332F1024GL125"
+  },
+  "build_instructions": "See artifact/Z3_Occupancy_Sensor/FLASH.md for the Linux CLI build workflow. Originally bootstrapped from a Simplicity Studio v5 + Gecko SDK 4.5.0 project; Studio-generated makefile was adapted (Windows paths replaced, link option --no-warn-rwx-segments stripped for binutils 2.38) and missing button/gpiointerrupt sources added.",
+  "date_generated": "2026-05-19"
+}

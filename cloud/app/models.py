@@ -62,7 +62,16 @@ class Device(Base):
     eui64 = Column(String, nullable=True)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     name = Column(String, nullable=True)
-    is_online = Column(Boolean, default=True)
+    # `is_online` is intentionally False by default now. Historically it
+    # defaulted to True, which made seed/probe rows that never report look
+    # ONLINE forever. Reality is derived from `last_seen_at`: an MQTT
+    # reported/event/registry handler bumps the timestamp and sets
+    # `is_online=True`; the offline reaper in `device_lifecycle` flips it
+    # back to False once `last_seen_at` is older than
+    # `settings.device_offline_after_seconds` (or stays False forever for
+    # rows that never reported).
+    is_online = Column(Boolean, default=False, nullable=False)
+    last_seen_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -143,6 +152,10 @@ class Automation(Base):
     version = Column(Integer, nullable=False, default=1, server_default="1")
     trigger = Column("trigger", JSON, nullable=False, quote=True)
     actions = Column(JSON, nullable=False)
+    # Monotonic version bumped on every cloud-side mutation. Gateway uses this
+    # to reject stale retained desired messages on reconnect / replay. See
+    # docs/AUTOMATION_MQTT_CONTRACT.md §7.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
     sync_status = Column(String, nullable=False, default="pending")
     last_run_status = Column(String, nullable=False, default="never_run")
     last_error = Column(String, nullable=True)

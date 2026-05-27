@@ -38,6 +38,16 @@ bool lightCtrlHandleCommand(const sb_command_t *cmd);
 // update when the light sends its attribute report back.
 void lightCtrlLocalToggle(void);
 
+// Phase 3: gateway-driven automation rule execution.
+// Send an On / Off / Toggle ZCL frame to the light registered under
+// `device_id` (EUI64 hex). `command` must be "on", "off", or "toggle".
+// No command_id, no command_reply — same LOCAL AUTOMATION semantics as
+// lightCtrlLocalToggle(). Returns true if the frame was handed off to the
+// stack successfully (EMBER_SUCCESS); false on any failure (unknown
+// device, wrong type, command in-flight, network not joined, send fail).
+bool lightCtrlLocalActionByDeviceId(const char *device_id,
+                                    const char *command);
+
 #ifdef __cplusplus
 }
 #endif

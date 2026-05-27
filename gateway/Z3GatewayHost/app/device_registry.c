@@ -134,6 +134,20 @@ bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out)
   return false;
 }
 
+bool deviceRegistryGetEuiBeStrByNodeId(EmberNodeId nodeId,
+                                       char *out, size_t outLen)
+{
+  if (!out || outLen < 17u) return false;
+  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+    if (g_slots[i].used && g_slots[i].nodeId == nodeId) {
+      strncpy(out, g_slots[i].eui64BeStr, outLen - 1u);
+      out[outLen - 1u] = '\0';
+      return true;
+    }
+  }
+  return false;
+}
+
 uint32_t deviceRegistryCount(void)
 {
   uint32_t n = 0;

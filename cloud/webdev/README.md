@@ -3,63 +3,22 @@
 Static web UI for checking cloud events, device state, gateway commissioning,
 and command status during development.
 
-## Local dev
+## Canonical local dev flow (Linux)
 
-One-command startup:
+Two long-lived processes, started independently so each can be restarted
+without taking the other down. This is the flow used on the dev box and what
+the project's runbooks (`docs/instruct.md` §F-G) target.
 
-```powershell
-cd F:\zigbee-ble-orchestration-platform
-.\.venv\Scripts\python.exe .\cloud\webdev\start_dev.py
-```
+```bash
+cd ~/Desktop/Repos/zigbee-ble-orchestration-platform
 
-Open:
+# 1. Backend (FastAPI + Postgres + MQTT subscriber)
+.venv/bin/python -m uvicorn cloud.app.main:app --host 0.0.0.0 --port 8000 \
+  > /tmp/cloud.log 2>&1 &
 
-```text
-http://localhost:5173
-```
-
-Press `Ctrl+C` in that terminal to stop both the Cloud API and Web UI.
-
-### Manual startup
-
-The local dev backend can run without Postgres by using the repo-root `.env`
-file:
-
-```powershell
-cd F:\zigbee-ble-orchestration-platform
-@"
-SB_DATABASE_URL=sqlite+aiosqlite:///./cloud/dev.db
-SB_MQTT_HOST=localhost
-SB_MQTT_PORT=1883
-SB_MQTT_USERNAME=client
-SB_MQTT_PASSWORD=client
-SB_TENANT_ID=hust
-SB_SITE_ID=lab01
-SB_GATEWAY_ID=gw-ubuntu-01
-SB_API_HOST=127.0.0.1
-SB_API_PORT=8000
-"@ | Set-Content .env
-```
-
-Seed the dev database:
-
-```powershell
-cd F:\zigbee-ble-orchestration-platform
-.\.venv\Scripts\python.exe -m cloud.app.seed
-```
-
-Run the cloud backend:
-
-```powershell
-cd F:\zigbee-ble-orchestration-platform
-.\.venv\Scripts\python.exe -m uvicorn cloud.app.main:app --host 127.0.0.1 --port 8000
-```
-
-Run the UI dev server:
-
-```powershell
-cd F:\zigbee-ble-orchestration-platform\cloud\webdev
-python .\dev_server.py
+# 2. UI dev server (proxies /api/* and /health to 127.0.0.1:8000)
+PORT=5173 API_TARGET=http://127.0.0.1:8000 \
+  python3 cloud/webdev/dev_server.py > /tmp/webdev.log 2>&1 &
 ```
 
 Open:
@@ -69,11 +28,29 @@ http://localhost:5173
 ```
 
 The dev server proxies `/api/*` and `/health` to `http://127.0.0.1:8000`.
-Override the backend target when needed:
+Override the backend target when pointing at a remote API:
 
-```powershell
-$env:API_TARGET="http://<ec2-public-ip>:8000"; python .\dev_server.py
+```bash
+API_TARGET="http://<ec2-public-ip>:8000" python3 cloud/webdev/dev_server.py
 ```
+
+## Bundled launcher (alternative)
+
+`start_dev.py` runs `cloud.app.seed` then spawns uvicorn + dev_server in one
+process. Convenient for first-time setup, but the canonical flow above is
+preferred for day-to-day use because:
+
+- Each service has its own log file you can tail independently.
+- Restarting one (e.g. uvicorn after a code edit) does not kill the other.
+- `seed` re-runs every launch with the bundled launcher — under the
+  manual flow you opt in by running `python3 -m cloud.app.seed` once.
+
+```bash
+python3 cloud/webdev/start_dev.py
+```
+
+(Originally written for the Windows dev box; falls back to `sys.executable`
+on Linux.)
 
 ## EC2 deploy shape
 

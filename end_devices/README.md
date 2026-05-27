@@ -8,6 +8,7 @@ Firmware source and configuration for Zigbee end devices. Flashable binaries are
 |--------|------------|-----|-------|
 | Z3Switch | End Device | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A |
 | Z3Light | Router | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A |
+| Z3_Occupancy_Sensor | Router (PIR + buttons) | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A |
 
 ## Directory Layout (per device)
 

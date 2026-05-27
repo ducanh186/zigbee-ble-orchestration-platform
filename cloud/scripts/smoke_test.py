@@ -32,6 +32,18 @@ import httpx
 import paho.mqtt.client as mqtt
 
 API_URL = os.environ.get("SB_API_URL", "http://localhost:8000")
+# Refuse to run against an API that points at a real-EUI device DB. The
+# script inserts synthetic light-00124b... rows that pollute the dashboard
+# when accidentally aimed at production-shaped state.
+_SAFE_API_URL_TOKENS = ("test", "127.0.0.1", "localhost")
+if not any(t in API_URL for t in _SAFE_API_URL_TOKENS) \
+   and not os.environ.get("SB_SMOKE_FORCE"):
+    print(
+        f"smoke_test: refusing to run against {API_URL}; set "
+        "SB_SMOKE_FORCE=1 to override (e.g. for CI runs).",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 MQTT_HOST = os.environ.get("SB_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("SB_MQTT_PORT", "1883"))
 MQTT_USER = os.environ.get("SB_MQTT_USERNAME", "gateway")

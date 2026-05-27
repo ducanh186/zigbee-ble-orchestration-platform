@@ -65,6 +65,24 @@ button:disabled {
   background: var(--accent-strong);
 }
 
+.danger {
+  border-color: #d14343;
+  background: #fff;
+  color: #d14343;
+}
+
+.danger:hover {
+  border-color: #b53030;
+  background: #fff5f5;
+  color: #b53030;
+}
+
+.detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -850,4 +868,113 @@ td {
   th:nth-child(3) {
     width: auto;
   }
+}
+
+.automations-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.automation-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.automation-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.automation-form input[type="text"],
+.automation-form select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.auto-actions-block {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auto-action-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.automation-form .toggle-row {
+  grid-column: 1 / -1;
+}
+
+.automation-form .wide {
+  grid-column: 1 / -1;
+}
+
+.automation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.automation-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.automation-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.automation-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.automation-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.automation-summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.automation-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
