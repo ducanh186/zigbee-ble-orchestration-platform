@@ -96,6 +96,10 @@ khi cửa permit-join mở/đóng. Payload có dạng:
 - `permit_join_failed` — kèm `reason` và `zstatus` khi gọi
   `gateway.open_network` thất bại ở stack/native (gateway vẫn reply
   command với `status="failed"`; event chỉ là kênh observability).
+- `provisioning_joined` — kèm `eui64`, `device_type`, `nwk_addr` khi một
+  thiết bị join thành công trong phiên secure provisioning (Install Code).
+  Xem [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md).
+- `provisioning_failed` — kèm `eui64` và `reason` khi secure join thất bại.
 
 ### Thiết bị (Devices)
 
@@ -357,6 +361,7 @@ Op v1:
 | --- | --- | --- |
 | `gateway.open_network` | `{ "duration_sec": 1..180 }` | Broadcast permit-join (network-creator-security plugin) trong `duration_sec` giây. Gateway tự đóng khi hết thời gian và publish `gateway/event permit_join_closed reason=timeout`. |
 | `gateway.close_network` | `{}` | Đóng permit-join ngay (broadcast permit_duration=0). Publish `gateway/event permit_join_closed reason=command`. |
+| `gateway.prepare_join` | `{ "eui64": "<hex>", "install_code": "<hex>", "duration_sec": 1..180 }` | Stage install code cho `eui64` rồi mở permit-join `duration_sec` giây (secure join bằng Install Code). Khi thiết bị join, gateway publish `gateway/event provisioning_joined`. Xem [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md). |
 
 Ví dụ commissioning open 60s:
 

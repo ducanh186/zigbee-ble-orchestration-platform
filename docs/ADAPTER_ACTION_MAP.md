@@ -52,6 +52,11 @@ Xem kèm:
 | `commands/{command_id}/request` | `sb_command_handle_request()` | Cloud ra một lệnh rời rạc (có `command_id`, `correlation_id`) |
 | `devices/{type}/{id}/desired` | `device_dispatch_desired()` | Cloud muốn trạng thái mong muốn cho device |
 
+> Op `gateway.prepare_join` (trong `commands/.../request`): stage install code cho
+> một `eui64` rồi mở permit-join, phục vụ secure provisioning. Gateway publish
+> `gateway/event provisioning_joined|provisioning_failed` khi xong. Chi tiết:
+> [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md).
+
 ### Z3Gateway C → MQTT (uplink — publish lên broker)
 
 | Nguồn bên trong | MQTT topic | Ý nghĩa |
