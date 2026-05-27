@@ -196,9 +196,12 @@ class _ProvisioningViewState extends State<ProvisioningView> {
   }
 
   bool get _canStart {
+    final session = _session;
     return _payload != null &&
         !_isSubmitting &&
-        (_session == null || _session!.isTerminal) &&
+        (session == null ||
+            (session.isTerminal &&
+                session.status != ProvisioningStatus.joined)) &&
         _gatewayController.text.trim().isNotEmpty &&
         _roomController.text.trim().isNotEmpty;
   }
@@ -256,7 +259,16 @@ class _ProvisioningViewState extends State<ProvisioningView> {
   }
 
   void _applyManualQr() {
-    _applyRawPayload(_manualQrController.text);
+    final rawPayload = _manualQrController.text;
+    if (rawPayload.trim().isEmpty) {
+      setState(() {
+        _payload = null;
+        _session = null;
+        _error = null;
+      });
+      return;
+    }
+    _applyRawPayload(rawPayload);
   }
 
   void _applyRawPayload(String rawPayload) {

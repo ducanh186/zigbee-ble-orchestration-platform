@@ -116,6 +116,34 @@ void main() {
     },
   );
 
+  testWidgets('empty manual QR does not show JSON parser error', (
+    tester,
+  ) async {
+    final repository = _FakeProvisioningRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        const ProvisioningView(pollInterval: Duration.zero),
+        repository: repository,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('provisioning-apply-manual-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unexpected end of input'), findsNothing);
+    expect(find.text('Device identity required'), findsOneWidget);
+    await _scrollUntilVisible(
+      tester,
+      find.byKey(const Key('provisioning-start-button')),
+    );
+    final startButton = tester.widget<FilledButton>(
+      find.byKey(const Key('provisioning-start-button')),
+    );
+    expect(startButton.onPressed, isNull);
+    expect(repository.createCount, 0);
+  });
+
   testWidgets('scan QR populates identity and clear removes it before start', (
     tester,
   ) async {
@@ -198,6 +226,13 @@ void main() {
     await _scrollUntilVisible(tester, find.text('JOINED'), delta: -240);
     expect(find.text('JOINED'), findsOneWidget);
     expect(find.text('EFR32MG12_LIGHT_KIT'), findsOneWidget);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    final startButton = tester.widget<FilledButton>(
+      find.byKey(const Key('provisioning-start-button')),
+    );
+    expect(startButton.onPressed, isNull);
   });
 
   testWidgets('cancels an active provisioning session', (tester) async {
