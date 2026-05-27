@@ -205,7 +205,7 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
 ):
     from sqlalchemy import select
 
-    from cloud.app.models import ProvisioningSession
+    from cloud.app.models import Command, ProvisioningSession
 
     await _seed_room(db_session_factory)
 
@@ -222,7 +222,16 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
     assert data["model"] == "EFR32MG12_LIGHT_KIT"
     assert data["expires_at"] is not None
     assert "install_code" not in data
-    assert fake_mqtt.published == []
+    assert len(fake_mqtt.published) == 1
+    published = fake_mqtt.published[0]
+    assert published["op"] == "gateway.prepare_join"
+    assert published["device_id"] is None
+    assert published["target"] == {
+        "eui64": VALID_EUI64,
+        "install_code": VALID_INSTALL_CODE,
+        "duration_sec": 180,
+    }
+    assert published["timeout_ms"] == 5000
 
     async with db_session_factory() as s:
         row = (
@@ -234,7 +243,13 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
         ).scalar_one()
         assert row.install_code == VALID_INSTALL_CODE
         assert row.status == "pending"
-        assert row.command_id is None
+        assert row.command_id is not None
+        command = await s.get(Command, row.command_id)
+        assert command is not None
+        assert command.target_kind == "gateway"
+        assert command.op == "gateway.prepare_join"
+        assert command.target == published["target"]
+        assert command.status == "accepted"
 
 
 @pytest.mark.asyncio
@@ -289,7 +304,7 @@ async def test_create_provisioning_session_duplicate_active_409(
         second.json()["detail"]["error_code"]
         == ProvisioningErrorCode.SESSION_ALREADY_ACTIVE
     )
-    assert fake_mqtt.published == []
+    assert len(fake_mqtt.published) == 1
 
 
 @pytest.mark.asyncio
@@ -305,7 +320,7 @@ async def test_delete_provisioning_session_cancels_non_terminal(
 
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "cancelled"
-    assert fake_mqtt.published == []
+    assert len(fake_mqtt.published) == 1
 
 
 @pytest.mark.asyncio
@@ -333,3 +348,127 @@ async def test_delete_provisioning_session_rejects_terminal(
     r = await client.delete("/api/provisioning/sessions/prov-joined")
 
     assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_prepare_join_reply_executed_marks_session_permit_open(
+    db_session_factory,
+):
+    import asyncio
+
+    from cloud.app.models import Command, Home, ProvisioningSession, Room
+    from cloud.app.mqtt_client import MQTTService
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id="room-1", home_id="home-1", name="R"))
+        s.add(
+            Command(
+                id="cmd-prepare",
+                device_id=None,
+                target_kind="gateway",
+                op="gateway.prepare_join",
+                target={
+                    "eui64": VALID_EUI64,
+                    "install_code": VALID_INSTALL_CODE,
+                    "duration_sec": 180,
+                },
+                status="accepted",
+                timeout_ms=5000,
+            )
+        )
+        s.add(
+            ProvisioningSession(
+                id="prov-prepare",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="pending",
+                command_id="cmd-prepare",
+            )
+        )
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+    service._handle_command_reply(
+        "sb/v1/hust/lab01/gw-ubuntu-01/commands/cmd-prepare/reply",
+        {"payload": {"status": "executed"}},
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as s:
+        session = await s.get(ProvisioningSession, "prov-prepare")
+        command = await s.get(Command, "cmd-prepare")
+
+    assert command.status == "executed"
+    assert session.status == "permit_open"
+    assert session.reason is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply_status", ["failed", "timeout"])
+async def test_prepare_join_reply_failure_marks_session_failed(
+    db_session_factory,
+    reply_status,
+):
+    import asyncio
+
+    from cloud.app.models import Command, Home, ProvisioningSession, Room
+    from cloud.app.mqtt_client import MQTTService
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-1", name="H"))
+        s.add(Room(id="room-1", home_id="home-1", name="R"))
+        s.add(
+            Command(
+                id=f"cmd-{reply_status}",
+                device_id=None,
+                target_kind="gateway",
+                op="gateway.prepare_join",
+                target={"eui64": VALID_EUI64},
+                status="accepted",
+                timeout_ms=5000,
+            )
+        )
+        s.add(
+            ProvisioningSession(
+                id=f"prov-{reply_status}",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="pending",
+                command_id=f"cmd-{reply_status}",
+            )
+        )
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+
+    def run_in_test_loop(coro_func):
+        tasks.append(asyncio.create_task(coro_func()))
+
+    service._run_async = run_in_test_loop
+    service._handle_command_reply(
+        f"sb/v1/hust/lab01/gw-ubuntu-01/commands/cmd-{reply_status}/reply",
+        {"payload": {"status": reply_status, "reason": "join failed"}},
+    )
+    await asyncio.gather(*tasks)
+
+    async with db_session_factory() as s:
+        session = await s.get(ProvisioningSession, f"prov-{reply_status}")
+
+    assert session.status == "failed"
+    assert session.reason == "join failed"

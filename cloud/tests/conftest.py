@@ -138,11 +138,13 @@ async def fake_mqtt(monkeypatch):
     import cloud.app.routers.automations as automod
     import cloud.app.routers.commands as cmdmod
     import cloud.app.routers.gateways as gwmod
+    import cloud.app.routers.provisioning as provmod
 
     monkeypatch.setattr(mqttmod, "mqtt_service", fake)
     monkeypatch.setattr(automod, "mqtt_service", fake)
     monkeypatch.setattr(cmdmod, "mqtt_service", fake)
     monkeypatch.setattr(gwmod, "mqtt_service", fake)
+    monkeypatch.setattr(provmod, "mqtt_service", fake)
     yield fake
 
 
