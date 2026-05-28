@@ -61,13 +61,14 @@ QR hiển thị trên màn thiết bị (hoặc sticker / nhập tay) mã hoá J
 | --- | --- | --- | --- |
 | `version` | int | có | Schema version. v1 = 1. App reject version không hỗ trợ. |
 | `eui64` | hex string (16 hex chars) | có | IEEE address, big-endian hex, không `0x`. |
-| `install_code` | hex string | có | Install code kèm CRC. Độ dài hợp lệ: 8/12/16/20 hex-pairs + CRC (xem §7). |
+| `install_code` | hex string | có | Install code kèm CRC little-endian. Độ dài hợp lệ: raw 6/8/12/16 bytes + CRC 2 bytes (full hex length 16/20/28/36). Xem §7. |
 | `device_type` | enum | có | `light \| switch \| motion`. |
 | `model` | string | không | Ví dụ `EFR32MG12_LIGHT_KIT`. Optional. |
 
 App validate **local** trước khi gửi: parse được JSON, `version` hỗ trợ,
 `eui64` đúng hex/độ dài, `install_code` đúng hex, `device_type` hợp lệ. App
-**không** kiểm CRC install code (để Cloud/Gateway lo) nhưng có thể check độ dài.
+**không** bắt buộc kiểm CRC install code; Cloud là authority và reject payload
+sai CRC trước khi tạo provisioning session.
 
 SCRUM-77 chỉ dùng QR/manual input như kênh out-of-band. BLE/Zigbee Direct không
 nằm trong request/response của contract này; nếu làm BLE provisioning thì tách
