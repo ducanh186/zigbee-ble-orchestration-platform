@@ -14,8 +14,6 @@ from pydantic import (
     model_validator,
 )
 
-from cloud.app.provisioning_install_code import normalize_install_code
-
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
 
 
@@ -25,7 +23,9 @@ def _fmt_ts(value: datetime | None) -> str | None:
     return value.strftime(TS_DISPLAY_FORMAT)
 
 
+_HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 _EUI64_RE = re.compile(r"^[0-9a-fA-F]{16}$")
+_INSTALL_CODE_HEX_LENGTHS = {16, 20, 28, 36}
 
 
 # ---------------------------------------------------------------------------
@@ -347,10 +347,12 @@ class ProvisioningDevicePayload(BaseModel):
     @field_validator("install_code")
     @classmethod
     def _validate_install_code(cls, value: str) -> str:
-        try:
-            return normalize_install_code(value)
-        except ValueError as exc:
-            raise ValueError("install_code must be valid hex with CRC length") from exc
+        if (
+            not _HEX_RE.fullmatch(value)
+            or len(value) not in _INSTALL_CODE_HEX_LENGTHS
+        ):
+            raise ValueError("install_code must be valid hex with CRC length")
+        return value.upper()
 
 
 class ProvisioningSessionCreate(BaseModel):
