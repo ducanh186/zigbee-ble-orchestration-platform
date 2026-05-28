@@ -1,5 +1,5 @@
 #include <stdbool.h>
-#include "app/pir_sensor.h"
+#include "pir_sensor.h"
 #include "app/framework/include/af.h"
 #include "sl_led.h"
 #include "sl_simple_led_instances.h"

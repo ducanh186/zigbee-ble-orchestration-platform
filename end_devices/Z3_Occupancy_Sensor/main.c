@@ -22,9 +22,13 @@
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
 #include "sl_power_manager.h"
 #endif
+#include <string.h>
+
 #include "app/pir_sensor.h"
 #include "app/buttons.h"
 #include "app/net_mgr.h"
+#include "app/display_qr.h"
+#include "app/provisioning_qr.h"
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 #include "sl_system_kernel.h"
 #else
@@ -40,6 +44,15 @@ void app_init(void)
   pirSensorInit();
   netMgrInit();
   buttonsInit();
+
+  if (display_qr_init("MOTION KIT")) {
+    char payload[224];
+    if (provisioning_qr_build_payload(payload, sizeof(payload)) > 0) {
+      display_qr_render_provisioning(payload);
+    }
+    // Never log raw payload — contains install_code per contract §7.
+    memset(payload, 0, sizeof(payload));
+  }
 }
 
 void app_process_action(void)
