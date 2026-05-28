@@ -5,6 +5,7 @@
 #include "app_mqtt.h"
 #include "device_discovery.h"
 #include "device_registry.h"
+#include "sec_mgr.h"
 
 #include "app/framework/include/af.h"
 
@@ -180,6 +181,10 @@ bool netMgrRediscoverByEui(const char *euiStr)
 
 void netMgrTick(void)
 {
+  // SCRUM-55 staging-table TTL sweep. Cheap (4-slot scan); safe to run
+  // unconditionally regardless of plugin presence.
+  secMgrTick();
+
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
   // Layer-1 boot rediscovery fires once, ~3 s after EMBER_NETWORK_UP.
   if (g_rediscoverDeadline != 0
@@ -266,6 +271,25 @@ EmberStatus netMgrCloseJoin(void)
   appLogLog("NET", "close_skip", "\"reason\":\"plugin_missing\"");
   return EMBER_LIBRARY_NOT_PRESENT;
 #endif
+}
+
+EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
+                                    const uint8_t *ic_bytes,
+                                    uint8_t ic_len,
+                                    uint16_t durationSec)
+{
+  // 2 s grace beyond permit-join window to cover slow associate + key derive.
+  uint32_t ttl_ms = (uint32_t)durationSec * 1000u + 2000u;
+  if (!secMgrStage(eui_le, ic_bytes, ic_len, ttl_ms)) {
+    appLogLog("NET", "open_secure_fail",
+              "\"reason\":\"stage_rejected\",\"ic_len\":%u",
+              (unsigned)ic_len);
+    return EMBER_BAD_ARGUMENT;
+  }
+  // Reuse the broadcast open path. Only the staged EUI64 can satisfy
+  // emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback, so the
+  // join window is effectively bound to that device.
+  return netMgrOpenForJoin(durationSec);
 }
 
 // callback: formed network

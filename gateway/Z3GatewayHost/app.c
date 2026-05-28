@@ -28,6 +28,7 @@
 
 // Forward declarations for CLI command handlers
 void cli_json_command(sl_cli_command_arg_t *arguments);
+static void cli_pjoin_secure_command(sl_cli_command_arg_t *arguments);
 
 // ===== Coordinator app modules =====
 #include "app/app_config.h"
@@ -41,6 +42,7 @@ void cli_json_command(sl_cli_command_arg_t *arguments);
 #include "app/light_ctrl.h"
 #include "app/rule_engine.h"
 #include "app/automation_rule.h"
+#include "app/sec_mgr.h"
 
 // ===== Original Z3Gateway token dump constants =====
 #define MFGSAMP_NUM_EZSP_TOKENS 8
@@ -148,6 +150,12 @@ void emberAfMainInitCallback(void)
   appStateInit();
   appStateNotifyChanged();
 
+  // SCRUM-55 security baseline: set TC link key request policy = DENY and
+  // initialise the install-code staging table. Pairs with config flag
+  // BDB_JOIN_USES_INSTALL_CODE_KEY=1 + sec_mgr.c TC plugin callback. Must
+  // run before any device join can be accepted.
+  secMgrInit();
+
   // MQTT client: init and connect to local broker
   appMqttInit();
   appMqttStart();
@@ -183,6 +191,36 @@ void emberAfMainInitCallback(void)
 
     sl_cli_command_add_command_group(sl_cli_example_handle, &coord_cmd_group);
     emberAfCorePrintln("Dashboard command registered: json");
+  }
+
+  // SCRUM-55: secure permit-join command bound to a specific EUI64 + IC.
+  // Usage:  pjoin-secure <duration_sec> <eui64-be-hex16> <ic-hex16/20/28/36>
+  {
+    static const sl_cli_command_info_t pjoin_secure_info =
+      SL_CLI_COMMAND(cli_pjoin_secure_command,
+                     "Open permit-join staged for one EUI64 with its install code",
+                     "duration_sec (1..180)" SL_CLI_UNIT_SEPARATOR
+                     "eui64 (16 hex chars, big-endian)" SL_CLI_UNIT_SEPARATOR
+                     "install_code (16/20/28/36 hex chars incl 2-byte CRC)"
+                     SL_CLI_UNIT_SEPARATOR,
+                     { SL_CLI_ARG_UINT16,
+                       SL_CLI_ARG_STRING,
+                       SL_CLI_ARG_STRING,
+                       SL_CLI_ARG_END });
+
+    static const sl_cli_command_entry_t sec_cmd_table[] = {
+      { "pjoin-secure", &pjoin_secure_info, false },
+      { NULL, NULL, false }
+    };
+
+    static sl_cli_command_group_t sec_cmd_group = {
+      { NULL },
+      false,
+      sec_cmd_table
+    };
+
+    sl_cli_command_add_command_group(sl_cli_example_handle, &sec_cmd_group);
+    emberAfCorePrintln("Security command registered: pjoin-secure");
   }
 
   emberAfCorePrintln("Coordinator init (host mode)");
@@ -341,6 +379,85 @@ void cli_json_command(sl_cli_command_arg_t *arguments)
   }
 
   cmdHandleLine(cmdBuf);
+}
+
+// SCRUM-55: pjoin-secure <duration_sec> <eui64-hex> <install_code-hex>
+// Stages the install code for the given EUI in the security manager, then
+// opens permit-join. Only that EUI can derive the right TC link key.
+//
+// IMPORTANT: install code is NEVER echoed back. Only metadata (eui + len)
+// is logged. Contract §7 "không log raw install code".
+static int hex_nibble(char c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+static bool parseIcHex(const char *s, uint8_t *out, uint8_t *out_len)
+{
+  if (!s || !out || !out_len) return false;
+  size_t hex_chars = strlen(s);
+  if (hex_chars == 0 || (hex_chars & 1u)) return false;
+  size_t byte_len = hex_chars / 2u;
+  // Valid Zigbee BDB install code lengths (incl 2-byte CRC).
+  if (!(byte_len == 8 || byte_len == 10 || byte_len == 14 || byte_len == 18)) {
+    return false;
+  }
+  for (size_t i = 0; i < byte_len; i++) {
+    int hi = hex_nibble(s[2u*i]);
+    int lo = hex_nibble(s[2u*i + 1u]);
+    if (hi < 0 || lo < 0) return false;
+    out[i] = (uint8_t)((hi << 4) | lo);
+  }
+  *out_len = (uint8_t)byte_len;
+  return true;
+}
+
+static void cli_pjoin_secure_command(sl_cli_command_arg_t *arguments)
+{
+  uint16_t duration_sec = sl_cli_get_argument_uint16(arguments, 0);
+  char    *eui_str      = sl_cli_get_argument_string(arguments, 1);
+  char    *ic_str       = sl_cli_get_argument_string(arguments, 2);
+
+  if (duration_sec < 1 || duration_sec > 180) {
+    emberAfCorePrintln("pjoin-secure: duration must be 1..180");
+    return;
+  }
+  if (!eui_str || strlen(eui_str) != 16) {
+    emberAfCorePrintln("pjoin-secure: eui64 must be 16 hex chars");
+    return;
+  }
+  if (!ic_str) {
+    emberAfCorePrintln("pjoin-secure: install_code required");
+    return;
+  }
+
+  EmberEUI64 eui_le;
+  if (!parseHexEui64(eui_str, eui_le)) {
+    emberAfCorePrintln("pjoin-secure: bad eui64 hex");
+    return;
+  }
+
+  uint8_t ic_bytes[18];
+  uint8_t ic_len = 0;
+  if (!parseIcHex(ic_str, ic_bytes, &ic_len)) {
+    emberAfCorePrintln("pjoin-secure: bad install_code (need 16/20/28/36 hex chars)");
+    return;
+  }
+
+  EmberStatus st = netMgrOpenForJoinSecure(eui_le, ic_bytes, ic_len, duration_sec);
+
+  // Wipe local IC copy on the way out — contract §7 hygiene.
+  memset(ic_bytes, 0, sizeof(ic_bytes));
+
+  if (st == EMBER_SUCCESS) {
+    emberAfCorePrintln("pjoin-secure: staged eui=%s ttl=%us (ic_len=%u)",
+                       eui_str, (unsigned)duration_sec, (unsigned)ic_len);
+  } else {
+    emberAfCorePrintln("pjoin-secure: open failed status=0x%02X", (unsigned)st);
+  }
 }
 
 #endif // SL_CATALOG_CLI_PRESENT
