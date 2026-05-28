@@ -128,6 +128,38 @@
             <button id="openJoinBtn" class="primary" type="button">Open Join</button>
             <button id="closeJoinBtn" type="button">Close Join</button>
           </div>
+          <div class="label-generator" aria-label="Provisioning QR label generator">
+            <div class="label-generator-header">
+              <span class="field-label">Provisioning Label</span>
+              <button id="generateLabelBtn" class="primary" type="button">Generate QR</button>
+            </div>
+            <div class="label-grid">
+              <label for="labelEui64Input">
+                <span class="field-label">EUI64</span>
+                <input id="labelEui64Input" type="text" autocomplete="off" spellcheck="false" maxlength="16" />
+              </label>
+              <label for="labelDeviceType">
+                <span class="field-label">Type</span>
+                <select id="labelDeviceType">
+                  <option value="light">Light</option>
+                  <option value="switch">Switch</option>
+                  <option value="motion">Motion</option>
+                </select>
+              </label>
+              <label for="labelModelInput">
+                <span class="field-label">Model</span>
+                <input id="labelModelInput" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <label for="labelInstallCodeInput">
+                <span class="field-label">Install Code</span>
+                <input id="labelInstallCodeInput" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+            <div class="label-result">
+              <div id="labelQrPreview" class="qr-preview"></div>
+              <pre id="labelPayload" class="code-block small">No label generated</pre>
+            </div>
+          </div>
         </section>
 
         <section class="panel automations-panel" aria-label="Automation rules">

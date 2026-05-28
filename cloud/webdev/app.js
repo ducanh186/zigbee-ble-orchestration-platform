@@ -88,6 +88,13 @@ const els = {
   gatewayMeta: byId("gatewayMeta"),
   openJoinBtn: byId("openJoinBtn"),
   closeJoinBtn: byId("closeJoinBtn"),
+  labelEui64Input: byId("labelEui64Input"),
+  labelDeviceType: byId("labelDeviceType"),
+  labelModelInput: byId("labelModelInput"),
+  labelInstallCodeInput: byId("labelInstallCodeInput"),
+  generateLabelBtn: byId("generateLabelBtn"),
+  labelQrPreview: byId("labelQrPreview"),
+  labelPayload: byId("labelPayload"),
   activitySummary: byId("activitySummary"),
   eventTypeFilter: byId("eventTypeFilter"),
   deviceFilterInput: byId("deviceFilterInput"),
@@ -133,6 +140,7 @@ function bindEvents() {
   els.deleteDeviceBtn.addEventListener("click", deleteSelectedDevice);
   els.openJoinBtn.addEventListener("click", openJoin);
   els.closeJoinBtn.addEventListener("click", closeJoin);
+  els.generateLabelBtn.addEventListener("click", generateProvisioningLabel);
   els.autoTemplate.addEventListener("change", () => {
     state.automationForm.template = els.autoTemplate.value;
     state.automationForm.triggerDeviceId = "";
@@ -704,6 +712,31 @@ async function createGatewayCommand(action, body) {
     await trackCommand(command);
     toast(`Gateway command ${command.status}: ${command.id}`);
   } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
+async function generateProvisioningLabel() {
+  const body = {
+    eui64: els.labelEui64Input.value.trim(),
+    device_type: els.labelDeviceType.value,
+  };
+  const model = els.labelModelInput.value.trim();
+  const installCode = els.labelInstallCodeInput.value.trim();
+  if (model) body.model = model;
+  if (installCode) body.install_code = installCode;
+
+  try {
+    const label = await fetchJson("/api/provisioning/labels", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    els.labelQrPreview.innerHTML = label.qr_svg;
+    els.labelPayload.textContent = label.payload_json;
+    els.labelInstallCodeInput.value = label.payload.install_code;
+    toast("Provisioning QR label generated");
+  } catch (error) {
+    els.labelQrPreview.innerHTML = "";
     toast(cleanError(error));
   }
 }
