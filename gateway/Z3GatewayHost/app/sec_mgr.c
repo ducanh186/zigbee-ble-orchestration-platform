@@ -58,15 +58,24 @@ static void wipeSlot(sec_slot_t *s)
 
 // ---------- public ----------
 
+static bool g_policySet = false;
+
 void secMgrInit(void)
 {
   memset(g_slots, 0, sizeof(g_slots));
+  g_policySet = false;
+  emberAfCorePrintln("secMgr: staging[%u] ready (TC policy deferred to NETWORK_UP)",
+                     (unsigned)SEC_MGR_MAX_SLOTS);
+}
 
+void secMgrOnStackUp(void)
+{
+  if (g_policySet) return;  // idempotent — only first NETWORK_UP per boot
   EzspStatus ezsp_status = ezspSetPolicy(EZSP_TC_KEY_REQUEST_POLICY_ID,
                                          EZSP_DENY_TC_KEY_REQUESTS_VAL);
   if (ezsp_status == EZSP_SUCCESS) {
-    emberAfCorePrintln("secMgr: TC policy=DENY, staging[%u] ready",
-                       (unsigned)SEC_MGR_MAX_SLOTS);
+    g_policySet = true;
+    emberAfCorePrintln("secMgr: TC policy=DENY (set on NETWORK_UP)");
   } else {
     emberAfCorePrintln("secMgr: WARN set TC policy failed, ezsp=0x%02X",
                        (unsigned)ezsp_status);

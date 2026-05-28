@@ -10,10 +10,18 @@
 // Valid Zigbee BDB lengths (contract §7): 8, 10, 14, 18.
 #define SEC_MGR_IC_MAX_LEN 18
 
-// One-shot init at gateway boot. Sets EZSP TC key request policy = DENY,
-// zeroes the staging table, logs readiness. Call once from
-// emberAfMainInitCallback after EZSP is up.
+// Boot-time init. Zeroes the staging table; safe to call before the EZSP
+// host-NCP link is up. EZSP policy is deferred to secMgrOnStackUp() (called
+// after EMBER_NETWORK_UP fires) because ezspSetPolicy needs the NCP
+// connected — running it from emberAfMainInitCallback returns
+// EZSP_NOT_CONNECTED (0x28).
 void secMgrInit(void);
+
+// Late init — called from emberAfStackStatusCallback when EMBER_NETWORK_UP.
+// Sets the EZSP TC key request policy to DENY so post-join APS link-key
+// requests using the well-known key are ignored. Idempotent — safe to call
+// on every NETWORK_UP transition; only logs on success/state change.
+void secMgrOnStackUp(void);
 
 // Periodic tick. Sweeps expired staging entries (zero-wipes IC bytes).
 // Call from netMgrTick().

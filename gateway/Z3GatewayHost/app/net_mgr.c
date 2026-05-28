@@ -286,10 +286,30 @@ EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
               (unsigned)ic_len);
     return EMBER_BAD_ARGUMENT;
   }
-  // Reuse the broadcast open path. Only the staged EUI64 can satisfy
-  // emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback, so the
-  // join window is effectively bound to that device.
-  return netMgrOpenForJoin(durationSec);
+
+  // With BDB_JOIN_USES_INSTALL_CODE_KEY=1 the network-creator-security
+  // plugin's plain OpenNetwork() returns INVALID_CALL by design. We bypass
+  // the plugin and just permit-join the radio directly; the joining device
+  // will trigger emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback,
+  // which returns the staged IC -> stack derives the TC link key via
+  // AES-MMO on the NCP side. No host-side hash needed.
+  if (durationSec > 254) durationSec = 254;
+  EmberStatus st = emberPermitJoining((uint8_t)durationSec);
+  if (st == EMBER_SUCCESS) {
+    g_networkOpen   = true;
+    g_openTick      = msTick();
+    g_openDurationMs = (uint32_t)durationSec * 1000u;
+
+    char extra[64];
+    snprintf(extra, sizeof(extra),
+             "\"duration_sec\":%u,\"trigger\":\"pjoin-secure\"",
+             (unsigned)durationSec);
+    appMqttPublishGatewayEvent("permit_join_opened", extra);
+  }
+  appLogLog("NET", "open_secure_cmd",
+            "\"zstatus\":\"0x%02X\",\"duration_s\":%u",
+            (unsigned)st, (unsigned)durationSec);
+  return st;
 }
 
 // callback: formed network
@@ -326,6 +346,10 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   if (status == EMBER_NETWORK_UP) {
     appLogEmitHeartbeat();
+    // SCRUM-55: set TC key request policy = DENY now that EZSP is connected.
+    // Calling ezspSetPolicy at emberAfMainInitCallback time returns
+    // EZSP_NOT_CONNECTED (0x28); NETWORK_UP guarantees the host-NCP link.
+    secMgrOnStackUp();
     // Arm boot-time rediscovery once per session. netMgrTick fires it after
     // BOOT_REDISCOVER_DELAY_MS so the EZSP child-table cache has time to
     // repopulate after stack-up.
