@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/provisioning_session.dart';
@@ -10,14 +11,25 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
 
+typedef ProvisioningQrScanLauncher =
+    Future<String?> Function(BuildContext context);
+
+Future<String?> _defaultProvisioningQrScanLauncher(BuildContext context) {
+  return Navigator.of(context).push<String>(
+    MaterialPageRoute(builder: (_) => const _ProvisioningQrScannerPage()),
+  );
+}
+
 class ProvisioningView extends StatefulWidget {
   const ProvisioningView({
     this.initialPayload,
+    this.qrScanLauncher = _defaultProvisioningQrScanLauncher,
     this.pollInterval = const Duration(seconds: 2),
     super.key,
   });
 
   final ProvisioningQrPayload? initialPayload;
+  final ProvisioningQrScanLauncher qrScanLauncher;
   final Duration pollInterval;
 
   @override
@@ -29,23 +41,33 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     text: 'gw-ubuntu-01',
   );
   final TextEditingController _roomController = TextEditingController();
+  final TextEditingController _manualQrController = TextEditingController();
   StreamSubscription<ProvisioningSession>? _polling;
+  ProvisioningQrPayload? _payload;
   ProvisioningSession? _session;
   bool _isSubmitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _payload = widget.initialPayload;
+  }
 
   @override
   void dispose() {
     _polling?.cancel();
     _gatewayController.dispose();
     _roomController.dispose();
+    _manualQrController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = AppLocalizations.of(context)?.provisioningTab ?? 'Provisioning';
-    final payload = widget.initialPayload;
+    final title =
+        AppLocalizations.of(context)?.provisioningTab ?? 'Provisioning';
+    final payload = _payload;
     final session = _session;
 
     return CustomScrollView(
@@ -86,6 +108,58 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                 ),
               ),
               const SizedBox(height: 12),
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            key: const Key('provisioning-scan-button'),
+                            onPressed: _scanQr,
+                            icon: const Icon(Icons.qr_code_scanner),
+                            label: const Text('Scan QR'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            key: const Key('provisioning-apply-manual-button'),
+                            onPressed: _applyManualQr,
+                            icon: const Icon(Icons.input),
+                            label: const Text('Use manual'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('provisioning-manual-qr-field'),
+                      controller: _manualQrController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'QR JSON',
+                        prefixIcon: Icon(Icons.data_object),
+                      ),
+                    ),
+                    if (payload != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          key: const Key('provisioning-clear-payload-button'),
+                          onPressed: _clearPayload,
+                          icon: const Icon(Icons.clear),
+                          label: const Text('Clear'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               _DeviceIdentityCard(payload: payload),
               const SizedBox(height: 12),
               Column(
@@ -122,15 +196,18 @@ class _ProvisioningViewState extends State<ProvisioningView> {
   }
 
   bool get _canStart {
-    return widget.initialPayload != null &&
+    final session = _session;
+    return _payload != null &&
         !_isSubmitting &&
-        (_session == null || _session!.isTerminal) &&
+        (session == null ||
+            (session.isTerminal &&
+                session.status != ProvisioningStatus.joined)) &&
         _gatewayController.text.trim().isNotEmpty &&
         _roomController.text.trim().isNotEmpty;
   }
 
   Future<void> _startProvisioning() async {
-    final payload = widget.initialPayload;
+    final payload = _payload;
     if (payload == null) {
       return;
     }
@@ -172,6 +249,60 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     }
   }
 
+  Future<void> _scanQr() async {
+    final rawPayload = await widget.qrScanLauncher(context);
+    if (!mounted || rawPayload == null || rawPayload.trim().isEmpty) {
+      return;
+    }
+    _manualQrController.text = rawPayload;
+    _applyRawPayload(rawPayload);
+  }
+
+  void _applyManualQr() {
+    final rawPayload = _manualQrController.text;
+    if (rawPayload.trim().isEmpty) {
+      setState(() {
+        _payload = null;
+        _session = null;
+        _error = null;
+      });
+      return;
+    }
+    _applyRawPayload(rawPayload);
+  }
+
+  void _applyRawPayload(String rawPayload) {
+    try {
+      final payload = ProvisioningQrPayload.parseJson(rawPayload);
+      setState(() {
+        _payload = payload;
+        _session = null;
+        _error = null;
+      });
+    } on FormatException catch (error) {
+      setState(() {
+        _payload = null;
+        _session = null;
+        _error = error.message;
+      });
+    } catch (error) {
+      setState(() {
+        _payload = null;
+        _session = null;
+        _error = error.toString();
+      });
+    }
+  }
+
+  void _clearPayload() {
+    _manualQrController.clear();
+    setState(() {
+      _payload = null;
+      _session = null;
+      _error = null;
+    });
+  }
+
   Future<void> _cancelProvisioning() async {
     final session = _session;
     if (session == null || session.isTerminal) {
@@ -189,6 +320,65 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     } catch (error) {
       setState(() => _error = error.toString());
     }
+  }
+}
+
+class _ProvisioningQrScannerPage extends StatefulWidget {
+  const _ProvisioningQrScannerPage();
+
+  @override
+  State<_ProvisioningQrScannerPage> createState() =>
+      _ProvisioningQrScannerPageState();
+}
+
+class _ProvisioningQrScannerPageState
+    extends State<_ProvisioningQrScannerPage> {
+  final MobileScannerController _controller = MobileScannerController(
+    formats: const [BarcodeFormat.qrCode],
+  );
+  bool _handledResult = false;
+
+  @override
+  void dispose() {
+    unawaited(_controller.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Scan provisioning QR')),
+      body: Stack(
+        children: [
+          MobileScanner(controller: _controller, onDetect: _handleDetect),
+          Center(
+            child: IgnorePointer(
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white70, width: 3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleDetect(BarcodeCapture capture) {
+    if (_handledResult || capture.barcodes.isEmpty) {
+      return;
+    }
+    final rawValue = capture.barcodes.first.rawValue;
+    if (rawValue == null || rawValue.trim().isEmpty) {
+      return;
+    }
+    _handledResult = true;
+    unawaited(_controller.stop());
+    Navigator.of(context).pop(rawValue);
   }
 }
 
