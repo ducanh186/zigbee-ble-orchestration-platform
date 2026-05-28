@@ -1,14 +1,42 @@
 #include "device_dispatch.h"
 #include "app_mqtt.h"
 #include "app_log.h"
+#include "app_utils.h"   // parseHexEui64
 #include "device_registry.h"
 #include "light_ctrl.h"
 #include "switch_logic.h"
 #include "net_mgr.h"
+#include "sec_mgr.h"     // SEC_MGR_IC_MAX_LEN
 
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>  // strcasecmp
+
+// Parse a hex install-code string (16/20/28/36 chars including CRC suffix)
+// into bytes. Returns true + writes byte length on success.
+static bool parseInstallCodeHex(const char *s, uint8_t *out, uint8_t *out_len)
+{
+  if (!s || !out || !out_len) return false;
+  size_t hex_chars = strlen(s);
+  if (hex_chars == 0 || (hex_chars & 1u)) return false;
+  size_t byte_len = hex_chars / 2u;
+  if (!(byte_len == 8 || byte_len == 10 || byte_len == 14 || byte_len == 18)) {
+    return false;
+  }
+  for (size_t i = 0; i < byte_len; i++) {
+    char hi = s[2u*i], lo = s[2u*i + 1u];
+    int h = (hi >= '0' && hi <= '9') ? (hi - '0')
+          : (hi >= 'a' && hi <= 'f') ? (hi - 'a' + 10)
+          : (hi >= 'A' && hi <= 'F') ? (hi - 'A' + 10) : -1;
+    int l = (lo >= '0' && lo <= '9') ? (lo - '0')
+          : (lo >= 'a' && lo <= 'f') ? (lo - 'a' + 10)
+          : (lo >= 'A' && lo <= 'F') ? (lo - 'A' + 10) : -1;
+    if (h < 0 || l < 0) return false;
+    out[i] = (uint8_t)((h << 4) | l);
+  }
+  *out_len = (uint8_t)byte_len;
+  return true;
+}
 
 static bool sameType(const char *a, const char *b)
 {
@@ -50,6 +78,43 @@ static bool dispatchGatewayOp(const sb_command_t *cmd)
   if (strcmp(cmd->op, "gateway.open_network") == 0) {
     int dur = (cmd->duration_sec > 0) ? cmd->duration_sec : 180;
     st = netMgrOpenForJoin((uint16_t)dur);
+  } else if (strcmp(cmd->op, "gateway.prepare_join") == 0) {
+    // SCRUM-81: Cloud → Gateway secure provisioning entry point.
+    // Contract §8.1 — stage install code for a specific EUI64, open a
+    // bounded permit-join window. Only the staged device can derive the
+    // correct TC link key (sec_mgr provides the install code via the
+    // network-creator-security plugin callback).
+    if (cmd->eui64[0] == '\0') {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "missing_eui64");
+      return false;
+    }
+    if (strlen(cmd->eui64) != 16) {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "invalid_eui64");
+      return false;
+    }
+    if (cmd->install_code[0] == '\0') {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "missing_install_code");
+      return false;
+    }
+    int dur = (cmd->duration_sec > 0) ? cmd->duration_sec : 60;
+    if (dur < 1 || dur > 180) {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "duration_out_of_range");
+      return false;
+    }
+    EmberEUI64 eui_le;
+    if (!parseHexEui64(cmd->eui64, eui_le)) {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "invalid_eui64");
+      return false;
+    }
+    uint8_t ic_bytes[SEC_MGR_IC_MAX_LEN];
+    uint8_t ic_len = 0;
+    if (!parseInstallCodeHex(cmd->install_code, ic_bytes, &ic_len)) {
+      appMqttPublishCommandReply(cmd->command_id, devId, "failed", "invalid_install_code");
+      return false;
+    }
+    st = netMgrOpenForJoinSecure(eui_le, ic_bytes, ic_len, (uint16_t)dur);
+    // Contract §7 hygiene: wipe local IC copy on the way out.
+    memset(ic_bytes, 0, sizeof(ic_bytes));
   } else if (strcmp(cmd->op, "gateway.close_network") == 0) {
     st = netMgrCloseJoin();
   } else if (strcmp(cmd->op, "gateway.rediscover_device") == 0) {
