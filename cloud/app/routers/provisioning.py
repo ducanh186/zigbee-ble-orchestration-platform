@@ -5,10 +5,14 @@ SCRUM-71 covers REST persistence and validation only. Publishing
 """
 from __future__ import annotations
 
+import io
+import json
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+import qrcode
+import qrcode.image.svg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,18 +20,55 @@ from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import Command, ProvisioningSession, Room
 from cloud.app.mqtt_client import mqtt_service
+from cloud.app.provisioning_install_code import generate_install_code
 from cloud.app.schemas import (
     ProvisioningErrorCode,
+    ProvisioningLabelCreate,
+    ProvisioningLabelOut,
     ProvisioningSessionCreate,
     ProvisioningSessionOut,
 )
 
 router = APIRouter(prefix="/api/provisioning/sessions", tags=["provisioning"])
+labels_router = APIRouter(prefix="/api/provisioning/labels", tags=["provisioning"])
 
 DEFAULT_PROVISIONING_DURATION_SEC = 180
 DEFAULT_PREPARE_JOIN_TIMEOUT_MS = 5000
 NON_TERMINAL_STATUSES = {"pending", "permit_open", "joining"}
 TERMINAL_STATUSES = {"joined", "failed", "expired", "cancelled"}
+
+
+def _qr_svg(payload_json: str) -> str:
+    image = qrcode.make(
+        payload_json,
+        image_factory=qrcode.image.svg.SvgPathImage,
+        border=2,
+    )
+    buf = io.BytesIO()
+    image.save(buf)
+    return buf.getvalue().decode("utf-8")
+
+
+@labels_router.post(
+    "",
+    response_model=ProvisioningLabelOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_provisioning_label(body: ProvisioningLabelCreate):
+    payload = {
+        "version": 1,
+        "eui64": body.eui64,
+        "install_code": body.install_code or generate_install_code(),
+        "device_type": body.device_type,
+    }
+    if body.model:
+        payload["model"] = body.model
+    payload_json = json.dumps(payload, separators=(",", ":"))
+    return {
+        "payload": payload,
+        "payload_json": payload_json,
+        "qr_svg": _qr_svg(payload_json),
+    }
 
 
 def _raise_contract_error(

@@ -493,6 +493,59 @@ select {
   margin-top: 5px;
 }
 
+.label-generator {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.label-generator-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.label-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 10px;
+}
+
+.label-grid label:first-child,
+.label-grid label:nth-child(3),
+.label-grid label:nth-child(4) {
+  grid-column: 1 / -1;
+}
+
+.label-grid input,
+.label-grid select {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.label-result {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.qr-preview {
+  display: grid;
+  min-height: 132px;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qr-preview svg {
+  width: 116px;
+  height: 116px;
+}
+
 .activity-tools {
   display: flex;
   align-items: center;
