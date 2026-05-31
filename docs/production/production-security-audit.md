@@ -51,7 +51,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 - Mosquitto currently has a plain listener on `1883` and no production TLS/mTLS listener in the checked configuration.
 - Backend API routing currently registers domain routers directly, and no backend auth router was found in the Phase 0 evidence scan.
 - Mobile app defaults point to a plain HTTP demo API URL and do not yet prove HTTPS-only production auth.
-- Gateway commissioning API exposes permit-join operations, but production authorization and secure commissioning guarantees need further implementation and test evidence.
+- Gateway commissioning API exposes permit-join operations with admin authorization, and Phase 5 adds local secure commissioning evidence for install-code-based joins.
 - Backup, monitoring, alerting, and rollback are partially documented through logs/healthcheck notes, but no production-grade backup/restore/alerting runbook is present in `docs/production/`.
 
 ## Evidence Table
@@ -67,7 +67,8 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 | MQTT credentials | Gateway source now requires explicit production MQTT username/password and cert paths when `SB_ENV=production` or `SB_PRODUCTION=1`; bridge configs use placeholders only. | Legacy deploy scripts still need release-path cleanup before final production rollout. | Gateway Phase 4 verified locally; deploy cleanup remains Phase 7. |
 | Mobile API base URL | `mobile_app/lib/main.dart:17-20`; `mobile_app/README.md:13,24` show HTTP API base URL defaults/examples. | Mobile production can target plain HTTP. | Needs Phase 1/2 mobile alignment. |
 | Backend auth routes | `cloud/app/routers/auth.py` implements login/logout, `cloud/app/auth.py` validates JWT-shaped bearer tokens, and `cloud/tests/test_auth_rbac.py` covers login, invalid token, and expired token behavior. | Mobile login-state integration is still pending under `SCRUM-91`. | Backend Phase 2 verified locally. |
-| Permit join API | `cloud/app/routers/gateways.py` protects open/close commissioning with `require_admin`, and `cloud/tests/test_gateways.py` covers unauthenticated, operator-forbidden, and admin-allowed behavior. | Secure Zigbee install-code/default-key guarantees still need Phase 5 evidence. | Backend auth done; secure commissioning needs Phase 5. |
+| Permit join API | `cloud/app/routers/gateways.py` protects open/close commissioning with `require_admin`, and `cloud/tests/test_gateways.py` covers unauthenticated, operator-forbidden, and admin-allowed behavior. | Live radio proof of default global key rejection still needs gateway hardware. | Backend auth done; secure commissioning locally verified in Phase 5. |
+| Zigbee secure commissioning | `cloud/app/routers/provisioning.py` publishes `gateway.prepare_join`; gateway parser/dispatch reads `eui64` and `install_code`, validates them, and calls `netMgrOpenForJoinSecure`; `network-creator-security-config.h` enables install-code joins and disables well-known key rejoins. | Live negative test still required before final readiness. | Phase 5 locally verified. |
 | Nginx/reverse proxy | `docs/production`, `deploy/.env.prod.example`, `nginx`, and `deploy/nginx.conf` were missing in Phase 0 scan. | HTTPS reverse proxy contract not documented or implemented. | Needs Phase 1. |
 | Backup/monitoring/rollback | `cloud/README.md:101-102,138`; `mqtt/README.md:68-69` mention logs and monitor user. | Not enough for production recovery or alerting. | Needs Phase 6/7. |
 
@@ -80,7 +81,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 | FastAPI | Exposes/binds `8000`. | Internal only behind Nginx. | Needs Phase 1. |
 | PostgreSQL | Compose maps `5432:5432`. | Private/internal only. | Needs Phase 1/6. |
 | Mosquitto | Secure compose uses `mqtt/config/mosquitto.prod.conf`, `mqtt/config/acl.prod.conf`, and cert mount `${MQTT_CERT_DIR:-../mqtt/certs}`. | TLS/mTLS on `8883`, strict ACL, no public plain MQTT. | Phase 3 locally verified; live negative tests pending. |
-| Gateway | `gateway/Z3GatewayHost/app/app_mqtt.c` has production fail-fast config and runtime tenant/site/gateway identity; bridge configs no longer commit real endpoint/password values. | Live gateway hardware startup still needs operator validation. | Phase 4 locally verified; secure commissioning needs Phase 5. |
+| Gateway | `gateway/Z3GatewayHost/app/app_mqtt.c` has production fail-fast config and runtime tenant/site/gateway identity; bridge configs no longer commit real endpoint/password values; secure commissioning now routes `gateway.prepare_join` to `netMgrOpenForJoinSecure`. | Live gateway startup and default-key rejection still need operator validation. | Phase 4 and Phase 5 locally verified. |
 
 ## Items Needing Human Confirmation
 

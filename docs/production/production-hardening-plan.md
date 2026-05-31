@@ -1,10 +1,10 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 03:18:48 +07:00
+Last updated: 2026-06-01 03:34:10 +07:00
 
 Jira: SCRUM-90
 
-Status: PHASE_4_GATEWAY_CONFIG_VERIFIED_LOCALLY
+Status: PHASE_5_SECURE_COMMISSIONING_VERIFIED_LOCALLY
 
 ## Execution Model
 
@@ -21,9 +21,9 @@ Option 1 is approved: implement the production-hardening work as small SCRUM-siz
 Current active branch/worktree:
 
 ```text
-Branch: codex/scrum-90-phase4-gateway-config
+Branch: codex/scrum-90-phase5-secure-commissioning
 Worktree: C:\tmp\zigbee-scrum90-production-hardening
-Base: origin/main after PR 67 merge
+Base: origin/main after PR 68 merge
 ```
 
 ## Phase Breakdown
@@ -94,6 +94,7 @@ Do not put real secrets, private keys, JWT secrets, database passwords, or certi
 - `SCRUM-91` mobile login-state subagent is running separately.
 - Backend Phase 2 auth/RBAC is locally verified, but mobile login-state integration still needs `SCRUM-91` output.
 - Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with operator approval.
+- Live Zigbee default global key rejection needs operator hardware evidence before final production readiness is claimed.
 
 ## Phase 0 Verification
 
@@ -214,3 +215,26 @@ Evidence checked:
 - Gateway MQTT TLS setup calls `mosquitto_tls_set`.
 - Tenant, site, and gateway id are runtime configurable.
 - Bridge config templates use placeholders instead of real endpoints or passwords.
+
+## Phase 5 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_secure_commissioning_contract.py -q
+```
+
+Result:
+
+```text
+4 passed
+```
+
+Evidence checked:
+
+- Cloud commissioning duration remains bounded to `1..180` seconds.
+- Gateway security config requires install-code joins and disables well-known key rejoins.
+- Gateway command parser reads `target.eui64` and `target.install_code`.
+- Gateway dispatch handles `gateway.prepare_join` with missing/bad input rejection.
+- Gateway dispatch calls `netMgrOpenForJoinSecure` and clears the local install-code byte buffer.
+- `docs/production/production-commissioning.md` documents the live negative procedure for default global key rejection.
