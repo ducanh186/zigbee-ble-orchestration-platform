@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -64,39 +65,44 @@ def verify_password(password: str, stored_hash: str | None) -> bool:
 
 
 def create_access_token(user: User) -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
     payload = {
         "sub": user.id,
         "role": user.role,
         "home_id": user.home_id,
         "exp": int(time.time()) + settings.auth_token_ttl_seconds,
     }
+    header_json = json.dumps(header, separators=(",", ":"), sort_keys=True)
     payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    header_part = _b64url_encode(header_json.encode("utf-8"))
     payload_part = _b64url_encode(payload_json.encode("utf-8"))
+    signing_input = f"{header_part}.{payload_part}"
     signature = hmac.new(
         settings.auth_token_secret.encode("utf-8"),
-        payload_part.encode("ascii"),
+        signing_input.encode("ascii"),
         hashlib.sha256,
     ).digest()
-    return f"{payload_part}.{_b64url_encode(signature)}"
+    return f"{signing_input}.{_b64url_encode(signature)}"
 
 
 def decode_access_token(token: str) -> dict:
     try:
-        payload_part, signature_part = token.split(".", 1)
+        header_part, payload_part, signature_part = token.split(".", 2)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid bearer token",
         ) from exc
 
+    signing_input = f"{header_part}.{payload_part}"
     expected = hmac.new(
         settings.auth_token_secret.encode("utf-8"),
-        payload_part.encode("ascii"),
+        signing_input.encode("ascii"),
         hashlib.sha256,
     ).digest()
     try:
         provided = _b64url_decode(signature_part)
-    except ValueError as exc:
+    except (ValueError, binascii.Error) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid bearer token",
@@ -108,12 +114,18 @@ def decode_access_token(token: str) -> dict:
         )
 
     try:
+        header = json.loads(_b64url_decode(header_part))
         payload = json.loads(_b64url_decode(payload_part))
-    except (ValueError, json.JSONDecodeError) as exc:
+    except (ValueError, binascii.Error, json.JSONDecodeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid bearer token",
         ) from exc
+    if header.get("alg") != "HS256" or header.get("typ") != "JWT":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid bearer token",
+        )
     if int(payload.get("exp", 0)) <= int(time.time()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -146,5 +158,14 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin role required",
+        )
+    return current_user
+
+
+async def require_operator(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in {"admin", "operator", "user"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operator role required",
         )
     return current_user

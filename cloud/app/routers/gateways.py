@@ -13,9 +13,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cloud.app.auth import require_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command
+from cloud.app.models import Command, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import (
     CommandOut,
@@ -71,6 +72,7 @@ async def commissioning_open(
     gateway_id: str,
     body: CommissioningOpenBody,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Open the Zigbee network for joining (broadcast permit join).
 
@@ -104,6 +106,7 @@ async def commissioning_close(
     gateway_id: str,
     body: CommissioningCloseBody,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Close the Zigbee network (broadcast permit-join with duration=0)."""
     _verify_gateway_id(gateway_id)

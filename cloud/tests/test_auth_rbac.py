@@ -1,7 +1,35 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
+
+
+def test_access_token_is_jwt_shaped_and_rejects_invalid_or_expired(monkeypatch):
+    from cloud.app import auth as authmod
+    from cloud.app.models import User
+
+    user = User(
+        id="jwt-1",
+        username="jwt-user",
+        role="operator",
+        password_hash="unused",
+        home_id="home-1",
+    )
+
+    token = authmod.create_access_token(user)
+    assert token.count(".") == 2
+    assert authmod.decode_access_token(token)["sub"] == "jwt-1"
+
+    with pytest.raises(HTTPException) as invalid:
+        authmod.decode_access_token("not-a-valid-token")
+    assert invalid.value.status_code == 401
+
+    monkeypatch.setattr(authmod.settings, "auth_token_ttl_seconds", -1)
+    expired = authmod.create_access_token(user)
+    with pytest.raises(HTTPException) as expired_error:
+        authmod.decode_access_token(expired)
+    assert expired_error.value.status_code == 401
 
 
 async def _ensure_home(session, home_id: str) -> None:

@@ -92,8 +92,8 @@ Do not put real secrets, private keys, JWT secrets, database passwords, or certi
 ## Open Dependencies
 
 - `SCRUM-91` mobile login-state subagent is running separately.
-- Backend auth endpoints need Phase 2 implementation; Phase 0 does not invent endpoint behavior.
-- Live EC2 validation is outside local Phase 0 and must be marked `not testable in this environment` unless run later with operator approval.
+- Backend Phase 2 auth/RBAC is locally verified, but mobile login-state integration still needs `SCRUM-91` output.
+- Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with operator approval.
 
 ## Phase 0 Verification
 
@@ -139,3 +139,28 @@ Evidence checked:
 - `deploy/nginx/prod.conf` proxies HTTPS traffic to internal `cloud-api:8000`.
 - `docs/production/production-networking.md` documents security group intent and local test limitations.
 - `docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config` parses the secure compose file.
+
+## Phase 2 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q
+```
+
+Result:
+
+```text
+23 passed in 9.54s
+```
+
+Evidence checked:
+
+- `/auth/login` returns JWT-shaped access tokens with expiry, role, user id, and home id.
+- Invalid and expired bearer tokens return `401`.
+- Unauthenticated device command requests return `401`.
+- `viewer` device command requests return `403`.
+- `operator` device command requests succeed where allowed.
+- `operator` permit-join requests return `403`.
+- `admin` permit-join requests succeed.
+- `docs/production/production-auth.md` records deferred refresh, `/auth/me`, and token-revocation items.

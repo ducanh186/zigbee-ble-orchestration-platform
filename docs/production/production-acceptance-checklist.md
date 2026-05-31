@@ -52,21 +52,30 @@ Status: Verified locally. Live EC2 security group state is not testable in this 
 
 ## Phase 2 - REST API Authentication and Authorization
 
-- [ ] Real login endpoint exists.
-- [ ] Password hashing is implemented with a safe algorithm.
-- [ ] JWT access tokens are issued and validated.
-- [ ] Refresh/logout/me behavior is implemented or explicitly deferred with rationale.
-- [ ] High-risk endpoints require authentication.
-- [ ] Role-based access control covers `viewer`, `operator`, and `admin`.
-- [ ] Unauthenticated command request returns `401`.
-- [ ] Viewer command request returns `403`.
-- [ ] Operator command request succeeds where allowed.
-- [ ] Operator permit-join request returns `403`.
-- [ ] Admin permit-join request succeeds.
-- [ ] Invalid token returns `401`.
-- [ ] Expired token returns `401`.
+- [x] Real login endpoint exists.
+- [x] Password hashing is implemented with a safe algorithm.
+- [x] JWT access tokens are issued and validated.
+- [x] Refresh/logout/me behavior is implemented or explicitly deferred with rationale.
+- [x] Phase 2 high-risk actuator endpoints require authentication.
+- [x] Role-based access control covers `viewer`, `operator`, and `admin`.
+- [x] Unauthenticated command request returns `401`.
+- [x] Viewer command request returns `403`.
+- [x] Operator command request succeeds where allowed.
+- [x] Operator permit-join request returns `403`.
+- [x] Admin permit-join request succeeds.
+- [x] Invalid token returns `401`.
+- [x] Expired token returns `401`.
 
-Status: Not started. `SCRUM-91` is delegated for mobile login-state work.
+Status: Backend REST API slice verified locally. Mobile login-state work remains delegated under `SCRUM-91`.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q
+23 passed in 9.54s
+```
+
+Runbook: docs/production/production-auth.md
 
 ## Phase 3 - MQTT TLS/mTLS and Broker ACL Hardening
 

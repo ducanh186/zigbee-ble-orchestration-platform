@@ -233,7 +233,7 @@ class AuthLogin(BaseModel):
 class AuthSessionOut(BaseModel):
     access_token: str
     user_id: str
-    role: Literal["admin", "user"]
+    role: Literal["admin", "operator", "viewer", "user"]
     home_id: str | None = None
     expires_at: datetime
 

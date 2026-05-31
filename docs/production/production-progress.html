@@ -117,7 +117,7 @@
       margin-top: 8px;
     }
     .bar {
-      width: 13%;
+      width: 38%;
       height: 100%;
       background: var(--accent);
     }
@@ -138,12 +138,12 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">25%</span>
-        <div class="progress" aria-label="25 percent complete"><div class="bar" style="width:25%"></div></div>
+        <span class="value">38%</span>
+        <div class="progress" aria-label="38 percent complete"><div class="bar" style="width:38%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
-        <span class="value">2026-06-01 02:12:02 +07:00</span>
+        <span class="value">2026-06-01 02:46:30 +07:00</span>
       </div>
     </div>
   </header>
@@ -175,9 +175,9 @@
           </tr>
           <tr>
             <td>2</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">BACKEND_DONE</span></td>
             <td>REST API authentication and authorization.</td>
-            <td><code>SCRUM-91</code> delegated for mobile login-state slice.</td>
+            <td><code>docs/production/production-auth.md</code>, auth/RBAC tests PASS; <code>SCRUM-91</code> mobile slice pending.</td>
           </tr>
           <tr>
             <td>3</td>
@@ -218,7 +218,7 @@
       <ul>
         <li>Production domain and certificate provider need operator confirmation.</li>
         <li>Live EC2 security group state is not verified in local environment.</li>
-        <li>Backend auth endpoints are not implemented in current local main evidence.</li>
+        <li>Mobile login-state integration remains delegated under <code>SCRUM-91</code>.</li>
       </ul>
     </section>
 
@@ -229,6 +229,7 @@
         <li><code>docs/production/production-hardening-plan.md</code></li>
         <li><code>docs/production/production-acceptance-checklist.md</code></li>
         <li><code>docs/production/production-final-report.md</code></li>
+        <li><code>docs/production/production-auth.md</code></li>
         <li><code>deploy/.env.prod.example</code></li>
       </ul>
     </section>
@@ -259,6 +260,11 @@
             <td><span class="badge done">PASS</span></td>
             <td>Secure compose config parses from the <code>deploy/</code> directory using a temporary copy of <code>.env.prod.example</code>.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>23 passed in 9.54s. Confirms JWT-shaped token validation, command auth/RBAC, and admin-only permit join.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -282,10 +288,10 @@
             <td>Phase 7 release cleanup or operator migration decision</td>
           </tr>
           <tr>
-            <td>Production auth is not proven by current backend evidence.</td>
-            <td>High</td>
-            <td><code>cloud/app/main.py:57-63</code></td>
-            <td>Phase 2</td>
+            <td>Mobile production auth state is not integrated with backend login yet.</td>
+            <td>Medium</td>
+            <td><code>SCRUM-91</code> delegated mobile login-state slice</td>
+            <td>Phase 2 mobile follow-up</td>
           </tr>
           <tr>
             <td>Backup/restore/alerting are not production-grade yet.</td>
@@ -300,10 +306,9 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit Phase 1 reverse-proxy/exposure-lockdown artifacts.</li>
-        <li>Push branch <code>codex/scrum-90-phase1-reverse-proxy</code>.</li>
-        <li>Create PR to <code>main</code> for Phase 1.</li>
-        <li>Continue Phase 2 after Phase 1 PR is reviewed and merged.</li>
+        <li>Commit, push, PR, and merge backend Phase 2 branch <code>codex/scrum-90-phase2-auth</code>.</li>
+        <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
+        <li>Start Phase 3 MQTT TLS/mTLS and ACL hardening.</li>
       </ol>
     </section>
 
@@ -327,6 +332,11 @@
             <td>2026-06-01 02:24:00 +07:00</td>
             <td>Phase 1 secure compose, Nginx HTTPS proxy config, networking runbook, and exposure contract test added.</td>
             <td><code>SCRUM-93</code>; <code>codex/scrum-90-phase1-reverse-proxy</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 02:46:30 +07:00</td>
+            <td>Backend Phase 2 JWT-shaped bearer auth, command RBAC, and admin-only permit join verified.</td>
+            <td><code>SCRUM-94</code>; <code>codex/scrum-90-phase2-auth</code></td>
           </tr>
         </tbody>
       </table>

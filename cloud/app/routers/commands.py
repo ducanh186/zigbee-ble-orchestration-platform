@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from pydantic import ValidationError
 
+from cloud.app.auth import require_operator
 from cloud.app.database import get_db
-from cloud.app.models import Command, Device
+from cloud.app.models import Command, Device, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import CommandCreate, CommandOut, translate_command_for_gateway
 
@@ -24,6 +25,7 @@ async def create_command(
     device_id: str,
     body: CommandCreate,
     db: AsyncSession = Depends(get_db),
+    _operator: User = Depends(require_operator),
 ):
     # Verify device exists and get its type for command translation
     result = await db.execute(select(Device).where(Device.id == device_id))
