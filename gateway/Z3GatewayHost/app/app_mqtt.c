@@ -12,6 +12,7 @@
 
 #include <mosquitto.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,13 +25,15 @@
 
 // ===== Broker connection defaults =====
 // Overridable at runtime via environment variables:
-//   SB_MQTT_HOST, SB_MQTT_PORT, SB_MQTT_USERNAME, SB_MQTT_PASSWORD
+//   SB_MQTT_HOST, SB_MQTT_PORT, SB_MQTT_USERNAME, SB_MQTT_PASSWORD,
+//   SB_MQTT_TLS_ENABLED, SB_MQTT_MTLS_ENABLED, SB_MQTT_CA_CERT_PATH,
+//   SB_MQTT_CLIENT_CERT_PATH, SB_MQTT_CLIENT_KEY_PATH
 #define MQTT_CLIENT_ID        "z3gw-host"
-#define MQTT_HOST_DEFAULT     "98.83.4.87"
+#define MQTT_HOST_DEFAULT     "localhost"
 #define MQTT_PORT_DEFAULT     1883
 #define MQTT_KEEPALIVE        60
 #define MQTT_USERNAME_DEFAULT "gateway"
-#define MQTT_PASSWORD_DEFAULT "gateway123"
+#define MQTT_PASSWORD_DEFAULT ""
 
 // Reconnect: 1 s initial, 30 s max, exponential backoff
 #define MQTT_RECONN_MIN  1
@@ -41,12 +44,20 @@ static const char *sMqttHost     = MQTT_HOST_DEFAULT;
 static int         sMqttPort     = MQTT_PORT_DEFAULT;
 static const char *sMqttUsername = MQTT_USERNAME_DEFAULT;
 static const char *sMqttPassword = MQTT_PASSWORD_DEFAULT;
+static bool        sMqttTlsEnabled = false;
+static bool        sMqttMtlsEnabled = false;
+static const char *sMqttCaCertPath = NULL;
+static const char *sMqttClientCertPath = NULL;
+static const char *sMqttClientKeyPath = NULL;
 
 // ===== Topic contract (sb/v1 namespace) =====
-#define MQTT_TENANT  "hust"
-#define MQTT_SITE    "lab01"
-#define MQTT_GW_ID   "gw-ubuntu-01"
-#define MQTT_PREFIX  "sb/v1/" MQTT_TENANT "/" MQTT_SITE "/" MQTT_GW_ID
+#define MQTT_TENANT_DEFAULT  "hust"
+#define MQTT_SITE_DEFAULT    "lab01"
+#define MQTT_GW_ID_DEFAULT   "gw-ubuntu-01"
+static const char *sMqttTenant = MQTT_TENANT_DEFAULT;
+static const char *sMqttSite   = MQTT_SITE_DEFAULT;
+static const char *sMqttGwId   = MQTT_GW_ID_DEFAULT;
+static char        sMqttPrefix[128] = "sb/v1/hust/lab01/gw-ubuntu-01";
 
 // ===== Inbound command queue =====
 // Sized for the larger of (a) a command request envelope and (b) an automation
@@ -92,6 +103,113 @@ static uint64_t epochMs(void)
   return (uint64_t)tv.tv_sec * 1000ULL + (uint64_t)(tv.tv_usec / 1000);
 }
 
+static bool envTruthy(const char *value)
+{
+  return value && value[0] &&
+         (strcmp(value, "1") == 0 ||
+          strcmp(value, "true") == 0 ||
+          strcmp(value, "yes") == 0 ||
+          strcmp(value, "on") == 0);
+}
+
+static bool isProductionMode(void)
+{
+  const char *mode = getenv("SB_ENV");
+  return envTruthy(getenv("SB_PRODUCTION")) ||
+         (mode && strcmp(mode, "production") == 0);
+}
+
+static bool requireEnv(const char *name, const char *value)
+{
+  if (value && value[0]) return true;
+  emberAfCorePrintln("MQTT: production config missing %s", name);
+  appLogLog("mqtt", "config_missing", "\"name\":\"%s\"", name);
+  return false;
+}
+
+static void refreshMqttPrefix(void)
+{
+  snprintf(sMqttPrefix, sizeof(sMqttPrefix), "sb/v1/%s/%s/%s",
+           sMqttTenant, sMqttSite, sMqttGwId);
+}
+
+static bool resolveMqttConfig(void)
+{
+  bool production = isProductionMode();
+
+  const char *envHost = getenv("SB_MQTT_HOST");
+  if (envHost && envHost[0]) {
+    sMqttHost = envHost;
+  } else if (production && !requireEnv("SB_MQTT_HOST", envHost)) {
+    return false;
+  }
+
+  const char *envPort = getenv("SB_MQTT_PORT");
+  if (envPort && envPort[0]) {
+    sMqttPort = atoi(envPort);
+    if (sMqttPort <= 0) {
+      emberAfCorePrintln("MQTT: invalid SB_MQTT_PORT=%s", envPort);
+      return false;
+    }
+  } else if (production && !requireEnv("SB_MQTT_PORT", envPort)) {
+    return false;
+  }
+
+  const char *envUser = getenv("SB_MQTT_USERNAME");
+  if (envUser && envUser[0]) {
+    sMqttUsername = envUser;
+  } else if (production && !requireEnv("SB_MQTT_USERNAME", envUser)) {
+    return false;
+  }
+
+  const char *envPass = getenv("SB_MQTT_PASSWORD");
+  if (envPass && envPass[0]) {
+    sMqttPassword = envPass;
+  } else if (production && !requireEnv("SB_MQTT_PASSWORD", envPass)) {
+    return false;
+  }
+
+  const char *envTenant = getenv("SB_TENANT_ID");
+  if (envTenant && envTenant[0]) {
+    sMqttTenant = envTenant;
+  } else if (production && !requireEnv("SB_TENANT_ID", envTenant)) {
+    return false;
+  }
+
+  const char *envSite = getenv("SB_SITE_ID");
+  if (envSite && envSite[0]) {
+    sMqttSite = envSite;
+  } else if (production && !requireEnv("SB_SITE_ID", envSite)) {
+    return false;
+  }
+
+  const char *envGwId = getenv("SB_GATEWAY_ID");
+  if (envGwId && envGwId[0]) {
+    sMqttGwId = envGwId;
+  } else if (production && !requireEnv("SB_GATEWAY_ID", envGwId)) {
+    return false;
+  }
+
+  sMqttTlsEnabled = production || envTruthy(getenv("SB_MQTT_TLS_ENABLED"));
+  sMqttMtlsEnabled = production || envTruthy(getenv("SB_MQTT_MTLS_ENABLED"));
+  sMqttCaCertPath = getenv("SB_MQTT_CA_CERT_PATH");
+  sMqttClientCertPath = getenv("SB_MQTT_CLIENT_CERT_PATH");
+  sMqttClientKeyPath = getenv("SB_MQTT_CLIENT_KEY_PATH");
+
+  if (sMqttTlsEnabled &&
+      !requireEnv("SB_MQTT_CA_CERT_PATH", sMqttCaCertPath)) {
+    return false;
+  }
+  if (sMqttMtlsEnabled &&
+      (!requireEnv("SB_MQTT_CLIENT_CERT_PATH", sMqttClientCertPath) ||
+       !requireEnv("SB_MQTT_CLIENT_KEY_PATH", sMqttClientKeyPath))) {
+    return false;
+  }
+
+  refreshMqttPrefix();
+  return true;
+}
+
 // Build a minimal sb.v1 envelope.  Caller supplies the inner payload JSON
 // (without outer braces).  Result written to buf.
 static int buildEnvelope(char *buf, size_t len, const char *innerPayloadJson)
@@ -103,12 +221,13 @@ static int buildEnvelope(char *buf, size_t len, const char *innerPayloadJson)
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
      "\"ts\":%llu,"
-     "\"tenant_id\":\"" MQTT_TENANT "\","
-     "\"site_id\":\"" MQTT_SITE "\","
-     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"tenant_id\":\"%s\","
+     "\"site_id\":\"%s\","
+     "\"gateway_id\":\"%s\","
      "\"source\":\"gateway\","
      "\"payload\":{%s}}",
-    (unsigned long)id, (unsigned long long)ts, innerPayloadJson);
+    (unsigned long)id, (unsigned long long)ts,
+    sMqttTenant, sMqttSite, sMqttGwId, innerPayloadJson);
 }
 
 //----------------------------------------------------------------------
@@ -127,7 +246,7 @@ static void mqttQueueInit(void)
 // Drop policy: a payload that would exceed MQTT_Q_PAYLOAD_MAX is rejected
 // outright -- silently truncating produces invalid JSON that downstream
 // parsers can mis-handle.  Topics are similarly guarded (any non-malicious
-// MQTT_PREFIX/automations/{id}/desired stays well under MQTT_Q_TOPIC_MAX,
+// sb/v1/.../automations/{id}/desired stays well under MQTT_Q_TOPIC_MAX,
 // but we still defend by rejecting if the topic alone would overflow).
 static bool mqttQueuePush(const char *topic, const void *payload,
                           int payloadLen, int qos)
@@ -221,30 +340,34 @@ static void onConnect(struct mosquitto *mosq, void *userdata, int rc)
   appMqttPublish("gateway/online", env, 1, true);
 
   // Subscribe to command requests
-  int sr = mosquitto_subscribe(mosq, NULL,
-               MQTT_PREFIX "/commands/+/request", 1);
+  char commandTopic[160];
+  snprintf(commandTopic, sizeof(commandTopic), "%s/commands/+/request",
+           sMqttPrefix);
+  int sr = mosquitto_subscribe(mosq, NULL, commandTopic, 1);
   if (sr != MOSQ_ERR_SUCCESS) {
     emberAfCorePrintln("MQTT: subscribe failed: %s", mosquitto_strerror(sr));
     appLogLog("mqtt", "sub_fail", "\"rc\":%d,\"text\":\"%s\"",
               sr, mosquitto_strerror(sr));
   } else {
-    emberAfCorePrintln("MQTT: subscribed to " MQTT_PREFIX "/commands/+/request");
+    emberAfCorePrintln("MQTT: subscribed to %s", commandTopic);
     appLogLog("mqtt", "subscribed",
-              "\"topic\":\"" MQTT_PREFIX "/commands/+/request\",\"qos\":1");
+              "\"topic\":\"%s\",\"qos\":1", commandTopic);
   }
 
   // Subscribe to automation desired (cloud -> gateway, retained).
   // See docs/AUTOMATION_MQTT_CONTRACT.md §4.
-  int sa = mosquitto_subscribe(mosq, NULL,
-               MQTT_PREFIX "/automations/+/desired", 1);
+  char automationTopic[160];
+  snprintf(automationTopic, sizeof(automationTopic),
+           "%s/automations/+/desired", sMqttPrefix);
+  int sa = mosquitto_subscribe(mosq, NULL, automationTopic, 1);
   if (sa != MOSQ_ERR_SUCCESS) {
     emberAfCorePrintln("MQTT: auto subscribe failed: %s", mosquitto_strerror(sa));
     appLogLog("mqtt", "auto_sub_fail", "\"rc\":%d,\"text\":\"%s\"",
               sa, mosquitto_strerror(sa));
   } else {
-    emberAfCorePrintln("MQTT: subscribed to " MQTT_PREFIX "/automations/+/desired");
+    emberAfCorePrintln("MQTT: subscribed to %s", automationTopic);
     appLogLog("mqtt", "subscribed",
-              "\"topic\":\"" MQTT_PREFIX "/automations/+/desired\",\"qos\":1");
+              "\"topic\":\"%s\",\"qos\":1", automationTopic);
   }
 }
 
@@ -291,19 +414,11 @@ void appMqttInit(void)
 {
   int ret;
 
-  // Resolve broker config from environment (SB_MQTT_* matches cloud convention)
-  const char *envHost = getenv("SB_MQTT_HOST");
-  if (envHost && envHost[0]) sMqttHost = envHost;
-
-  const char *envPort = getenv("SB_MQTT_PORT");
-  if (envPort && envPort[0]) sMqttPort = atoi(envPort);
-  if (sMqttPort <= 0) sMqttPort = MQTT_PORT_DEFAULT;
-
-  const char *envUser = getenv("SB_MQTT_USERNAME");
-  if (envUser && envUser[0]) sMqttUsername = envUser;
-
-  const char *envPass = getenv("SB_MQTT_PASSWORD");
-  if (envPass && envPass[0]) sMqttPassword = envPass;
+  // Resolve broker config from environment (SB_MQTT_* matches cloud convention).
+  if (!resolveMqttConfig()) {
+    emberAfCorePrintln("MQTT: production config validation failed");
+    return;
+  }
 
   emberAfCorePrintln("MQTT: config host=%s port=%d user=%s",
                      sMqttHost, sMqttPort, sMqttUsername);
@@ -329,13 +444,31 @@ void appMqttInit(void)
   // Authenticate with broker
   mosquitto_username_pw_set(sMosq, sMqttUsername, sMqttPassword);
 
+  if (sMqttTlsEnabled) {
+    ret = mosquitto_tls_set(
+      sMosq,
+      sMqttCaCertPath,
+      NULL,
+      sMqttMtlsEnabled ? sMqttClientCertPath : NULL,
+      sMqttMtlsEnabled ? sMqttClientKeyPath : NULL,
+      NULL);
+    if (ret != MOSQ_ERR_SUCCESS) {
+      emberAfCorePrintln("MQTT: tls_set failed: %s", mosquitto_strerror(ret));
+      mosquitto_destroy(sMosq);
+      sMosq = NULL;
+      return;
+    }
+  }
+
   // Initialize inbound command queue
   mqttQueueInit();
 
   // LWT: broker publishes this if we disconnect ungracefully
   char lwt[512];
   buildEnvelope(lwt, sizeof(lwt), "\"value\":\"offline\"");
-  mosquitto_will_set(sMosq, MQTT_PREFIX "/gateway/online",
+  char lwtTopic[160];
+  snprintf(lwtTopic, sizeof(lwtTopic), "%s/gateway/online", sMqttPrefix);
+  mosquitto_will_set(sMosq, lwtTopic,
                      (int)strlen(lwt), lwt, 1, true);
 
   sAppStartMs   = epochMs();
@@ -374,7 +507,7 @@ int appMqttPublish(const char *topicSuffix, const char *payload,
   if (!sMosq) return MOSQ_ERR_INVAL;
 
   char fullTopic[192];
-  snprintf(fullTopic, sizeof(fullTopic), "%s/%s", MQTT_PREFIX, topicSuffix);
+  snprintf(fullTopic, sizeof(fullTopic), "%s/%s", sMqttPrefix, topicSuffix);
 
   int rc = mosquitto_publish(sMosq, NULL, fullTopic,
                              (int)strlen(payload), payload, qos, retain);
@@ -561,7 +694,7 @@ void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
 
     char fullTopic[192];
     snprintf(fullTopic, sizeof(fullTopic),
-             "%s/devices/%s/%s/registry", MQTT_PREFIX, types[i], eui64Str);
+             "%s/devices/%s/%s/registry", sMqttPrefix, types[i], eui64Str);
 
     // Empty (zero-length) payload + retain=1 -> broker drops the retained
     // value for this topic.  See MQTT 3.1.1 / 5 spec section on retained
@@ -654,16 +787,17 @@ void appMqttPublishCommandReply(const char *command_id,
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
      "\"ts\":%llu,"
-     "\"tenant_id\":\"" MQTT_TENANT "\","
-     "\"site_id\":\"" MQTT_SITE "\","
-     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"tenant_id\":\"%s\","
+     "\"site_id\":\"%s\","
+     "\"gateway_id\":\"%s\","
      "\"source\":\"gateway\","
      "\"correlation_id\":\"cmd_%s\","
      "\"payload\":{\"command_id\":\"%s\","
                   "\"device_id\":%s,"
                   "\"status\":\"%s\","
                   "\"reason\":%s}}",
-    (unsigned long)id, (unsigned long long)ts, command_id,
+    (unsigned long)id, (unsigned long long)ts,
+    sMqttTenant, sMqttSite, sMqttGwId, command_id,
     command_id, devField, status, reasonField);
 
   char topicSuffix[96];
@@ -748,13 +882,14 @@ void appMqttPublishAutomationEvent(const char *automation_id,
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
      "\"ts\":%llu,"
-     "\"tenant_id\":\"" MQTT_TENANT "\","
-     "\"site_id\":\"" MQTT_SITE "\","
-     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"tenant_id\":\"%s\","
+     "\"site_id\":\"%s\","
+     "\"gateway_id\":\"%s\","
      "\"source\":\"gateway\","
      "\"correlation_id\":\"auto_%s\","
      "\"payload\":{%s}}",
     (unsigned long)id, (unsigned long long)ts,
+    sMqttTenant, sMqttSite, sMqttGwId,
     automation_id, inner_payload_json);
 
   if (n < 0 || (size_t)n >= sizeof(envelope)) {
@@ -798,9 +933,9 @@ void appMqttPublishAutomationReported(const char *automation_id,
     "{\"schema\":\"sb.v1\","
      "\"msg_id\":\"%lu\","
      "\"ts\":%llu,"
-     "\"tenant_id\":\"" MQTT_TENANT "\","
-     "\"site_id\":\"" MQTT_SITE "\","
-     "\"gateway_id\":\"" MQTT_GW_ID "\","
+     "\"tenant_id\":\"%s\","
+     "\"site_id\":\"%s\","
+     "\"gateway_id\":\"%s\","
      "\"source\":\"gateway\","
      "\"correlation_id\":\"auto_%s\","
      "\"payload\":{\"automation_id\":\"%s\","
@@ -808,6 +943,7 @@ void appMqttPublishAutomationReported(const char *automation_id,
                   "\"sync_status\":\"%s\","
                   "\"last_error\":%s}}",
     (unsigned long)id, (unsigned long long)ts,
+    sMqttTenant, sMqttSite, sMqttGwId,
     automation_id, automation_id,
     (unsigned long)version, sync_status, errField);
 
