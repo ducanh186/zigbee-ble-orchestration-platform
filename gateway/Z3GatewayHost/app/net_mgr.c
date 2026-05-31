@@ -5,6 +5,7 @@
 #include "app_mqtt.h"
 #include "device_discovery.h"
 #include "device_registry.h"
+#include "sec_mgr.h"
 
 #include "app/framework/include/af.h"
 
@@ -180,6 +181,10 @@ bool netMgrRediscoverByEui(const char *euiStr)
 
 void netMgrTick(void)
 {
+  // SCRUM-55 staging-table TTL sweep. Cheap (4-slot scan); safe to run
+  // unconditionally regardless of plugin presence.
+  secMgrTick();
+
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
   // Layer-1 boot rediscovery fires once, ~3 s after EMBER_NETWORK_UP.
   if (g_rediscoverDeadline != 0
@@ -268,6 +273,45 @@ EmberStatus netMgrCloseJoin(void)
 #endif
 }
 
+EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
+                                    const uint8_t *ic_bytes,
+                                    uint8_t ic_len,
+                                    uint16_t durationSec)
+{
+  // 2 s grace beyond permit-join window to cover slow associate + key derive.
+  uint32_t ttl_ms = (uint32_t)durationSec * 1000u + 2000u;
+  if (!secMgrStage(eui_le, ic_bytes, ic_len, ttl_ms)) {
+    appLogLog("NET", "open_secure_fail",
+              "\"reason\":\"stage_rejected\",\"ic_len\":%u",
+              (unsigned)ic_len);
+    return EMBER_BAD_ARGUMENT;
+  }
+
+  // With BDB_JOIN_USES_INSTALL_CODE_KEY=1 the network-creator-security
+  // plugin's plain OpenNetwork() returns INVALID_CALL by design. We bypass
+  // the plugin and just permit-join the radio directly; the joining device
+  // will trigger emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback,
+  // which returns the staged IC -> stack derives the TC link key via
+  // AES-MMO on the NCP side. No host-side hash needed.
+  if (durationSec > 254) durationSec = 254;
+  EmberStatus st = emberPermitJoining((uint8_t)durationSec);
+  if (st == EMBER_SUCCESS) {
+    g_networkOpen   = true;
+    g_openTick      = msTick();
+    g_openDurationMs = (uint32_t)durationSec * 1000u;
+
+    char extra[64];
+    snprintf(extra, sizeof(extra),
+             "\"duration_sec\":%u,\"trigger\":\"pjoin-secure\"",
+             (unsigned)durationSec);
+    appMqttPublishGatewayEvent("permit_join_opened", extra);
+  }
+  appLogLog("NET", "open_secure_cmd",
+            "\"zstatus\":\"0x%02X\",\"duration_s\":%u",
+            (unsigned)st, (unsigned)durationSec);
+  return st;
+}
+
 // callback: formed network
 void emberAfPluginNetworkCreatorCompleteCallback(const EmberNetworkParameters *network,
                                                 bool usedSecondaryChannels)
@@ -302,6 +346,10 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   if (status == EMBER_NETWORK_UP) {
     appLogEmitHeartbeat();
+    // SCRUM-55: set TC key request policy = DENY now that EZSP is connected.
+    // Calling ezspSetPolicy at emberAfMainInitCallback time returns
+    // EZSP_NOT_CONNECTED (0x28); NETWORK_UP guarantees the host-NCP link.
+    secMgrOnStackUp();
     // Arm boot-time rediscovery once per session. netMgrTick fires it after
     // BOOT_REDISCOVER_DELAY_MS so the EZSP child-table cache has time to
     // repopulate after stack-up.

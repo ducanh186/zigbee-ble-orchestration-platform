@@ -31,7 +31,11 @@
 // <q EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_BDB_JOIN_USES_INSTALL_CODE_KEY> Trust Center requires install code for joining
 // <i> Default: FALSE
 // <i> The TC will allow joining of a device through install code only. Applications that implement the emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback callback will be given a chance to add an install code for a joining device during the join procedure.
-#define EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_BDB_JOIN_USES_INSTALL_CODE_KEY   0
+// SCRUM-55: enforce install-code-derived TC link key for all device joins.
+// Pairs with sec_mgr.c::emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback,
+// which returns the IC staged for the joining EUI64 (NOT_FOUND otherwise).
+// Default-key (ZigBeeAlliance09) joins are rejected by the stack with this on.
+#define EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_BDB_JOIN_USES_INSTALL_CODE_KEY   1
 
 // <q EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_ALLOW_TC_REJOIN_WITH_WELL_KNOWN_KEY> Allow Trust Center rejoin with well known key
 // <i> Default: FALSE

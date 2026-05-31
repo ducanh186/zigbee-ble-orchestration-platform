@@ -202,9 +202,36 @@ void emberAfTrustCenterJoinCallback(EmberNodeId newNodeId,
   (void)parentOfNewNode;
   (void)decision;
 
+  // SCRUM-55 acceptance log — decode the join key origin so a successful
+  // install-code-derived join is distinguishable from a default-key (denied)
+  // attempt without needing an external Zigbee sniffer. The key_type string
+  // is the proxy used by the negative-test runbook.
+  //
+  // With EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_BDB_JOIN_USES_INSTALL_CODE_KEY=1
+  // a successful join here implies the stack derived the TC link key from
+  // a staged install code; default-key (ZigBeeAlliance09) attempts are
+  // rejected before this callback fires.
+  const char *key_type;
+  switch (status) {
+    case EMBER_STANDARD_SECURITY_SECURED_REJOIN:
+    case EMBER_STANDARD_SECURITY_UNSECURED_JOIN:
+      key_type = "IC_DERIVED";
+      break;
+    case EMBER_DEVICE_LEFT:
+      key_type = "LEFT";
+      break;
+    default:
+      key_type = "OTHER";
+      break;
+  }
+
+  char euiStrTc[17];
+  eui64ToStringBigEndian(euiStrTc, sizeof(euiStrTc), newNodeEui64);
   appLogLog("NET", "tc_join",
-    "\"node_id\":\"0x%04X\",\"status\":%u,\"decision\":%u",
-    (unsigned)newNodeId, (unsigned)status, (unsigned)decision
+    "\"node_id\":\"0x%04X\",\"eui64\":\"%s\",\"status\":%u,"
+    "\"decision\":%u,\"key_type\":\"%s\"",
+    (unsigned)newNodeId, euiStrTc,
+    (unsigned)status, (unsigned)decision, key_type
   );
 
   bool joined = (status == EMBER_STANDARD_SECURITY_SECURED_REJOIN

@@ -1070,6 +1070,14 @@ $(OUTPUT_DIR)/project/app/net_mgr.o: app/net_mgr.c
 CDEPS += $(OUTPUT_DIR)/project/app/net_mgr.d
 OBJS += $(OUTPUT_DIR)/project/app/net_mgr.o
 
+# SCRUM-55: security baseline module (install-code TC join policy + staging table).
+$(OUTPUT_DIR)/project/app/sec_mgr.o: app/sec_mgr.c
+	@$(POSIX_TOOL_PATH)echo 'Building app/sec_mgr.c'
+	@$(POSIX_TOOL_PATH)mkdir -p $(@D)
+	$(ECHO)$(CC) $(CFLAGS) -c -o $@ app/sec_mgr.c
+CDEPS += $(OUTPUT_DIR)/project/app/sec_mgr.d
+OBJS += $(OUTPUT_DIR)/project/app/sec_mgr.o
+
 $(OUTPUT_DIR)/project/app/telemetry_rx.o: app/telemetry_rx.c
 	@$(POSIX_TOOL_PATH)echo 'Building app/telemetry_rx.c'
 	@$(POSIX_TOOL_PATH)mkdir -p $(@D)

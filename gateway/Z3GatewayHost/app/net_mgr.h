@@ -31,6 +31,21 @@ EmberStatus netMgrOpenForJoin(uint16_t durationSec);
 // Cancels any auto-close timer.  Returns SDK status.
 EmberStatus netMgrCloseJoin(void);
 
+// Stage an install code for a specific EUI64 (via sec_mgr) and open the
+// network for joining.  Only that EUI can derive the correct TC link key,
+// so the join is bound to the intended device.  TTL of the staged IC is
+// `durationSec*1000 + 2000` (2 s grace past permit-join window).
+//
+// SCRUM-55 security baseline + SCRUM-69 §8.1 contract.
+//
+// Returns the EmberStatus from netMgrOpenForJoin, or EMBER_BAD_ARGUMENT if
+// the IC length is invalid (must be 8/10/14/18 bytes incl 2-byte CRC) or
+// the staging table is full.
+EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
+                                    const uint8_t *ic_bytes,
+                                    uint8_t ic_len,
+                                    uint16_t durationSec);
+
 // On-demand rediscovery (gateway.rediscover_device). Looks up `euiStr`
 // (big-endian hex, 16 chars) in the EZSP child table or the stack address
 // cache, then kicks ZDO Simple Descriptor classification via
