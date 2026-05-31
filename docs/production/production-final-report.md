@@ -26,6 +26,9 @@ Reason:
 | Acceptance checklist | `docs/production/production-acceptance-checklist.md` |
 | Progress dashboard | `docs/production/production-progress.html` |
 | Production env example | `deploy/.env.prod.example` |
+| Production networking runbook | `docs/production/production-networking.md` |
+| Secure production compose | `deploy/docker-compose.prod-secure.yml` |
+| Nginx production config | `deploy/nginx/prod.conf` |
 
 ## Final Readiness Gate
 
@@ -40,11 +43,10 @@ Before this report can say `READY`, all of the following must be true:
 
 ## Current Open Items
 
-- Phase 1: HTTPS reverse proxy and exposure lockdown.
+- Phase 1: HTTPS reverse proxy and exposure lockdown is locally verified, but live EC2 security group state still needs operator confirmation.
 - Phase 2: REST API authentication and authorization.
 - Phase 3: MQTT TLS/mTLS and ACL hardening.
 - Phase 4: Gateway production config hardening.
 - Phase 5: Zigbee secure commissioning.
 - Phase 6: Backup, restore, monitoring, and alerting.
 - Phase 7: CI/CD, release, rollback, and final evidence.
-
