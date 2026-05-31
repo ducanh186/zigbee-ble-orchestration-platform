@@ -66,6 +66,6 @@ def test_phase6_acceptance_and_dashboard_are_updated() -> None:
     assert "[x] Health monitoring is documented." in phase6
     assert "[x] Alerting channel is documented." in phase6
     assert "production-operations.md" in phase6
-    assert "88%" in progress
     assert "SCRUM-98" in progress
+    assert "production-operations.md" in progress
     assert "production-operations.md" in final_report

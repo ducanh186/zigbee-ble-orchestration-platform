@@ -1,10 +1,10 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 03:58:00 +07:00
+Last updated: 2026-06-01 04:22:00 +07:00
 
 Jira: SCRUM-90
 
-Status: PHASE_6_OPERATIONS_VERIFIED_LOCALLY
+Status: PHASE_7_RELEASE_CANDIDATE_VERIFIED_LOCALLY
 
 ## Execution Model
 
@@ -21,9 +21,9 @@ Option 1 is approved: implement the production-hardening work as small SCRUM-siz
 Current active branch/worktree:
 
 ```text
-Branch: codex/scrum-90-phase6-ops-runbooks
+Branch: codex/scrum-90-phase7-release-evidence
 Worktree: C:\tmp\zigbee-scrum90-production-hardening
-Base: origin/main after PR 69 merge
+Base: origin/main after PR 70 merge
 ```
 
 ## Phase Breakdown
@@ -96,6 +96,7 @@ Do not put real secrets, private keys, JWT secrets, database passwords, or certi
 - Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with operator approval.
 - Live Zigbee default global key rejection needs operator hardware evidence before final production readiness is claimed.
 - Real backup and restore dry-run evidence needs an operator-approved environment before final production readiness is claimed.
+- Current EC2 deploy uses legacy `docker-compose.prod.yml`; secure compose cutover is required before stable production release.
 
 ## Phase 0 Verification
 
@@ -260,3 +261,24 @@ Evidence checked:
 - Secure compose persists `postgres-data`, `mosquitto-data`, and `mosquitto-log`.
 - Secure compose retains healthchecks for PostgreSQL, MQTT, and API.
 - Phase 6 checklist, final report, and progress dashboard link the operations runbook.
+
+## Phase 7 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_release_readiness_contract.py -q
+```
+
+Result:
+
+```text
+3 passed
+```
+
+Evidence checked:
+
+- `docs/production/production-release.md` documents CI, release, rollback, EC2 deploy evidence, and pre-release creation.
+- `docs/production/release-notes-v0.9.0-rc.1.md` is ready for the GitHub pre-release.
+- Phase 7 checklist, final report, and progress dashboard link release evidence.
+- Final report keeps `NOT_PRODUCTION_READY` visible.

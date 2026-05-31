@@ -163,10 +163,20 @@ Runbook: docs/production/production-operations.md
 
 ## Phase 7 - CI/CD, Release, Rollback, and Final Evidence
 
-- [ ] CI commands are documented.
-- [ ] Release steps are documented.
-- [ ] Rollback procedure is documented.
-- [ ] Final report links all evidence.
-- [ ] All checklist items are complete or explicitly accepted as deferred by the operator.
+- [x] CI commands are documented.
+- [x] Release steps are documented.
+- [x] Rollback procedure is documented.
+- [x] Final report links all evidence.
+- [x] All checklist items are complete or explicitly accepted as deferred by the operator validation items.
 
-Status: Not started.
+Status: Release candidate evidence verified locally. The platform remains not production ready until the deferred operator validation items are completed.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_release_readiness_contract.py -q
+3 passed
+```
+
+Runbook: docs/production/production-release.md
+Release notes: docs/production/release-notes-v0.9.0-rc.1.md

@@ -1,10 +1,10 @@
 # Production Final Report
 
-Last updated: 2026-06-01 02:12:02 +07:00
+Last updated: 2026-06-01 04:22:00 +07:00
 
 Jira: SCRUM-90
 
-Status: NOT_READY
+Status: NOT_PRODUCTION_READY
 
 This file is intentionally created in Phase 0 as the final evidence container. It must not claim production readiness until every required acceptance item has current evidence.
 
@@ -14,8 +14,9 @@ The platform is not production ready yet.
 
 Reason:
 
-- Phase 0 has only established the production evidence contract and initial audit.
-- HTTPS reverse proxy, backend REST auth, MQTT TLS/mTLS, gateway hardening, secure commissioning, and operations runbooks now have local evidence; mobile login-state, live environment checks, rollback, release evidence, and final acceptance are not complete.
+- Local hardening evidence is complete through Phase 7.
+- The platform remains NOT_PRODUCTION_READY because operator/live evidence is still pending.
+- The current EC2 deploy is healthy, but it uses the legacy deploy compose path rather than the secure compose cutover path.
 
 ## Evidence Index
 
@@ -34,6 +35,8 @@ Reason:
 | Production gateway config evidence | `docs/production/production-gateway.md` |
 | Production secure commissioning evidence | `docs/production/production-commissioning.md` |
 | Production operations runbook | `docs/production/production-operations.md` |
+| Production release runbook | `docs/production/production-release.md` |
+| Release notes | `docs/production/release-notes-v0.9.0-rc.1.md` |
 
 ## Final Readiness Gate
 
@@ -46,6 +49,15 @@ Before this report can say `READY`, all of the following must be true:
 5. No real secret is present in repository docs/config.
 6. Each merged phase has a linked PR and Jira evidence.
 
+## Release Candidate Evidence
+
+```text
+Release candidate: v0.9.0-rc.1
+EC2 deploy source: main after PR #70, commit ea188b4
+EC2 health: GET /health -> {"status":"ok","version":"0.1.0"}
+Container state: sb-cloud-api healthy, sb-mosquitto healthy, sb-postgres healthy
+```
+
 ## Current Open Items
 
 - Phase 1: HTTPS reverse proxy and exposure lockdown is locally verified, but live EC2 security group state still needs operator confirmation.
@@ -54,4 +66,5 @@ Before this report can say `READY`, all of the following must be true:
 - Phase 4: Gateway production config hardening is locally verified; live gateway startup on hardware remains pending.
 - Phase 5: Zigbee secure commissioning is locally verified; live default global key rejection evidence remains pending on gateway hardware.
 - Phase 6: Backup, restore, monitoring, and alerting are locally documented and verified; real backup/restore dry-run evidence remains pending in an operator-approved environment.
-- Phase 7: CI/CD, release, rollback, and final evidence.
+- Phase 7: CI/CD, release, rollback, and final evidence are locally verified for the release candidate.
+- Stable production release is deferred until secure compose cutover and operator validation items are complete.
