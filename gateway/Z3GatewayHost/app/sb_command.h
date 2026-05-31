@@ -37,6 +37,12 @@ typedef struct {
   // (parsed from payload.target.duration_sec; 0 means absent)
   int  duration_sec;
 
+  // gateway.prepare_join only (SCRUM-81). Empty if absent.
+  // target.eui64        : 16 hex chars, big-endian (contract §3 form)
+  // target.install_code : 16/20/28/36 hex chars incl 2-byte CRC (§7)
+  char eui64[17];
+  char install_code[40];
+
   // Optional
   uint32_t timeout_ms;      // default 5000 if absent
 } sb_command_t;

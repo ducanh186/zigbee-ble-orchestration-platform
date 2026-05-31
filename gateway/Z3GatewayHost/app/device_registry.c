@@ -4,6 +4,7 @@
 #include "app_mqtt.h"
 #include "app_utils.h"
 #include "app_log.h"
+#include "sec_mgr.h"  // secMgrHasStaged / secMgrForget
 
 #include <string.h>
 #include <strings.h>     // strcasecmp
@@ -238,6 +239,20 @@ void emberAfTrustCenterJoinCallback(EmberNodeId newNodeId,
                  || status == EMBER_STANDARD_SECURITY_UNSECURED_JOIN);
 
   if (joined) {
+    // SCRUM-81 contract §8.3 — when this join was driven by a prepare_join
+    // (Cloud staged the install code via sec_mgr), publish provisioning_joined
+    // and release the staging slot. Cloud correlates by eui64 + active session.
+    // For joins not preceded by a stage (e.g. existing devices that rejoin
+    // with their persistent TC link key), no event fires here.
+    if (secMgrHasStaged(newNodeEui64)) {
+      char extra[96];
+      snprintf(extra, sizeof(extra),
+               "\"eui64\":\"%s\",\"nwk_addr\":\"0x%04X\"",
+               euiStrTc, (unsigned)newNodeId);
+      appMqttPublishGatewayEvent("provisioning_joined", extra);
+      secMgrForget(newNodeEui64);
+    }
+
     deviceMonitorOnJoin(newNodeId, newNodeEui64);
 
     // Refresh nodeId for an already-known device (rejoin) before kicking

@@ -2,8 +2,10 @@
 
 #include "app/framework/include/af.h"
 #include "app_log.h"
+#include "app_mqtt.h"     // appMqttPublishGatewayEvent — provisioning_failed
 #include "app_utils.h"
 
+#include <stdio.h>
 #include <string.h>
 
 // EZSP policy IDs we set. Per gecko_sdk/protocol/zigbee/app/util/ezsp/ezsp-enum.h:
@@ -93,6 +95,12 @@ void secMgrTick(void)
         eui64ToStringBigEndian(eui_str, sizeof(eui_str), g_slots[i].eui_le);
         appLogLog("secMgr", "expired", "\"eui64\":\"%s\",\"slot\":%u",
                   eui_str, (unsigned)i);
+        // SCRUM-81 contract §8.3 — publish provisioning_failed when the
+        // staged join window expires without the device joining.
+        char extra[96];
+        snprintf(extra, sizeof(extra),
+                 "\"eui64\":\"%s\",\"reason\":\"timeout\"", eui_str);
+        appMqttPublishGatewayEvent("provisioning_failed", extra);
         wipeSlot(&g_slots[i]);
       }
     }
@@ -142,6 +150,12 @@ void secMgrForget(const EmberEUI64 eui_le)
   eui64ToStringBigEndian(eui_str, sizeof(eui_str), s->eui_le);
   wipeSlot(s);
   appLogLog("secMgr", "forget", "\"eui64\":\"%s\"", eui_str);
+}
+
+bool secMgrHasStaged(const EmberEUI64 eui_le)
+{
+  if (!eui_le) return false;
+  return findSlotByEui(eui_le) != NULL;
 }
 
 // ---------- TC plugin callback ----------

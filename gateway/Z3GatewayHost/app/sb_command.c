@@ -125,6 +125,13 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
     out->duration_sec = (int)dsec;
   }
 
+  // target.eui64 / target.install_code (gateway.prepare_join, SCRUM-81).
+  // Both optional — only present for prepare_join.  Dispatch validates length.
+  (void)findQuotedString(body, "\"eui64\":",
+                         out->eui64, sizeof(out->eui64));
+  (void)findQuotedString(body, "\"install_code\":",
+                         out->install_code, sizeof(out->install_code));
+
   // timeout_ms (optional)
   uint32_t t = 0;
   if (findUintExact(body, "\"timeout_ms\":", &t) && t > 0) {
