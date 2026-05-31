@@ -138,12 +138,12 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">63%</span>
-        <div class="progress" aria-label="63 percent complete"><div class="bar" style="width:63%"></div></div>
+        <span class="value">75%</span>
+        <div class="progress" aria-label="75 percent complete"><div class="bar" style="width:75%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
-        <span class="value">2026-06-01 03:18:48 +07:00</span>
+        <span class="value">2026-06-01 03:34:10 +07:00</span>
       </div>
     </div>
   </header>
@@ -193,9 +193,9 @@
           </tr>
           <tr>
             <td>5</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">DONE</span></td>
             <td>Zigbee secure commissioning.</td>
-            <td>Pending.</td>
+            <td><code>docs/production/production-commissioning.md</code>, secure commissioning contract test PASS</td>
           </tr>
           <tr>
             <td>6</td>
@@ -221,6 +221,7 @@
         <li>Mobile login-state integration remains delegated under <code>SCRUM-91</code>.</li>
         <li>Live MQTT mTLS negative tests need operator-approved certificates/environment.</li>
         <li>Live gateway hardware startup validation is not run in this local environment.</li>
+        <li>Live Zigbee default global key rejection evidence needs gateway hardware.</li>
       </ul>
     </section>
 
@@ -234,6 +235,7 @@
         <li><code>docs/production/production-auth.md</code></li>
         <li><code>docs/production/production-mqtt.md</code></li>
         <li><code>docs/production/production-gateway.md</code></li>
+        <li><code>docs/production/production-commissioning.md</code></li>
         <li><code>deploy/.env.prod.example</code></li>
       </ul>
     </section>
@@ -284,6 +286,11 @@
             <td><span class="badge done">PASS</span></td>
             <td>4 passed in 0.11s. Confirms production gateway fail-fast env contract, runtime identity, TLS setup, and placeholder bridge configs.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_secure_commissioning_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>4 passed. Confirms install-code gateway prepare_join parsing, secure dispatch, bounded duration, and negative procedure documentation.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -325,6 +332,12 @@
             <td>Operator hardware validation</td>
           </tr>
           <tr>
+            <td>Live default global key rejection is not validated locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-commissioning.md</code></td>
+            <td>Operator hardware validation</td>
+          </tr>
+          <tr>
             <td>Backup/restore/alerting are not production-grade yet.</td>
             <td>Medium</td>
             <td><code>cloud/README.md:101-102</code>; <code>mqtt/README.md:68-69</code></td>
@@ -337,9 +350,9 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit, push, PR, and merge Phase 4 branch <code>codex/scrum-90-phase4-gateway-config</code>.</li>
+        <li>Commit, push, PR, and merge Phase 5 branch <code>codex/scrum-90-phase5-secure-commissioning</code>.</li>
         <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
-        <li>Start Phase 5 Zigbee secure commissioning.</li>
+        <li>Start Phase 6 backup, restore, monitoring, and alerting.</li>
       </ol>
     </section>
 
@@ -378,6 +391,11 @@
             <td>2026-06-01 03:18:48 +07:00</td>
             <td>Phase 4 gateway production fail-fast MQTT config, TLS env contract, runtime identity, and placeholder bridge templates added.</td>
             <td><code>SCRUM-96</code>; <code>codex/scrum-90-phase4-gateway-config</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:34:10 +07:00</td>
+            <td>Phase 5 gateway secure commissioning command parsing, install-code dispatch, local guardrail tests, and negative procedure runbook added.</td>
+            <td><code>SCRUM-97</code>; <code>codex/scrum-90-phase5-secure-commissioning</code></td>
           </tr>
         </tbody>
       </table>

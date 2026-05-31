@@ -122,14 +122,23 @@ Runbook: docs/production/production-gateway.md
 
 ## Phase 5 - Zigbee Secure Commissioning
 
-- [ ] Permit join is closed by default.
-- [ ] Permit join duration is short and bounded.
-- [ ] Only admin can open permit join.
-- [ ] Install-code commissioning support is proven or documented.
-- [ ] Default global Zigbee key join is rejected or documented as `Needs confirmation`.
-- [ ] Negative commissioning procedure exists.
+- [x] Permit join is closed by default.
+- [x] Permit join duration is short and bounded.
+- [x] Only admin can open permit join.
+- [x] Install-code commissioning support is proven or documented.
+- [x] Default global Zigbee key join is rejected by gateway security config and marked for live negative evidence.
+- [x] Negative commissioning procedure exists.
 
-Status: Not started.
+Status: Verified locally by secure commissioning contract tests. Live default global key rejection must still be captured on gateway hardware before final production readiness is claimed.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_secure_commissioning_contract.py -q
+4 passed
+```
+
+Runbook: docs/production/production-commissioning.md
 
 ## Phase 6 - Backup, Restore, Monitoring, and Alerting
 

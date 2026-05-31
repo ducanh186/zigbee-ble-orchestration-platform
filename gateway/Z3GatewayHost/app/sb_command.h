@@ -36,6 +36,8 @@ typedef struct {
   // Gateway-targeted ops only
   // (parsed from payload.target.duration_sec; 0 means absent)
   int  duration_sec;
+  char eui64[17];          // payload.target.eui64 for gateway.prepare_join
+  char install_code[37];   // payload.target.install_code hex incl 2-byte CRC
 
   // Optional
   uint32_t timeout_ms;      // default 5000 if absent

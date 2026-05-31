@@ -124,6 +124,18 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
   if (findUintExact(body, "\"duration_sec\":", &dsec)) {
     out->duration_sec = (int)dsec;
   }
+  char eui64[18] = {0};
+  if (findQuotedString(body, "\"eui64\":", eui64, sizeof(eui64))
+      && strlen(eui64) < sizeof(out->eui64)) {
+    strncpy(out->eui64, eui64, sizeof(out->eui64) - 1);
+  }
+
+  char installCode[38] = {0};
+  if (findQuotedString(body, "\"install_code\":",
+                       installCode, sizeof(installCode))
+      && strlen(installCode) < sizeof(out->install_code)) {
+    strncpy(out->install_code, installCode, sizeof(out->install_code) - 1);
+  }
 
   // timeout_ms (optional)
   uint32_t t = 0;

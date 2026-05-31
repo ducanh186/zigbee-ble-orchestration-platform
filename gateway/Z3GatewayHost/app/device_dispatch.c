@@ -5,6 +5,7 @@
 #include "light_ctrl.h"
 #include "switch_logic.h"
 #include "net_mgr.h"
+#include "app_utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -26,6 +27,47 @@ static const char* inferTypeFromCluster(const char *cluster_id)
     return "light";
   }
   return NULL;
+}
+
+static int hexNibble(char c)
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+static bool parseInstallCodeHex(const char *s, uint8_t *out, uint8_t *outLen)
+{
+  if (!s || !out || !outLen) return false;
+  size_t hexChars = strlen(s);
+  if (hexChars == 0 || (hexChars & 1u)) return false;
+
+  size_t byteLen = hexChars / 2u;
+  if (!(byteLen == 8 || byteLen == 10 || byteLen == 14 || byteLen == 18)) {
+    return false;
+  }
+
+  for (size_t i = 0; i < byteLen; i++) {
+    int hi = hexNibble(s[2u * i]);
+    int lo = hexNibble(s[2u * i + 1u]);
+    if (hi < 0 || lo < 0) return false;
+    out[i] = (uint8_t)((hi << 4) | lo);
+  }
+
+  *outLen = (uint8_t)byteLen;
+  return true;
+}
+
+static bool rejectGatewayOp(const sb_command_t *cmd,
+                            const char *devId,
+                            const char *reason)
+{
+  appMqttPublishCommandReply(cmd->command_id, devId, "failed", reason);
+  appLogLog("DISPATCH", "reject",
+            "\"command_id\":\"%s\",\"reason\":\"%s\",\"op\":\"%s\"",
+            cmd->command_id, reason, cmd->op);
+  return false;
 }
 
 // Handle gateway-scoped commands (no device target).
@@ -52,6 +94,33 @@ static bool dispatchGatewayOp(const sb_command_t *cmd)
     st = netMgrOpenForJoin((uint16_t)dur);
   } else if (strcmp(cmd->op, "gateway.close_network") == 0) {
     st = netMgrCloseJoin();
+  } else if (strcmp(cmd->op, "gateway.prepare_join") == 0) {
+    if (cmd->eui64[0] == '\0') {
+      return rejectGatewayOp(cmd, devId, "missing_eui64");
+    }
+    if (cmd->install_code[0] == '\0') {
+      return rejectGatewayOp(cmd, devId, "missing_install_code");
+    }
+
+    int dur = (cmd->duration_sec > 0) ? cmd->duration_sec : 180;
+    if (dur < 1 || dur > 180) {
+      return rejectGatewayOp(cmd, devId, "bad_duration");
+    }
+
+    EmberEUI64 euiLe;
+    if (!parseHexEui64(cmd->eui64, euiLe)) {
+      return rejectGatewayOp(cmd, devId, "bad_eui64");
+    }
+
+    uint8_t icBytes[18] = {0};
+    uint8_t icLen = 0;
+    if (!parseInstallCodeHex(cmd->install_code, icBytes, &icLen)) {
+      memset(icBytes, 0, sizeof(icBytes));
+      return rejectGatewayOp(cmd, devId, "bad_install_code");
+    }
+
+    st = netMgrOpenForJoinSecure(euiLe, icBytes, icLen, (uint16_t)dur);
+    memset(icBytes, 0, sizeof(icBytes));
   } else if (strcmp(cmd->op, "gateway.rediscover_device") == 0) {
     // Layer-2 on-demand classification.  Requires a device_id (EUI64 hex).
     // Result of classification arrives asynchronously as a retained
