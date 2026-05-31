@@ -16,5 +16,10 @@ abstract class DeviceRepository {
     required DevicePower target,
   });
 
+  Future<SmartDevice> renameDeviceName({
+    required String deviceId,
+    required String name,
+  });
+
   Future<CommandResult> fetchCommand(String commandId);
 }

@@ -29,6 +29,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   );
   CommandResult? _lastCommand;
   DevicePower? _lastTarget;
+  bool _isRenamingDevice = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
   List<SmartDevice> get lights =>
@@ -39,6 +40,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   CloudStatus get cloudStatus => _cloudStatus;
   CommandResult? get lastCommand => _lastCommand;
   DevicePower? get lastTarget => _lastTarget;
+  bool get isRenamingDevice => _isRenamingDevice;
 
   int get onlineCount => _devices.where((device) => device.isOnline).length;
   int get lightsOnCount =>
@@ -155,6 +157,36 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       return;
     }
     await setLightPower(device, target);
+  }
+
+  Future<void> renameDevice(SmartDevice device, String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isRenamingDevice) {
+      return;
+    }
+
+    _isRenamingDevice = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final renamed = await _repository.renameDeviceName(
+        deviceId: device.id,
+        name: normalizedName,
+      );
+      final index = _devices.indexWhere((item) => item.id == device.id);
+      if (index != -1) {
+        _devices[index] = _devices[index].copyWith(name: renamed.name);
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong doi duoc ten thiet bi',
+      );
+    } finally {
+      _isRenamingDevice = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _pollCommand(DevicePower target) async {

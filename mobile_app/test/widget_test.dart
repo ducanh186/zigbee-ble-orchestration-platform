@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
@@ -7,7 +8,9 @@ import 'package:zigbee_smart_building/data/repositories/mock_device_repository.d
 import 'package:zigbee_smart_building/domain/models/automation_rule.dart';
 import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
+import 'package:zigbee_smart_building/domain/models/device_power.dart';
 import 'package:zigbee_smart_building/domain/models/event_log.dart';
+import 'package:zigbee_smart_building/domain/models/smart_device.dart';
 import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
@@ -15,6 +18,7 @@ import 'package:zigbee_smart_building/main.dart';
 import 'package:zigbee_smart_building/ui/core/localization/locale_controller.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
 import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
+import 'package:zigbee_smart_building/ui/features/devices/view_models/device_dashboard_view_model.dart';
 import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_card.dart';
 
 class _PreAuthedRepository implements AuthRepository {
@@ -75,6 +79,40 @@ class _DeviceEventsRepository extends MockDeviceRepository {
       ];
     }
     return super.fetchEvents(deviceId: deviceId);
+  }
+}
+
+class _ImmediateRenameRepository extends MockDeviceRepository {
+  String? renamedDeviceId;
+  String? renamedName;
+  String _lightName = 'Lab Light 01';
+
+  @override
+  Future<List<SmartDevice>> fetchDevices() async {
+    final devices = await super.fetchDevices();
+    return [
+      for (final device in devices)
+        device.id == 'light-01' ? device.copyWith(name: _lightName) : device,
+    ];
+  }
+
+  @override
+  Future<SmartDevice> renameDeviceName({
+    required String deviceId,
+    required String name,
+  }) async {
+    renamedDeviceId = deviceId;
+    renamedName = name;
+    _lightName = name;
+    return SmartDevice(
+      id: deviceId,
+      deviceType: 'light',
+      name: name,
+      eui64: '00124b0001aa22bb',
+      roomId: 'lab01',
+      isOnline: true,
+      power: DevicePower.on,
+    );
   }
 }
 
@@ -302,33 +340,11 @@ void main() {
     expect(repository.requestedDeviceIds, contains('pir-01'));
   });
 
-  testWidgets('notification center categorizes and tracks unread events', (
-    tester,
-  ) async {
+  testWidgets('shell does not show sticky notification popup', (tester) async {
     await pumpDashboard(tester, useMockApi: true);
 
-    expect(find.byTooltip('Notifications'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Notifications'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Notification Center'), findsOneWidget);
-    expect(find.text('Unread 4'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Automation'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, 'Other'), findsOneWidget);
-
-    await tester.tap(find.text('Mark read').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Unread 3'), findsOneWidget);
-
-    await tester.tap(find.text('Mark all read'));
-    await tester.pumpAndSettle();
-    expect(find.text('Unread 0'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Automation'));
-    await tester.pumpAndSettle();
-    expect(find.text('occupancy_changed'), findsOneWidget);
-    expect(find.text('LIGHT'), findsNothing);
+    expect(find.byTooltip('Notifications'), findsNothing);
+    expect(find.text('Notification Center'), findsNothing);
   });
 
   testWidgets('device detail keeps verbose cloud event payloads compact', (
@@ -351,6 +367,37 @@ void main() {
     expect(find.text('Device registry updated'), findsOneWidget);
     expect(find.textContaining('metadata_source'), findsNothing);
     expect(repository.requestedDeviceIds, contains('light-01'));
+  });
+
+  testWidgets('device detail renames display label only', (tester) async {
+    final repository = _ImmediateRenameRepository();
+    await pumpDashboard(tester, useMockApi: true, repository: repository);
+
+    await tester.tap(
+      find
+          .ancestor(
+            of: find.text('Lab Light 01'),
+            matching: find.byType(InkWell),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Rename device'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Desk lamp');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(repository.renamedDeviceId, 'light-01');
+    expect(repository.renamedName, 'Desk lamp');
+    final viewModel = Provider.of<DeviceDashboardViewModel>(
+      tester.element(find.byType(MaterialApp)),
+      listen: false,
+    );
+    expect(viewModel.deviceById('light-01')?.name, 'Desk lamp');
+    expect(find.text('Desk lamp', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('light-01'), findsOneWidget);
   });
 
   testWidgets('settings owns devices logs account logout and runtime toggle', (

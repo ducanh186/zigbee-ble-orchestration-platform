@@ -60,6 +60,17 @@ class ApiClient {
     });
   }
 
+  Future<Object?> patchJson(String path, Map<String, Object?> body) async {
+    return _send(() async {
+      final response = await _httpClient.patch(
+        _uri(path),
+        headers: _headers(includeJsonContentType: true),
+        body: jsonEncode(body),
+      );
+      return _decode(response);
+    });
+  }
+
   Future<Object?> deleteJson(String path) async {
     return _send(() async {
       final response = await _httpClient.delete(

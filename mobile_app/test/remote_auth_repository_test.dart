@@ -7,7 +7,7 @@ import 'package:zigbee_smart_building/data/repositories/remote_auth_repository.d
 import 'package:zigbee_smart_building/data/services/api_client.dart';
 
 void main() {
-  test('login parses access_token, user_id, expires_at from response',
+  test('login parses access_token, user_id, role, home_id, expires_at',
       () async {
     final repository = RemoteAuthRepository(
       apiClient: ApiClient(
@@ -22,6 +22,8 @@ void main() {
             jsonEncode({
               'access_token': 'token-abc',
               'user_id': 'operator-1',
+              'role': 'user',
+              'home_id': 'home-1',
               'expires_at': '2026-05-16T12:00:00Z',
             }),
             200,
@@ -38,6 +40,8 @@ void main() {
 
     expect(session.accessToken, 'token-abc');
     expect(session.userId, 'operator-1');
+    expect(session.role, 'user');
+    expect(session.homeId, 'home-1');
     expect(session.expiresAt, DateTime.utc(2026, 5, 16, 12));
   });
 

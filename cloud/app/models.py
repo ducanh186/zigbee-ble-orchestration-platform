@@ -48,6 +48,8 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     username = Column(String, unique=True, nullable=False)
+    role = Column(String, nullable=False, default="user", server_default="user")
+    password_hash = Column(String, nullable=True)
     home_id = Column(String, ForeignKey("homes.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
 

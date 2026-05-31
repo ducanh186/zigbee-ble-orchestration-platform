@@ -92,6 +92,34 @@ async def ensure_device_last_seen_column(target_engine=None) -> None:
             )
 
 
+async def ensure_user_auth_columns(target_engine=None) -> None:
+    """Idempotent backfill for minimal auth/RBAC columns on users."""
+    from sqlalchemy import inspect, text
+
+    eng = target_engine if target_engine is not None else engine
+
+    def _missing_columns(sync_conn) -> set[str]:
+        insp = inspect(sync_conn)
+        if not insp.has_table("users"):
+            return set()
+        cols = {c["name"] for c in insp.get_columns("users")}
+        return {"role", "password_hash"} - cols
+
+    async with eng.begin() as conn:
+        missing = await conn.run_sync(_missing_columns)
+        if "role" in missing:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN role VARCHAR NOT NULL DEFAULT 'user'"
+                )
+            )
+        if "password_hash" in missing:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN password_hash VARCHAR")
+            )
+
+
 async def init_db() -> None:
     """Create missing tables and apply lightweight column migrations.
 
@@ -129,3 +157,4 @@ async def init_db() -> None:
     # Cross-dialect column backfill — runs on every startup, idempotent.
     await ensure_automation_version_column()
     await ensure_device_last_seen_column()
+    await ensure_user_auth_columns()

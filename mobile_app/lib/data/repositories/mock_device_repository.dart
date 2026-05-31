@@ -139,6 +139,26 @@ class MockDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<SmartDevice> renameDeviceName({
+    required String deviceId,
+    required String name,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final index = _devices.indexWhere((device) => device.id == deviceId);
+    if (index == -1) {
+      return SmartDevice(
+        id: deviceId,
+        deviceType: 'unknown',
+        name: name,
+        isOnline: false,
+        power: DevicePower.unknown,
+      );
+    }
+    _devices[index] = _devices[index].copyWith(name: name);
+    return _devices[index];
+  }
+
+  @override
   Future<CommandResult> fetchCommand(String commandId) async {
     await Future<void>.delayed(const Duration(milliseconds: 220));
     final command = _commands[commandId];

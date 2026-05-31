@@ -16,6 +16,7 @@ import qrcode.image.svg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cloud.app.auth import require_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import Command, ProvisioningSession, Room
@@ -54,7 +55,10 @@ def _qr_svg(payload_json: str) -> str:
     response_model=ProvisioningLabelOut,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_provisioning_label(body: ProvisioningLabelCreate):
+async def create_provisioning_label(
+    body: ProvisioningLabelCreate,
+    _admin=Depends(require_admin),
+):
     payload = {
         "version": 1,
         "eui64": body.eui64,
@@ -204,3 +208,4 @@ async def cancel_provisioning_session(
     await db.commit()
     await db.refresh(session)
     return session
+from cloud.app.auth import require_admin
