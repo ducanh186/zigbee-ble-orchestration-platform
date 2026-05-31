@@ -29,6 +29,7 @@ Reason:
 | Production networking runbook | `docs/production/production-networking.md` |
 | Secure production compose | `deploy/docker-compose.prod-secure.yml` |
 | Nginx production config | `deploy/nginx/prod.conf` |
+| Production REST auth evidence | `docs/production/production-auth.md` |
 
 ## Final Readiness Gate
 
@@ -44,7 +45,7 @@ Before this report can say `READY`, all of the following must be true:
 ## Current Open Items
 
 - Phase 1: HTTPS reverse proxy and exposure lockdown is locally verified, but live EC2 security group state still needs operator confirmation.
-- Phase 2: REST API authentication and authorization.
+- Phase 2: Backend REST API auth/RBAC is locally verified; mobile login-state integration remains under `SCRUM-91`.
 - Phase 3: MQTT TLS/mTLS and ACL hardening.
 - Phase 4: Gateway production config hardening.
 - Phase 5: Zigbee secure commissioning.
