@@ -1,10 +1,10 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 02:12:02 +07:00
+Last updated: 2026-06-01 03:05:25 +07:00
 
 Jira: SCRUM-90
 
-Status: PHASE_0_VERIFIED
+Status: PHASE_3_MQTT_VERIFIED_LOCALLY
 
 ## Execution Model
 
@@ -18,12 +18,12 @@ Option 1 is approved: implement the production-hardening work as small SCRUM-siz
 6. Create a PR targeting `main`.
 7. Merge only after review and checks are acceptable.
 
-Current branch/worktree for Phase 0:
+Current active branch/worktree:
 
 ```text
-Branch: codex/scrum-90-production-hardening
+Branch: codex/scrum-90-phase3-mqtt-hardening
 Worktree: C:\tmp\zigbee-scrum90-production-hardening
-Base: local main at 5bc9eb1
+Base: origin/main after PR 66 merge
 ```
 
 ## Phase Breakdown
@@ -164,3 +164,29 @@ Evidence checked:
 - `operator` permit-join requests return `403`.
 - `admin` permit-join requests succeed.
 - `docs/production/production-auth.md` records deferred refresh, `/auth/me`, and token-revocation items.
+
+## Phase 3 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_production_mqtt_contract.py -q
+```
+
+Result:
+
+```text
+3 passed in 0.06s
+docker compose config PASS
+```
+
+Evidence checked:
+
+- Secure production compose mounts `mqtt/config/mosquitto.prod.conf`.
+- Secure production compose mounts `mqtt/config/acl.prod.conf`.
+- Secure production compose mounts `${MQTT_CERT_DIR:-../mqtt/certs}` read-only.
+- Secure production compose exposes internal MQTT `8883`, not `1883`.
+- Production Mosquitto config requires TLS/mTLS on `8883`.
+- Production Mosquitto config has no `1883` or `9001` listener.
+- Production ACL scopes `cloud`, `gateway`, and `monitor` without broad readwrite wildcard grants.
+- Real certificates and private keys remain outside git.

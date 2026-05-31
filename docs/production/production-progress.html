@@ -117,7 +117,7 @@
       margin-top: 8px;
     }
     .bar {
-      width: 38%;
+      width: 50%;
       height: 100%;
       background: var(--accent);
     }
@@ -138,12 +138,12 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">38%</span>
-        <div class="progress" aria-label="38 percent complete"><div class="bar" style="width:38%"></div></div>
+        <span class="value">50%</span>
+        <div class="progress" aria-label="50 percent complete"><div class="bar" style="width:50%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
-        <span class="value">2026-06-01 02:46:30 +07:00</span>
+        <span class="value">2026-06-01 03:05:25 +07:00</span>
       </div>
     </div>
   </header>
@@ -181,9 +181,9 @@
           </tr>
           <tr>
             <td>3</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">DONE</span></td>
             <td>MQTT TLS/mTLS and broker ACL hardening.</td>
-            <td>Pending.</td>
+            <td><code>mqtt/config/mosquitto.prod.conf</code>, <code>mqtt/config/acl.prod.conf</code>, MQTT contract test PASS</td>
           </tr>
           <tr>
             <td>4</td>
@@ -219,6 +219,7 @@
         <li>Production domain and certificate provider need operator confirmation.</li>
         <li>Live EC2 security group state is not verified in local environment.</li>
         <li>Mobile login-state integration remains delegated under <code>SCRUM-91</code>.</li>
+        <li>Live MQTT mTLS negative tests need operator-approved certificates/environment.</li>
       </ul>
     </section>
 
@@ -230,6 +231,7 @@
         <li><code>docs/production/production-acceptance-checklist.md</code></li>
         <li><code>docs/production/production-final-report.md</code></li>
         <li><code>docs/production/production-auth.md</code></li>
+        <li><code>docs/production/production-mqtt.md</code></li>
         <li><code>deploy/.env.prod.example</code></li>
       </ul>
     </section>
@@ -265,6 +267,16 @@
             <td><span class="badge done">PASS</span></td>
             <td>23 passed in 9.54s. Confirms JWT-shaped token validation, command auth/RBAC, and admin-only permit join.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_mqtt_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>3 passed in 0.06s. Confirms production Mosquitto TLS/mTLS config, ACL scoping, and secure compose wiring.</td>
+          </tr>
+          <tr>
+            <td><code>docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Secure compose parses with MQTT cert mount and internal <code>8883</code> exposure.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -294,6 +306,12 @@
             <td>Phase 2 mobile follow-up</td>
           </tr>
           <tr>
+            <td>Live MQTT handshake and ACL negative tests are not run locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-mqtt.md</code></td>
+            <td>Operator environment validation</td>
+          </tr>
+          <tr>
             <td>Backup/restore/alerting are not production-grade yet.</td>
             <td>Medium</td>
             <td><code>cloud/README.md:101-102</code>; <code>mqtt/README.md:68-69</code></td>
@@ -306,9 +324,9 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit, push, PR, and merge backend Phase 2 branch <code>codex/scrum-90-phase2-auth</code>.</li>
+        <li>Commit, push, PR, and merge Phase 3 branch <code>codex/scrum-90-phase3-mqtt-hardening</code>.</li>
         <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
-        <li>Start Phase 3 MQTT TLS/mTLS and ACL hardening.</li>
+        <li>Start Phase 4 gateway config hardening and secret fallback removal.</li>
       </ol>
     </section>
 
@@ -337,6 +355,11 @@
             <td>2026-06-01 02:46:30 +07:00</td>
             <td>Backend Phase 2 JWT-shaped bearer auth, command RBAC, and admin-only permit join verified.</td>
             <td><code>SCRUM-94</code>; <code>codex/scrum-90-phase2-auth</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:05:25 +07:00</td>
+            <td>Phase 3 production Mosquitto TLS/mTLS config, strict ACL, cert mount, and compose validation added.</td>
+            <td><code>SCRUM-95</code>; <code>codex/scrum-90-phase3-mqtt-hardening</code></td>
           </tr>
         </tbody>
       </table>

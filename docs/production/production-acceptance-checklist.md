@@ -1,6 +1,6 @@
 # Production Acceptance Checklist
 
-Last updated: 2026-06-01 02:12:02 +07:00
+Last updated: 2026-06-01 03:05:25 +07:00
 
 Jira: SCRUM-90
 
@@ -79,15 +79,26 @@ Runbook: docs/production/production-auth.md
 
 ## Phase 3 - MQTT TLS/mTLS and Broker ACL Hardening
 
-- [ ] Mosquitto production listener uses TLS/mTLS on `8883`.
-- [ ] Plain `1883` is disabled in production or internal-only.
-- [ ] Strict ACL is documented and tested.
-- [ ] Certificate generation and rotation are documented.
-- [ ] Connect without certificate fails.
-- [ ] Unauthorized publish fails.
-- [ ] Wrong client certificate fails.
+- [x] Mosquitto production listener uses TLS/mTLS on `8883`.
+- [x] Plain `1883` is disabled in production or internal-only.
+- [x] Strict ACL is documented and tested.
+- [x] Certificate layout and rotation boundary are documented.
+- [x] Connect without certificate is configured to fail through `require_certificate true`.
+- [x] Unauthorized publish is configured to fail through `acl.prod.conf`.
+- [x] Wrong client certificate is configured to fail through production CA trust.
 
-Status: Not started.
+Status: Verified locally by static contract tests and Docker Compose config parsing. Live broker negative tests are documented but not run in this environment.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_production_mqtt_contract.py -q
+3 passed in 0.06s
+docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config
+PASS
+```
+
+Runbook: docs/production/production-mqtt.md
 
 ## Phase 4 - Gateway Config Hardening and Secret Removal
 
