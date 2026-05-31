@@ -1,6 +1,6 @@
 # Production Acceptance Checklist
 
-Last updated: 2026-06-01 03:05:25 +07:00
+Last updated: 2026-06-01 03:18:48 +07:00
 
 Jira: SCRUM-90
 
@@ -102,14 +102,23 @@ Runbook: docs/production/production-mqtt.md
 
 ## Phase 4 - Gateway Config Hardening and Secret Removal
 
-- [ ] Gateway production mode fails fast without MQTT host.
-- [ ] Gateway production mode fails fast without TLS certificate paths.
-- [ ] Dangerous fallback to public IP is removed or disabled in production.
-- [ ] Dangerous fallback credentials are removed or disabled in production.
-- [ ] Tenant, site, and gateway IDs are configurable.
-- [ ] Development mode can still use explicit localhost demo configuration.
+- [x] Gateway production mode fails fast without MQTT host.
+- [x] Gateway production mode fails fast without TLS certificate paths.
+- [x] Dangerous fallback to public IP is removed or disabled in production.
+- [x] Dangerous fallback credentials are removed or disabled in production.
+- [x] Tenant, site, and gateway IDs are configurable.
+- [x] Development mode can still use explicit localhost demo configuration.
 
-Status: Not started.
+Status: Verified locally by static gateway config contract tests. Live gateway hardware startup is not run in this environment.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_gateway_production_config_contract.py -q
+4 passed in 0.11s
+```
+
+Runbook: docs/production/production-gateway.md
 
 ## Phase 5 - Zigbee Secure Commissioning
 

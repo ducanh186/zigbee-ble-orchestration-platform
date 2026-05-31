@@ -117,7 +117,7 @@
       margin-top: 8px;
     }
     .bar {
-      width: 50%;
+      width: 63%;
       height: 100%;
       background: var(--accent);
     }
@@ -138,12 +138,12 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">50%</span>
-        <div class="progress" aria-label="50 percent complete"><div class="bar" style="width:50%"></div></div>
+        <span class="value">63%</span>
+        <div class="progress" aria-label="63 percent complete"><div class="bar" style="width:63%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
-        <span class="value">2026-06-01 03:05:25 +07:00</span>
+        <span class="value">2026-06-01 03:18:48 +07:00</span>
       </div>
     </div>
   </header>
@@ -187,9 +187,9 @@
           </tr>
           <tr>
             <td>4</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">DONE</span></td>
             <td>Gateway config hardening and secret fallback removal.</td>
-            <td>Pending.</td>
+            <td><code>gateway/Z3GatewayHost/app/app_mqtt.c</code>, bridge templates, gateway config contract test PASS</td>
           </tr>
           <tr>
             <td>5</td>
@@ -220,6 +220,7 @@
         <li>Live EC2 security group state is not verified in local environment.</li>
         <li>Mobile login-state integration remains delegated under <code>SCRUM-91</code>.</li>
         <li>Live MQTT mTLS negative tests need operator-approved certificates/environment.</li>
+        <li>Live gateway hardware startup validation is not run in this local environment.</li>
       </ul>
     </section>
 
@@ -232,6 +233,7 @@
         <li><code>docs/production/production-final-report.md</code></li>
         <li><code>docs/production/production-auth.md</code></li>
         <li><code>docs/production/production-mqtt.md</code></li>
+        <li><code>docs/production/production-gateway.md</code></li>
         <li><code>deploy/.env.prod.example</code></li>
       </ul>
     </section>
@@ -277,6 +279,11 @@
             <td><span class="badge done">PASS</span></td>
             <td>Secure compose parses with MQTT cert mount and internal <code>8883</code> exposure.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_gateway_production_config_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>4 passed in 0.11s. Confirms production gateway fail-fast env contract, runtime identity, TLS setup, and placeholder bridge configs.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -312,6 +319,12 @@
             <td>Operator environment validation</td>
           </tr>
           <tr>
+            <td>Live gateway hardware startup is not validated locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-gateway.md</code></td>
+            <td>Operator hardware validation</td>
+          </tr>
+          <tr>
             <td>Backup/restore/alerting are not production-grade yet.</td>
             <td>Medium</td>
             <td><code>cloud/README.md:101-102</code>; <code>mqtt/README.md:68-69</code></td>
@@ -324,9 +337,9 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit, push, PR, and merge Phase 3 branch <code>codex/scrum-90-phase3-mqtt-hardening</code>.</li>
+        <li>Commit, push, PR, and merge Phase 4 branch <code>codex/scrum-90-phase4-gateway-config</code>.</li>
         <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
-        <li>Start Phase 4 gateway config hardening and secret fallback removal.</li>
+        <li>Start Phase 5 Zigbee secure commissioning.</li>
       </ol>
     </section>
 
@@ -360,6 +373,11 @@
             <td>2026-06-01 03:05:25 +07:00</td>
             <td>Phase 3 production Mosquitto TLS/mTLS config, strict ACL, cert mount, and compose validation added.</td>
             <td><code>SCRUM-95</code>; <code>codex/scrum-90-phase3-mqtt-hardening</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:18:48 +07:00</td>
+            <td>Phase 4 gateway production fail-fast MQTT config, TLS env contract, runtime identity, and placeholder bridge templates added.</td>
+            <td><code>SCRUM-96</code>; <code>codex/scrum-90-phase4-gateway-config</code></td>
           </tr>
         </tbody>
       </table>

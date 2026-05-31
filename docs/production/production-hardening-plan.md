@@ -1,10 +1,10 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 03:05:25 +07:00
+Last updated: 2026-06-01 03:18:48 +07:00
 
 Jira: SCRUM-90
 
-Status: PHASE_3_MQTT_VERIFIED_LOCALLY
+Status: PHASE_4_GATEWAY_CONFIG_VERIFIED_LOCALLY
 
 ## Execution Model
 
@@ -21,9 +21,9 @@ Option 1 is approved: implement the production-hardening work as small SCRUM-siz
 Current active branch/worktree:
 
 ```text
-Branch: codex/scrum-90-phase3-mqtt-hardening
+Branch: codex/scrum-90-phase4-gateway-config
 Worktree: C:\tmp\zigbee-scrum90-production-hardening
-Base: origin/main after PR 66 merge
+Base: origin/main after PR 67 merge
 ```
 
 ## Phase Breakdown
@@ -190,3 +190,27 @@ Evidence checked:
 - Production Mosquitto config has no `1883` or `9001` listener.
 - Production ACL scopes `cloud`, `gateway`, and `monitor` without broad readwrite wildcard grants.
 - Real certificates and private keys remain outside git.
+
+## Phase 4 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_gateway_production_config_contract.py -q
+```
+
+Result:
+
+```text
+4 passed in 0.11s
+```
+
+Evidence checked:
+
+- Gateway source has no demo public MQTT endpoint fallback.
+- Gateway source has no demo MQTT password fallback.
+- Production mode reads `SB_ENV=production` or `SB_PRODUCTION=1`.
+- Production mode requires MQTT host, port, username, password, tenant/site/gateway id, CA cert, client cert, and client key.
+- Gateway MQTT TLS setup calls `mosquitto_tls_set`.
+- Tenant, site, and gateway id are runtime configurable.
+- Bridge config templates use placeholders instead of real endpoints or passwords.
