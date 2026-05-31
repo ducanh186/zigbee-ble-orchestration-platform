@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production Hardening Progress - SCRUM-90</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --text: #17202a;
+      --muted: #5f6f82;
+      --line: #d8e0ea;
+      --accent: #0f766e;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --ok: #15803d;
+      --info: #1d4ed8;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header, main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      padding-top: 32px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px;
+    }
+    p {
+      margin: 0 0 12px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    .auditing { background: #dbeafe; color: var(--info); }
+    .blocked { background: #fee2e2; color: var(--danger); }
+    .queued { background: #e5e7eb; color: #374151; }
+    .active { background: #fef3c7; color: var(--warn); }
+    .done { background: #dcfce7; color: var(--ok); }
+    .notready { background: #fee2e2; color: var(--danger); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+      font-size: 13px;
+      color: #334155;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      background: #eef3f8;
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+    ul {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+    .progress {
+      height: 12px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .bar {
+      width: 13%;
+      height: 100%;
+      background: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Production Hardening Progress</h1>
+    <p>Zigbee Smart Building Platform - SCRUM-90</p>
+    <div class="meta">
+      <div class="metric">
+        <span class="label">Overall status</span>
+        <span class="value"><span class="badge active">IMPLEMENTING</span></span>
+      </div>
+      <div class="metric">
+        <span class="label">Production readiness</span>
+        <span class="value"><span class="badge notready">NOT_READY</span></span>
+      </div>
+      <div class="metric">
+        <span class="label">Progress</span>
+        <span class="value">13%</span>
+        <div class="progress" aria-label="13 percent complete"><div class="bar"></div></div>
+      </div>
+      <div class="metric">
+        <span class="label">Last updated</span>
+        <span class="value">2026-06-01 02:12:02 +07:00</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Phase Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Status</th>
+            <th>Goal</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>Production scope, audit, plan, acceptance checklist, dashboard, env contract.</td>
+            <td><code>docs/production/*</code>, <code>deploy/.env.prod.example</code>, artifact verification PASS</td>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>HTTPS reverse proxy and public exposure lockdown.</td>
+            <td>Pending.</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>REST API authentication and authorization.</td>
+            <td><code>SCRUM-91</code> delegated for mobile login-state slice.</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>MQTT TLS/mTLS and broker ACL hardening.</td>
+            <td>Pending.</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>Gateway config hardening and secret fallback removal.</td>
+            <td>Pending.</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>Zigbee secure commissioning.</td>
+            <td>Pending.</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>Backup, restore, monitoring, and alerting.</td>
+            <td>Pending.</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td>CI/CD, release, rollback, and final evidence.</td>
+            <td>Pending.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Current Blockers</h2>
+      <ul>
+        <li>Production domain and certificate provider need operator confirmation.</li>
+        <li>Live EC2 security group state is not verified in local environment.</li>
+        <li>Backend auth endpoints are not implemented in current local main evidence.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Evidence Links / File Paths</h2>
+      <ul>
+        <li><code>docs/production/production-security-audit.md</code></li>
+        <li><code>docs/production/production-hardening-plan.md</code></li>
+        <li><code>docs/production/production-acceptance-checklist.md</code></li>
+        <li><code>docs/production/production-final-report.md</code></li>
+        <li><code>deploy/.env.prod.example</code></li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Phase 0 artifact existence and placeholder scan</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Required files exist; no unfinished-marker strings, known demo IP, demo credential strings, or private key markers in new artifacts.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Risk Register</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Severity</th>
+            <th>Evidence</th>
+            <th>Next phase</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>API is exposed on public port 8000 in current deployment docs/config.</td>
+            <td>High</td>
+            <td><code>cloud/Dockerfile:18,21</code>; <code>cloud/README.md:79,108-110</code></td>
+            <td>Phase 1</td>
+          </tr>
+          <tr>
+            <td>Plain MQTT listener and host mapping are present.</td>
+            <td>High</td>
+            <td><code>mqtt/config/mosquitto.conf:3</code>; <code>deploy/docker-compose.prod.yml:6-7</code></td>
+            <td>Phase 3</td>
+          </tr>
+          <tr>
+            <td>Production auth is not proven by current backend evidence.</td>
+            <td>High</td>
+            <td><code>cloud/app/main.py:57-63</code></td>
+            <td>Phase 2</td>
+          </tr>
+          <tr>
+            <td>Backup/restore/alerting are not production-grade yet.</td>
+            <td>Medium</td>
+            <td><code>cloud/README.md:101-102</code>; <code>mqtt/README.md:68-69</code></td>
+            <td>Phase 6</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Next Actions</h2>
+      <ol>
+        <li>Commit Phase 0 artifacts.</li>
+        <li>Push branch <code>codex/scrum-90-production-hardening</code>.</li>
+        <li>Create PR to <code>main</code> for Phase 0.</li>
+        <li>Continue Phase 1 after Phase 0 PR is reviewed and merged.</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>Change Log</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Change</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-06-01 02:12:02 +07:00</td>
+            <td>Phase 0 started in isolated worktree and production documentation scaffold created.</td>
+            <td><code>SCRUM-90</code>; <code>codex/scrum-90-production-hardening</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
