@@ -1,5 +1,6 @@
 import '../../domain/models/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/repositories/token_storage.dart';
 import '../services/api_client.dart';
 
 // TODO(SCRUM-20): Cloud backend does not yet expose an auth router.
@@ -9,9 +10,38 @@ import '../services/api_client.dart';
 //           "home_id": "...", "expires_at": "<ISO8601>"}
 //   POST /auth/logout (authenticated)
 class RemoteAuthRepository implements AuthRepository {
-  RemoteAuthRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  RemoteAuthRepository({
+    required ApiClient apiClient,
+    TokenStorage? tokenStorage,
+  }) : _apiClient = apiClient,
+       _tokenStorage = tokenStorage;
 
   final ApiClient _apiClient;
+  final TokenStorage? _tokenStorage;
+
+  @override
+  Future<AuthSession?> restoreSession() async {
+    final storage = _tokenStorage;
+    if (storage == null) {
+      _apiClient.setAccessToken(null);
+      return null;
+    }
+
+    final session = await storage.readSession();
+    if (session == null) {
+      _apiClient.setAccessToken(null);
+      return null;
+    }
+
+    if (session.isExpired) {
+      await storage.clearSession();
+      _apiClient.setAccessToken(null);
+      return null;
+    }
+
+    _apiClient.setAccessToken(session.accessToken);
+    return session;
+  }
 
   @override
   Future<AuthSession> login({
@@ -48,6 +78,7 @@ class RemoteAuthRepository implements AuthRepository {
     // Owning this side effect in the repository keeps the view model free
     // of API-client knowledge.
     _apiClient.setAccessToken(session.accessToken);
+    await _tokenStorage?.saveSession(session);
 
     return session;
   }
@@ -60,6 +91,7 @@ class RemoteAuthRepository implements AuthRepository {
       // Always clear the token locally even if the server call fails so the
       // client cannot accidentally reuse a revoked bearer.
       _apiClient.setAccessToken(null);
+      await _tokenStorage?.clearSession();
     }
   }
 }

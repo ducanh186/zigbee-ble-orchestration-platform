@@ -10,6 +10,9 @@ import 'package:zigbee_smart_building/ui/features/shell/views/smart_building_she
 
 class _NeverAuthenticatedRepository implements AuthRepository {
   @override
+  Future<AuthSession?> restoreSession() async => null;
+
+  @override
   Future<AuthSession> login({
     required String username,
     required String password,

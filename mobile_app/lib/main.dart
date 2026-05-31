@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,7 @@ import 'data/repositories/remote_automation_repository.dart';
 import 'data/repositories/remote_device_repository.dart';
 import 'data/repositories/remote_provisioning_repository.dart';
 import 'data/services/api_client.dart';
+import 'data/storage/secure_token_storage.dart';
 import 'domain/repositories/automation_repository.dart';
 import 'domain/repositories/device_repository.dart';
 import 'domain/repositories/provisioning_repository.dart';
@@ -28,9 +31,8 @@ const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://98.83.4.87:8000',
 );
-// Keep release builds usable until the cloud login flow is ready end-to-end.
-// Override with `--dart-define=HIDE_LOGIN=false` when validating auth.
-const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: true);
+// Demo builds may override this with `--dart-define=HIDE_LOGIN=true`.
+const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: false);
 
 void main() {
   final apiClient = ApiClient(baseUrl: _apiBaseUrl);
@@ -44,8 +46,12 @@ void main() {
       ? MockProvisioningRepository()
       : RemoteProvisioningRepository(apiClient: apiClient);
   final authViewModel = AuthViewModel(
-    repository: RemoteAuthRepository(apiClient: apiClient),
+    repository: RemoteAuthRepository(
+      apiClient: apiClient,
+      tokenStorage: const SecureTokenStorage(),
+    ),
   );
+  unawaited(authViewModel.bootstrap());
 
   runApp(
     ZigbeeSmartBuildingApp(
@@ -79,7 +85,7 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   final bool useMockApi;
 
   /// Optional injection point for tests. If null, the production tree wires
-  /// a real [AuthViewModel] backed by the in-memory repository.
+  /// a real [AuthViewModel] backed by secure token storage.
   final AuthViewModel? authViewModelOverride;
 
   /// When true, [_AuthGate] skips the login screen and opens the shell.
@@ -140,11 +146,14 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   AuthViewModel _fallbackAuthViewModel() {
     // Tests that omit [authViewModelOverride] still need a working auth view
     // model. Production always supplies one via [main].
-    return AuthViewModel(
+    final viewModel = AuthViewModel(
       repository: RemoteAuthRepository(
         apiClient: ApiClient(baseUrl: apiBaseUrl),
+        tokenStorage: const SecureTokenStorage(),
       ),
     );
+    unawaited(viewModel.bootstrap());
+    return viewModel;
   }
 }
 
@@ -161,9 +170,23 @@ class _AuthGate extends StatelessWidget {
       return const SmartBuildingShell();
     }
     final auth = context.watch<AuthViewModel>();
+    if (auth.isLoading) {
+      return const _AuthLoadingView();
+    }
     if (!auth.isAuthenticated) {
       return const LoginView();
     }
     return const SmartBuildingShell();
+  }
+}
+
+class _AuthLoadingView extends StatelessWidget {
+  const _AuthLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(child: Center(child: CircularProgressIndicator())),
+    );
   }
 }

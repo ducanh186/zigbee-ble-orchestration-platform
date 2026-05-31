@@ -23,6 +23,10 @@ import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_ca
 
 class _PreAuthedRepository implements AuthRepository {
   @override
+  Future<AuthSession?> restoreSession() async =>
+      const AuthSession(accessToken: 'test-token');
+
+  @override
   Future<AuthSession> login({
     required String username,
     required String password,

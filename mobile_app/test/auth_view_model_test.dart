@@ -5,6 +5,8 @@ import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
 
 class FakeAuthRepository implements AuthRepository {
+  AuthSession? restoredSession;
+
   @override
   Future<AuthSession> login({
     required String username,
@@ -19,6 +21,9 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<AuthSession?> restoreSession() async => restoredSession;
 }
 
 class FailingAuthRepository implements AuthRepository {
@@ -36,6 +41,9 @@ class FailingAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<AuthSession?> restoreSession() async => null;
 }
 
 void main() {
@@ -46,6 +54,22 @@ void main() {
 
     expect(viewModel.isAuthenticated, isTrue);
     expect(viewModel.session?.accessToken, 'test-token');
+    expect(viewModel.errorMessage, isNull);
+  });
+
+  test('bootstrap restores an existing authenticated session', () async {
+    final repository = FakeAuthRepository()
+      ..restoredSession = AuthSession(
+        accessToken: 'stored-token',
+        userId: 'operator-1',
+        expiresAt: DateTime.utc(2026, 5, 16, 12),
+      );
+    final viewModel = AuthViewModel(repository: repository);
+
+    await viewModel.bootstrap();
+
+    expect(viewModel.isAuthenticated, isTrue);
+    expect(viewModel.session?.accessToken, 'stored-token');
     expect(viewModel.errorMessage, isNull);
   });
 
