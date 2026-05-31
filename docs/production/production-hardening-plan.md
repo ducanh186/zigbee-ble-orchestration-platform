@@ -115,3 +115,27 @@ Evidence checked:
 - No unfinished-marker strings in new Phase 0 artifacts.
 - No known demo IP or demo credential strings are repeated in new Phase 0 artifacts.
 - No private key block marker appears in new Phase 0 artifacts.
+
+## Phase 1 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_production_exposure_contract.py -q
+```
+
+Result:
+
+```text
+2 passed in 0.06s
+docker compose config PASS
+```
+
+Evidence checked:
+
+- `deploy/docker-compose.prod-secure.yml` maps only public reverse-proxy ports `80` and `443`.
+- `deploy/docker-compose.prod-secure.yml` does not map host ports `8000`, `1883`, or `5432`.
+- `deploy/nginx/prod.conf` redirects HTTP to HTTPS.
+- `deploy/nginx/prod.conf` proxies HTTPS traffic to internal `cloud-api:8000`.
+- `docs/production/production-networking.md` documents security group intent and local test limitations.
+- `docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config` parses the secure compose file.

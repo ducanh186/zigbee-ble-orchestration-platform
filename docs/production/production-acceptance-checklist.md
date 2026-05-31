@@ -29,14 +29,26 @@ Phase 0 timestamp: 2026-06-01 02:12:02 +07:00
 
 ## Phase 1 - Public Exposure Lockdown and HTTPS Reverse Proxy
 
-- [ ] Public `80` redirects to `443`.
-- [ ] Public `443` terminates HTTPS for `<PROD_DOMAIN>`.
-- [ ] FastAPI is not directly public.
-- [ ] PostgreSQL is private/internal only.
-- [ ] Plain MQTT `1883` is not public.
-- [ ] EC2 security group rules are documented.
+- [x] Public `80` redirects to `443`.
+- [x] Public `443` terminates HTTPS for `<PROD_DOMAIN>`.
+- [x] FastAPI is not directly public in the secure production compose file.
+- [x] PostgreSQL is private/internal only in the secure production compose file.
+- [x] Plain MQTT `1883` is not public in the secure production compose file.
+- [x] EC2 security group rules are documented.
 
-Status: Not started.
+Evidence:
+
+```text
+Test: python -m pytest cloud/tests/test_production_exposure_contract.py -q
+Result: 2 passed in 0.06s
+Compose: docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config
+Compose result: PASS
+Config: deploy/docker-compose.prod-secure.yml
+Config: deploy/nginx/prod.conf
+Runbook: docs/production/production-networking.md
+```
+
+Status: Verified locally. Live EC2 security group state is not testable in this environment.
 
 ## Phase 2 - REST API Authentication and Authorization
 
@@ -111,4 +123,3 @@ Status: Not started.
 - [ ] All checklist items are complete or explicitly accepted as deferred by the operator.
 
 Status: Not started.
-

@@ -138,8 +138,8 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">13%</span>
-        <div class="progress" aria-label="13 percent complete"><div class="bar"></div></div>
+        <span class="value">25%</span>
+        <div class="progress" aria-label="25 percent complete"><div class="bar" style="width:25%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
@@ -169,9 +169,9 @@
           </tr>
           <tr>
             <td>1</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">DONE</span></td>
             <td>HTTPS reverse proxy and public exposure lockdown.</td>
-            <td>Pending.</td>
+            <td><code>deploy/docker-compose.prod-secure.yml</code>, <code>deploy/nginx/prod.conf</code>, exposure contract test PASS</td>
           </tr>
           <tr>
             <td>2</td>
@@ -249,6 +249,16 @@
             <td><span class="badge done">PASS</span></td>
             <td>Required files exist; no unfinished-marker strings, known demo IP, demo credential strings, or private key markers in new artifacts.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_exposure_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>2 passed in 0.06s. Confirms secure compose public ports and Nginx HTTPS proxy contract.</td>
+          </tr>
+          <tr>
+            <td><code>docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Secure compose config parses from the <code>deploy/</code> directory using a temporary copy of <code>.env.prod.example</code>.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -266,16 +276,10 @@
         </thead>
         <tbody>
           <tr>
-            <td>API is exposed on public port 8000 in current deployment docs/config.</td>
-            <td>High</td>
-            <td><code>cloud/Dockerfile:18,21</code>; <code>cloud/README.md:79,108-110</code></td>
-            <td>Phase 1</td>
-          </tr>
-          <tr>
-            <td>Plain MQTT listener and host mapping are present.</td>
-            <td>High</td>
-            <td><code>mqtt/config/mosquitto.conf:3</code>; <code>deploy/docker-compose.prod.yml:6-7</code></td>
-            <td>Phase 3</td>
+            <td>Legacy deploy file still exposes API/MQTT/DB host ports if used directly.</td>
+            <td>Medium</td>
+            <td><code>deploy/docker-compose.prod.yml</code> remains for existing demo path; secure path is <code>deploy/docker-compose.prod-secure.yml</code></td>
+            <td>Phase 7 release cleanup or operator migration decision</td>
           </tr>
           <tr>
             <td>Production auth is not proven by current backend evidence.</td>
@@ -296,10 +300,10 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit Phase 0 artifacts.</li>
-        <li>Push branch <code>codex/scrum-90-production-hardening</code>.</li>
-        <li>Create PR to <code>main</code> for Phase 0.</li>
-        <li>Continue Phase 1 after Phase 0 PR is reviewed and merged.</li>
+        <li>Commit Phase 1 reverse-proxy/exposure-lockdown artifacts.</li>
+        <li>Push branch <code>codex/scrum-90-phase1-reverse-proxy</code>.</li>
+        <li>Create PR to <code>main</code> for Phase 1.</li>
+        <li>Continue Phase 2 after Phase 1 PR is reviewed and merged.</li>
       </ol>
     </section>
 
@@ -318,6 +322,11 @@
             <td>2026-06-01 02:12:02 +07:00</td>
             <td>Phase 0 started in isolated worktree and production documentation scaffold created.</td>
             <td><code>SCRUM-90</code>; <code>codex/scrum-90-production-hardening</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 02:24:00 +07:00</td>
+            <td>Phase 1 secure compose, Nginx HTTPS proxy config, networking runbook, and exposure contract test added.</td>
+            <td><code>SCRUM-93</code>; <code>codex/scrum-90-phase1-reverse-proxy</code></td>
           </tr>
         </tbody>
       </table>
