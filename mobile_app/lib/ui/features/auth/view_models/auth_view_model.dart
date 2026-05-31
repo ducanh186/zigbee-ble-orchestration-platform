@@ -4,6 +4,15 @@ import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/auth_session.dart';
 import '../../../../domain/repositories/auth_repository.dart';
 
+enum AuthStatus {
+  unauthenticated,
+  checking,
+  authenticating,
+  authenticated,
+  refreshing,
+  error,
+}
+
 class AuthViewModel extends ChangeNotifier {
   AuthViewModel({required AuthRepository repository})
     : _repository = repository;
@@ -11,23 +20,54 @@ class AuthViewModel extends ChangeNotifier {
   final AuthRepository _repository;
 
   AuthSession? _session;
-  bool _isLoading = false;
+  AuthStatus _status = AuthStatus.unauthenticated;
   String? _errorMessage;
 
   AuthSession? get session => _session;
-  bool get isLoading => _isLoading;
-  bool get isAuthenticated => _session != null;
+  AuthStatus get status => _status;
+  bool get isLoading =>
+      _status == AuthStatus.checking ||
+      _status == AuthStatus.authenticating ||
+      _status == AuthStatus.refreshing;
+  bool get isAuthenticated =>
+      _status == AuthStatus.authenticated && _session != null;
   String? get errorMessage => _errorMessage;
+
+  Future<void> bootstrap() async {
+    if (isLoading) {
+      return;
+    }
+
+    _status = AuthStatus.checking;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _session = await _repository.restoreSession();
+      _status = _session == null
+          ? AuthStatus.unauthenticated
+          : AuthStatus.authenticated;
+    } catch (error) {
+      _session = null;
+      _status = AuthStatus.unauthenticated;
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khoi phuc phien dang nhap that bai',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
 
   Future<void> login({
     required String username,
     required String password,
   }) async {
-    if (_isLoading) {
+    if (isLoading) {
       return;
     }
 
-    _isLoading = true;
+    _status = AuthStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
 
@@ -36,11 +76,15 @@ class AuthViewModel extends ChangeNotifier {
         username: username,
         password: password,
       );
+      _status = AuthStatus.authenticated;
     } catch (error) {
       _session = null;
-      _errorMessage = friendlyErrorMessage(error, context: 'Dang nhap that bai');
+      _status = AuthStatus.unauthenticated;
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Dang nhap that bai',
+      );
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }
@@ -52,6 +96,7 @@ class AuthViewModel extends ChangeNotifier {
       // Swallow logout errors so the local session is always cleared.
     } finally {
       _session = null;
+      _status = AuthStatus.unauthenticated;
       _errorMessage = null;
       notifyListeners();
     }

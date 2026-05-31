@@ -15,6 +15,9 @@ class FakeAuthRepository implements AuthRepository {
   bool shouldFail = false;
 
   @override
+  Future<AuthSession?> restoreSession() async => null;
+
+  @override
   Future<AuthSession> login({
     required String username,
     required String password,

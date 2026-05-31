@@ -156,26 +156,31 @@ void main() {
   });
 
   group('view-model surfaces friendly messages, not raw exceptions', () {
-    test('AuthViewModel maps an unauthorized ApiException to friendly text',
-        () async {
-      final viewModel = AuthViewModel(
-        repository: _UnauthorizedAuthRepository(),
-      );
+    test(
+      'AuthViewModel maps an unauthorized ApiException to friendly text',
+      () async {
+        final viewModel = AuthViewModel(
+          repository: _UnauthorizedAuthRepository(),
+        );
 
-      await viewModel.login(username: 'operator', password: 'wrong');
+        await viewModel.login(username: 'operator', password: 'wrong');
 
-      expect(viewModel.isAuthenticated, isFalse);
-      expect(viewModel.errorMessage, isNotNull);
-      expect(viewModel.errorMessage, contains('Dang nhap that bai'));
-      expect(viewModel.errorMessage, contains('Phien dang nhap'));
-      // The raw ApiException toString() format must not be surfaced.
-      expect(viewModel.errorMessage, isNot(contains('API 401')));
-      expect(viewModel.errorMessage, isNot(contains('invalid credentials')));
-    });
+        expect(viewModel.isAuthenticated, isFalse);
+        expect(viewModel.errorMessage, isNotNull);
+        expect(viewModel.errorMessage, contains('Dang nhap that bai'));
+        expect(viewModel.errorMessage, contains('Phien dang nhap'));
+        // The raw ApiException toString() format must not be surfaced.
+        expect(viewModel.errorMessage, isNot(contains('API 401')));
+        expect(viewModel.errorMessage, isNot(contains('invalid credentials')));
+      },
+    );
   });
 }
 
 class _UnauthorizedAuthRepository implements AuthRepository {
+  @override
+  Future<AuthSession?> restoreSession() async => null;
+
   @override
   Future<AuthSession> login({
     required String username,
