@@ -30,6 +30,7 @@ Reason:
 | Secure production compose | `deploy/docker-compose.prod-secure.yml` |
 | Nginx production config | `deploy/nginx/prod.conf` |
 | Production REST auth evidence | `docs/production/production-auth.md` |
+| Production MQTT TLS/ACL evidence | `docs/production/production-mqtt.md` |
 
 ## Final Readiness Gate
 
@@ -46,7 +47,7 @@ Before this report can say `READY`, all of the following must be true:
 
 - Phase 1: HTTPS reverse proxy and exposure lockdown is locally verified, but live EC2 security group state still needs operator confirmation.
 - Phase 2: Backend REST API auth/RBAC is locally verified; mobile login-state integration remains under `SCRUM-91`.
-- Phase 3: MQTT TLS/mTLS and ACL hardening.
+- Phase 3: MQTT TLS/mTLS and ACL config is locally verified; live broker negative tests need operator-approved certificates/environment.
 - Phase 4: Gateway production config hardening.
 - Phase 5: Zigbee secure commissioning.
 - Phase 6: Backup, restore, monitoring, and alerting.

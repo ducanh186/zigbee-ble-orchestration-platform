@@ -21,15 +21,15 @@ services:
     container_name: sb-mosquitto
     restart: unless-stopped
     expose:
-      - "1883"
+      - "8883"
     volumes:
-      - ../mqtt/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ../mqtt/config/acl.conf:/mosquitto/config/acl.conf:ro
-      - ../mqtt/config/conf.d:/mosquitto/config/conf.d:ro
+      - ../mqtt/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../mqtt/config/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro
+      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
       - ../mqtt/passwords:/mosquitto/passwords
       - mosquitto-data:/mosquitto/data
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u monitor -P $$MQTT_MONITOR_PASSWORD -t '$$SYS/broker/uptime' -C 1 -W 3"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt --cert /mosquitto/certs/clients/monitor.crt --key /mosquitto/certs/clients/monitor.key -u monitor -P $$MQTT_MONITOR_PASSWORD -t '$$SYS/broker/uptime' -C 1 -W 3"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -63,7 +63,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 | API bind | `cloud/app/config.py:17-18`; `cloud/Dockerfile:18,21` bind/expose API on `0.0.0.0:8000`. | Direct public API exposure. | Needs Nginx/private binding phase. |
 | EC2 docs | `cloud/README.md:79,108-110`; `deploy/ec2-setup.sh:66-69` document public `8000` and `1883`. | Public attack surface for REST and MQTT. | Needs doc and deploy correction. |
 | Docker Compose ports | `deploy/docker-compose.prod.yml:6-7,30-31,47-48` maps `1883`, `5432`, and `8000` to host ports. | MQTT, DB, and API can become public depending on host firewall/security group. | Needs production compose profile. |
-| MQTT listener | `mqtt/config/mosquitto.conf:3,6,9-11` defines listeners on `1883` and `9001`, password file, and ACL file. | No checked TLS/mTLS listener; plain MQTT remains available. | Needs Phase 3. |
+| MQTT listener | `mqtt/config/mosquitto.prod.conf` defines production listener `8883` with TLS/mTLS, while local dev `mqtt/config/mosquitto.conf` still keeps `1883` and `9001` for development. | Live broker negative tests still need operator-approved certificates/environment. | Production config verified locally in Phase 3. |
 | MQTT credentials | `deploy/deploy.ps1:178,204-218`; `deploy/deploy.sh:123,149-163` generate/default credential-like values. Values are intentionally not repeated here. | Weak/demo credential fallback risk. | Needs Phase 3/4. |
 | Mobile API base URL | `mobile_app/lib/main.dart:17-20`; `mobile_app/README.md:13,24` show HTTP API base URL defaults/examples. | Mobile production can target plain HTTP. | Needs Phase 1/2 mobile alignment. |
 | Backend auth routes | `cloud/app/routers/auth.py` implements login/logout, `cloud/app/auth.py` validates JWT-shaped bearer tokens, and `cloud/tests/test_auth_rbac.py` covers login, invalid token, and expired token behavior. | Mobile login-state integration is still pending under `SCRUM-91`. | Backend Phase 2 verified locally. |
@@ -79,7 +79,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 | Nginx | No production Nginx config found in Phase 0 scan. | Public `80/443`; redirect HTTP to HTTPS. | Needs Phase 1. |
 | FastAPI | Exposes/binds `8000`. | Internal only behind Nginx. | Needs Phase 1. |
 | PostgreSQL | Compose maps `5432:5432`. | Private/internal only. | Needs Phase 1/6. |
-| Mosquitto | Plain `1883` listener and host mapping. | TLS/mTLS on `8883`, strict ACL, no public plain MQTT. | Needs Phase 3. |
+| Mosquitto | Secure compose uses `mqtt/config/mosquitto.prod.conf`, `mqtt/config/acl.prod.conf`, and cert mount `${MQTT_CERT_DIR:-../mqtt/certs}`. | TLS/mTLS on `8883`, strict ACL, no public plain MQTT. | Phase 3 locally verified; live negative tests pending. |
 | Gateway | Commissioning and MQTT assumptions need deeper validation. | Per-gateway config/cert, fail-fast production mode. | Needs Phase 4/5. |
 
 ## Items Needing Human Confirmation
