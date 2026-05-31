@@ -1,10 +1,10 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 03:34:10 +07:00
+Last updated: 2026-06-01 03:58:00 +07:00
 
 Jira: SCRUM-90
 
-Status: PHASE_5_SECURE_COMMISSIONING_VERIFIED_LOCALLY
+Status: PHASE_6_OPERATIONS_VERIFIED_LOCALLY
 
 ## Execution Model
 
@@ -21,9 +21,9 @@ Option 1 is approved: implement the production-hardening work as small SCRUM-siz
 Current active branch/worktree:
 
 ```text
-Branch: codex/scrum-90-phase5-secure-commissioning
+Branch: codex/scrum-90-phase6-ops-runbooks
 Worktree: C:\tmp\zigbee-scrum90-production-hardening
-Base: origin/main after PR 68 merge
+Base: origin/main after PR 69 merge
 ```
 
 ## Phase Breakdown
@@ -95,6 +95,7 @@ Do not put real secrets, private keys, JWT secrets, database passwords, or certi
 - Backend Phase 2 auth/RBAC is locally verified, but mobile login-state integration still needs `SCRUM-91` output.
 - Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with operator approval.
 - Live Zigbee default global key rejection needs operator hardware evidence before final production readiness is claimed.
+- Real backup and restore dry-run evidence needs an operator-approved environment before final production readiness is claimed.
 
 ## Phase 0 Verification
 
@@ -238,3 +239,24 @@ Evidence checked:
 - Gateway dispatch handles `gateway.prepare_join` with missing/bad input rejection.
 - Gateway dispatch calls `netMgrOpenForJoinSecure` and clears the local install-code byte buffer.
 - `docs/production/production-commissioning.md` documents the live negative procedure for default global key rejection.
+
+## Phase 6 Verification
+
+Command:
+
+```text
+python -m pytest cloud/tests/test_production_operations_contract.py -q
+```
+
+Result:
+
+```text
+3 passed
+```
+
+Evidence checked:
+
+- `docs/production/production-operations.md` covers PostgreSQL backup/restore, Mosquitto persistence backup, gateway identity/cert backup, monitoring, alerting, and restore dry-run evidence.
+- Secure compose persists `postgres-data`, `mosquitto-data`, and `mosquitto-log`.
+- Secure compose retains healthchecks for PostgreSQL, MQTT, and API.
+- Phase 6 checklist, final report, and progress dashboard link the operations runbook.

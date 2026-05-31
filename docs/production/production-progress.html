@@ -138,12 +138,12 @@
       </div>
       <div class="metric">
         <span class="label">Progress</span>
-        <span class="value">75%</span>
-        <div class="progress" aria-label="75 percent complete"><div class="bar" style="width:75%"></div></div>
+        <span class="value">88%</span>
+        <div class="progress" aria-label="88 percent complete"><div class="bar" style="width:88%"></div></div>
       </div>
       <div class="metric">
         <span class="label">Last updated</span>
-        <span class="value">2026-06-01 03:34:10 +07:00</span>
+        <span class="value">2026-06-01 03:58:00 +07:00</span>
       </div>
     </div>
   </header>
@@ -199,9 +199,9 @@
           </tr>
           <tr>
             <td>6</td>
-            <td><span class="badge queued">NOT_STARTED</span></td>
+            <td><span class="badge done">DONE</span></td>
             <td>Backup, restore, monitoring, and alerting.</td>
-            <td>Pending.</td>
+            <td><code>docs/production/production-operations.md</code>, operations contract test PASS</td>
           </tr>
           <tr>
             <td>7</td>
@@ -222,6 +222,7 @@
         <li>Live MQTT mTLS negative tests need operator-approved certificates/environment.</li>
         <li>Live gateway hardware startup validation is not run in this local environment.</li>
         <li>Live Zigbee default global key rejection evidence needs gateway hardware.</li>
+        <li>Real backup/restore dry-run evidence needs an operator-approved environment.</li>
       </ul>
     </section>
 
@@ -236,6 +237,7 @@
         <li><code>docs/production/production-mqtt.md</code></li>
         <li><code>docs/production/production-gateway.md</code></li>
         <li><code>docs/production/production-commissioning.md</code></li>
+        <li><code>docs/production/production-operations.md</code></li>
         <li><code>deploy/.env.prod.example</code></li>
       </ul>
     </section>
@@ -291,6 +293,11 @@
             <td><span class="badge done">PASS</span></td>
             <td>4 passed. Confirms install-code gateway prepare_join parsing, secure dispatch, bounded duration, and negative procedure documentation.</td>
           </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_operations_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>3 passed. Confirms backup/restore, monitoring, alerting runbook coverage and persistent compose state.</td>
+          </tr>
         </tbody>
       </table>
     </section>
@@ -338,10 +345,10 @@
             <td>Operator hardware validation</td>
           </tr>
           <tr>
-            <td>Backup/restore/alerting are not production-grade yet.</td>
+            <td>Backup/restore dry-run evidence is not captured locally.</td>
             <td>Medium</td>
-            <td><code>cloud/README.md:101-102</code>; <code>mqtt/README.md:68-69</code></td>
-            <td>Phase 6</td>
+            <td><code>docs/production/production-operations.md</code></td>
+            <td>Operator environment validation</td>
           </tr>
         </tbody>
       </table>
@@ -350,9 +357,9 @@
     <section class="panel">
       <h2>Next Actions</h2>
       <ol>
-        <li>Commit, push, PR, and merge Phase 5 branch <code>codex/scrum-90-phase5-secure-commissioning</code>.</li>
+        <li>Commit, push, PR, and merge Phase 6 branch <code>codex/scrum-90-phase6-ops-runbooks</code>.</li>
         <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
-        <li>Start Phase 6 backup, restore, monitoring, and alerting.</li>
+        <li>Start Phase 7 CI/CD, release, rollback, final evidence, and GitHub release preparation.</li>
       </ol>
     </section>
 
@@ -396,6 +403,11 @@
             <td>2026-06-01 03:34:10 +07:00</td>
             <td>Phase 5 gateway secure commissioning command parsing, install-code dispatch, local guardrail tests, and negative procedure runbook added.</td>
             <td><code>SCRUM-97</code>; <code>codex/scrum-90-phase5-secure-commissioning</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:58:00 +07:00</td>
+            <td>Phase 6 operations runbook, backup/restore/monitoring/alerting contract test, and Mosquitto log volume persistence added.</td>
+            <td><code>SCRUM-98</code>; <code>codex/scrum-90-phase6-ops-runbooks</code></td>
           </tr>
         </tbody>
       </table>
