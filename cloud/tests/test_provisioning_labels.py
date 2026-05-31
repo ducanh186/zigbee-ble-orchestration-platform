@@ -9,8 +9,32 @@ VALID_EUI64 = "A8D417FEFF570B00"
 VALID_INSTALL_CODE = "83FED3407A939723A5C639B26916D505C3B5"
 
 
+async def _admin_headers(client, db_session_factory) -> dict[str, str]:
+    from cloud.app.auth import hash_password
+    from cloud.app.models import User
+
+    async with db_session_factory() as session:
+        session.add(
+            User(
+                id="admin-1",
+                username="admin",
+                role="admin",
+                password_hash=hash_password("admin-pass"),
+            )
+        )
+        await session.commit()
+
+    login = await client.post(
+        "/auth/login",
+        json={"username": "admin", "password": "admin-pass"},
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
 @pytest.mark.asyncio
-async def test_label_api_generates_contract_payload_and_svg(client):
+async def test_label_api_generates_contract_payload_and_svg(client, db_session_factory):
+    headers = await _admin_headers(client, db_session_factory)
     response = await client.post(
         "/api/provisioning/labels",
         json={
@@ -18,6 +42,7 @@ async def test_label_api_generates_contract_payload_and_svg(client):
             "device_type": "light",
             "model": "EFR32MG12_LIGHT_KIT",
         },
+        headers=headers,
     )
 
     assert response.status_code == 201
@@ -35,7 +60,8 @@ async def test_label_api_generates_contract_payload_and_svg(client):
 
 
 @pytest.mark.asyncio
-async def test_label_api_accepts_valid_existing_install_code(client):
+async def test_label_api_accepts_valid_existing_install_code(client, db_session_factory):
+    headers = await _admin_headers(client, db_session_factory)
     response = await client.post(
         "/api/provisioning/labels",
         json={
@@ -43,6 +69,7 @@ async def test_label_api_accepts_valid_existing_install_code(client):
             "install_code": VALID_INSTALL_CODE,
             "device_type": "switch",
         },
+        headers=headers,
     )
 
     assert response.status_code == 201
@@ -50,7 +77,8 @@ async def test_label_api_accepts_valid_existing_install_code(client):
 
 
 @pytest.mark.asyncio
-async def test_label_api_rejects_wrong_install_code_crc(client):
+async def test_label_api_rejects_wrong_install_code_crc(client, db_session_factory):
+    headers = await _admin_headers(client, db_session_factory)
     response = await client.post(
         "/api/provisioning/labels",
         json={
@@ -58,6 +86,7 @@ async def test_label_api_rejects_wrong_install_code_crc(client):
             "install_code": VALID_INSTALL_CODE[:-4] + "0000",
             "device_type": "motion",
         },
+        headers=headers,
     )
 
     assert response.status_code == 422

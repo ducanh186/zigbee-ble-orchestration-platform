@@ -12,6 +12,7 @@ from cloud.app.database import async_session, init_db
 from cloud.app.device_lifecycle import run_offline_reaper
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.routers import (
+    auth,
     automations,
     commands,
     devices,
@@ -69,6 +70,7 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)

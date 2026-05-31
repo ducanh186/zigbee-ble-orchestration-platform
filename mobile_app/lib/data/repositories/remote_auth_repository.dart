@@ -5,7 +5,8 @@ import '../services/api_client.dart';
 // TODO(SCRUM-20): Cloud backend does not yet expose an auth router.
 // Expected contract once implemented:
 //   POST /auth/login  body: {"username": "...", "password": "..."}
-//   200 -> {"access_token": "...", "user_id": "...", "expires_at": "<ISO8601>"}
+//   200 -> {"access_token": "...", "user_id": "...", "role": "...",
+//           "home_id": "...", "expires_at": "<ISO8601>"}
 //   POST /auth/logout (authenticated)
 class RemoteAuthRepository implements AuthRepository {
   RemoteAuthRepository({required ApiClient apiClient}) : _apiClient = apiClient;
@@ -31,10 +32,14 @@ class RemoteAuthRepository implements AuthRepository {
       );
     }
     final userId = map['user_id'] as String?;
+    final role = map['role'] as String?;
+    final homeId = map['home_id'] as String?;
     final expiresAtRaw = map['expires_at'] as String?;
     final session = AuthSession(
       accessToken: rawAccessToken,
       userId: userId,
+      role: role,
+      homeId: homeId,
       expiresAt: expiresAtRaw == null ? null : DateTime.tryParse(expiresAtRaw),
     );
 

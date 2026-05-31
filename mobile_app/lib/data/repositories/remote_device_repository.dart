@@ -153,6 +153,19 @@ class RemoteDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<SmartDevice> renameDeviceName({
+    required String deviceId,
+    required String name,
+  }) async {
+    final json = await _apiClient.patchJson('/api/devices/$deviceId', {
+      'name': name,
+    });
+    return DeviceApiModel.fromJson(
+      Map<String, Object?>.from(json as Map),
+    ).toDomain();
+  }
+
+  @override
   Future<CommandResult> fetchCommand(String commandId) async {
     final json = await _apiClient.getJson('/api/commands/$commandId');
     return CommandApiModel.fromJson(

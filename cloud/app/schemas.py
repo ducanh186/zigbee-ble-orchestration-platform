@@ -14,6 +14,8 @@ from pydantic import (
     model_validator,
 )
 
+from cloud.app.provisioning_install_code import normalize_install_code
+
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
 
 
@@ -217,6 +219,27 @@ class DeviceOut(BaseModel):
     @field_serializer("last_seen_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
+
+
+class DeviceUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class AuthLogin(BaseModel):
+    username: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1)
+
+
+class AuthSessionOut(BaseModel):
+    access_token: str
+    user_id: str
+    role: Literal["admin", "user"]
+    home_id: str | None = None
+    expires_at: datetime
+
+    @field_serializer("expires_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return v.isoformat() if v is not None else None
 
 
 class DeviceStateOut(BaseModel):

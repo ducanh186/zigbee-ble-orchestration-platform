@@ -73,6 +73,13 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
               ),
               actions: [
                 IconButton(
+                  tooltip: 'Rename device',
+                  onPressed: viewModel.isRenamingDevice
+                      ? null
+                      : () => _renameDevice(context, viewModel, current),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
                   tooltip: 'Refresh',
                   onPressed: () => _refresh(viewModel, current.id),
                   icon: const Icon(Icons.refresh),
@@ -118,6 +125,70 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
   ) async {
     await viewModel.load();
     await viewModel.loadDeviceEvents(deviceId);
+  }
+
+  Future<void> _renameDevice(
+    BuildContext context,
+    DeviceDashboardViewModel viewModel,
+    SmartDevice device,
+  ) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _RenameDeviceDialog(initialName: device.name),
+    );
+    if (!mounted || name == null) {
+      return;
+    }
+    await viewModel.renameDevice(device, name);
+  }
+}
+
+class _RenameDeviceDialog extends StatefulWidget {
+  const _RenameDeviceDialog({required this.initialName});
+
+  final String initialName;
+
+  @override
+  State<_RenameDeviceDialog> createState() => _RenameDeviceDialogState();
+}
+
+class _RenameDeviceDialogState extends State<_RenameDeviceDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename device'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Display name'),
+        textInputAction: TextInputAction.done,
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Save'),
+        ),
+      ],
+    );
   }
 }
 

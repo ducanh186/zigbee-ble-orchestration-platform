@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     device_offline_after_seconds: int = 300
     # How often the reaper task wakes up to scan for stale devices.
     device_offline_scan_interval_seconds: int = 60
+    auth_token_secret: str = "dev-only-change-me"
+    auth_token_ttl_seconds: int = 8 * 60 * 60
 
     model_config = {"env_prefix": "SB_", "env_file": ".env", "extra": "ignore"}
 

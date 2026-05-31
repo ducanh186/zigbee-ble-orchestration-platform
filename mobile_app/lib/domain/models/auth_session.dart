@@ -2,11 +2,15 @@ class AuthSession {
   const AuthSession({
     required this.accessToken,
     this.userId,
+    this.role,
+    this.homeId,
     this.expiresAt,
   });
 
   final String accessToken;
   final String? userId;
+  final String? role;
+  final String? homeId;
   final DateTime? expiresAt;
 
   bool get isExpired {
