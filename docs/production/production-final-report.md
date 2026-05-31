@@ -15,7 +15,7 @@ The platform is not production ready yet.
 Reason:
 
 - Phase 0 has only established the production evidence contract and initial audit.
-- HTTPS reverse proxy, backend REST auth, MQTT TLS/mTLS, gateway hardening, and secure commissioning now have local evidence; mobile login-state, live environment checks, backup/restore, monitoring, rollback, and final acceptance are not complete.
+- HTTPS reverse proxy, backend REST auth, MQTT TLS/mTLS, gateway hardening, secure commissioning, and operations runbooks now have local evidence; mobile login-state, live environment checks, rollback, release evidence, and final acceptance are not complete.
 
 ## Evidence Index
 
@@ -33,6 +33,7 @@ Reason:
 | Production MQTT TLS/ACL evidence | `docs/production/production-mqtt.md` |
 | Production gateway config evidence | `docs/production/production-gateway.md` |
 | Production secure commissioning evidence | `docs/production/production-commissioning.md` |
+| Production operations runbook | `docs/production/production-operations.md` |
 
 ## Final Readiness Gate
 
@@ -52,5 +53,5 @@ Before this report can say `READY`, all of the following must be true:
 - Phase 3: MQTT TLS/mTLS and ACL config is locally verified; live broker negative tests need operator-approved certificates/environment.
 - Phase 4: Gateway production config hardening is locally verified; live gateway startup on hardware remains pending.
 - Phase 5: Zigbee secure commissioning is locally verified; live default global key rejection evidence remains pending on gateway hardware.
-- Phase 6: Backup, restore, monitoring, and alerting.
+- Phase 6: Backup, restore, monitoring, and alerting are locally documented and verified; real backup/restore dry-run evidence remains pending in an operator-approved environment.
 - Phase 7: CI/CD, release, rollback, and final evidence.

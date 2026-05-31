@@ -142,15 +142,24 @@ Runbook: docs/production/production-commissioning.md
 
 ## Phase 6 - Backup, Restore, Monitoring, and Alerting
 
-- [ ] PostgreSQL backup scope is documented.
-- [ ] Mosquitto persistence backup scope is documented.
-- [ ] Gateway identity/certificate backup scope is documented.
-- [ ] Restore procedure is documented.
-- [ ] Health monitoring is documented.
-- [ ] Alerting channel is documented.
-- [ ] Backup/restore dry-run evidence exists or is marked not testable here.
+- [x] PostgreSQL backup scope is documented.
+- [x] Mosquitto persistence backup scope is documented.
+- [x] Gateway identity/certificate backup scope is documented.
+- [x] Restore procedure is documented.
+- [x] Health monitoring is documented.
+- [x] Alerting channel is documented.
+- [x] Backup/restore dry-run evidence exists or is marked not testable here.
 
-Status: Not started.
+Status: Verified locally by operations contract tests. Real backup and restore dry-run evidence must still be captured in an operator-approved environment before final production readiness is claimed.
+
+Evidence:
+
+```text
+python -m pytest cloud/tests/test_production_operations_contract.py -q
+3 passed
+```
+
+Runbook: docs/production/production-operations.md
 
 ## Phase 7 - CI/CD, Release, Rollback, and Final Evidence
 

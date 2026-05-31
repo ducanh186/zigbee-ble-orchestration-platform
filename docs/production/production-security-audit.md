@@ -52,7 +52,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 - Backend API routing currently registers domain routers directly, and no backend auth router was found in the Phase 0 evidence scan.
 - Mobile app defaults point to a plain HTTP demo API URL and do not yet prove HTTPS-only production auth.
 - Gateway commissioning API exposes permit-join operations with admin authorization, and Phase 5 adds local secure commissioning evidence for install-code-based joins.
-- Backup, monitoring, alerting, and rollback are partially documented through logs/healthcheck notes, but no production-grade backup/restore/alerting runbook is present in `docs/production/`.
+- Backup, monitoring, and alerting are documented in the Phase 6 operations runbook; rollback and final release evidence still need Phase 7.
 
 ## Evidence Table
 
@@ -70,7 +70,7 @@ Current evidence shows the repository is still closer to a demo or lab deploymen
 | Permit join API | `cloud/app/routers/gateways.py` protects open/close commissioning with `require_admin`, and `cloud/tests/test_gateways.py` covers unauthenticated, operator-forbidden, and admin-allowed behavior. | Live radio proof of default global key rejection still needs gateway hardware. | Backend auth done; secure commissioning locally verified in Phase 5. |
 | Zigbee secure commissioning | `cloud/app/routers/provisioning.py` publishes `gateway.prepare_join`; gateway parser/dispatch reads `eui64` and `install_code`, validates them, and calls `netMgrOpenForJoinSecure`; `network-creator-security-config.h` enables install-code joins and disables well-known key rejoins. | Live negative test still required before final readiness. | Phase 5 locally verified. |
 | Nginx/reverse proxy | `docs/production`, `deploy/.env.prod.example`, `nginx`, and `deploy/nginx.conf` were missing in Phase 0 scan. | HTTPS reverse proxy contract not documented or implemented. | Needs Phase 1. |
-| Backup/monitoring/rollback | `cloud/README.md:101-102,138`; `mqtt/README.md:68-69` mention logs and monitor user. | Not enough for production recovery or alerting. | Needs Phase 6/7. |
+| Backup/monitoring/rollback | `docs/production/production-operations.md` documents backup, restore, monitoring, alerting, and dry-run evidence requirements; rollback remains a release concern. | Real restore dry-run evidence still needs operator-approved environment. | Phase 6 locally verified; rollback remains Phase 7. |
 
 ## Current Exposure Map
 
