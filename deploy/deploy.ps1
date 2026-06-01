@@ -244,10 +244,24 @@ echo 'cloud/.env written.'
 "@
 
 # ----------------------------------------------------------
-# Step 6: Docker compose up
+# Step 6: Prepare HTTPS certificate
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "--- [6/6] Building and starting containers ---" -ForegroundColor Yellow
+$httpsHost = if ($config["HTTPS_HOST"]) { $config["HTTPS_HOST"] } else { $EC2_HOST }
+
+Write-Host "--- [6/7] Preparing HTTPS certificate ---" -ForegroundColor Yellow
+
+Invoke-EC2 @"
+set -e
+cd $REMOTE_DIR
+bash deploy/setup-https.sh '$httpsHost' '$REMOTE_DIR'
+"@
+
+# ----------------------------------------------------------
+# Step 7: Docker compose up
+# ----------------------------------------------------------
+Write-Host ""
+Write-Host "--- [7/7] Building and starting containers ---" -ForegroundColor Yellow
 
 Invoke-EC2 @"
 set -e
@@ -298,6 +312,7 @@ fi
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  Deploy complete!" -ForegroundColor Green
+Write-Host "  API HTTPS: https://${httpsHost}" -ForegroundColor Green
 Write-Host "  API Swagger: http://${EC2_HOST}:8000/docs" -ForegroundColor Green
 Write-Host "  MQTT Broker: ${EC2_HOST}:1883" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green

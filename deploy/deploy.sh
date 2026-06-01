@@ -186,10 +186,24 @@ echo 'cloud/.env written.'
 REMOTE_EOF
 
 # ----------------------------------------------------------
-# Step 6: Docker compose up
+# Step 6: Prepare HTTPS certificate
 # ----------------------------------------------------------
 echo ""
-echo "--- [6/6] Building and starting containers ---"
+echo "--- [6/7] Preparing HTTPS certificate ---"
+
+HTTPS_HOST="${config[HTTPS_HOST]:-$EC2_HOST}"
+
+ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+set -e
+cd $REMOTE_DIR
+bash deploy/setup-https.sh '$HTTPS_HOST' '$REMOTE_DIR'
+REMOTE_EOF
+
+# ----------------------------------------------------------
+# Step 7: Docker compose up
+# ----------------------------------------------------------
+echo ""
+echo "--- [7/7] Building and starting containers ---"
 
 ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 set -e
@@ -247,6 +261,7 @@ REMOTE_EOF
 echo ""
 echo "========================================="
 echo "  Deploy complete!"
+echo "  API HTTPS: https://$HTTPS_HOST"
 echo "  API Swagger: http://$EC2_HOST:8000/docs"
 echo "  MQTT Broker: $EC2_HOST:1883"
 echo "========================================="
