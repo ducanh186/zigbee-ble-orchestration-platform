@@ -26,7 +26,7 @@ services:
       - ../mqtt/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
       - ../mqtt/config/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro
       - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
-      - ../mqtt/passwords:/mosquitto/passwords
+      - ./mosquitto/passwords:/mosquitto/passwords
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
     healthcheck:
@@ -71,6 +71,8 @@ services:
       - "8000"
     env_file:
       - ./.env.prod
+    volumes:
+      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
     depends_on:
       mosquitto:
         condition: service_healthy

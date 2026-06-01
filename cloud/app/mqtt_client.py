@@ -76,6 +76,7 @@ class MQTTService:
         self.client.username_pw_set(
             self.settings.mqtt_username, self.settings.mqtt_password
         )
+        self._configure_tls()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.connect(self.settings.mqtt_host, self.settings.mqtt_port)
@@ -84,6 +85,34 @@ class MQTTService:
     def disconnect(self) -> None:
         self.client.loop_stop()
         self.client.disconnect()
+
+    def _configure_tls(self) -> None:
+        if not self.settings.mqtt_tls_enabled:
+            return
+        if not self.settings.mqtt_ca_cert_path:
+            raise RuntimeError(
+                "SB_MQTT_CA_CERT_PATH is required when SB_MQTT_TLS_ENABLED=true"
+            )
+
+        certfile = None
+        keyfile = None
+        if self.settings.mqtt_mtls_enabled:
+            if (
+                not self.settings.mqtt_client_cert_path
+                or not self.settings.mqtt_client_key_path
+            ):
+                raise RuntimeError(
+                    "SB_MQTT_CLIENT_CERT_PATH and SB_MQTT_CLIENT_KEY_PATH are "
+                    "required when SB_MQTT_MTLS_ENABLED=true"
+                )
+            certfile = self.settings.mqtt_client_cert_path
+            keyfile = self.settings.mqtt_client_key_path
+
+        self.client.tls_set(
+            ca_certs=self.settings.mqtt_ca_cert_path,
+            certfile=certfile,
+            keyfile=keyfile,
+        )
 
     # ------------------------------------------------------------------
     # Callbacks

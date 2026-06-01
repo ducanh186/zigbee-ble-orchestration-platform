@@ -163,11 +163,9 @@ Write-Host "--- [3/6] Preparing remote directories ---" -ForegroundColor Yellow
 Invoke-EC2 @"
 set -e
 cd $REMOTE_DIR
-mkdir -p deploy/mosquitto/config/conf.d
 mkdir -p deploy/mosquitto/passwords
 mkdir -p deploy/cloud
-cp -f mqtt/config/mosquitto.conf deploy/mosquitto/config/
-cp -f mqtt/config/acl.conf       deploy/mosquitto/config/
+mkdir -p mqtt/certs/clients
 echo 'Directories prepared.'
 "@
 
@@ -179,6 +177,7 @@ Write-Host "--- [4/6] Generating MQTT passwords ---" -ForegroundColor Yellow
 
 $gwPass = if ($config["MQTT_GATEWAY_PASS"]) { $config["MQTT_GATEWAY_PASS"] } else { "gateway123" }
 $cliPass = if ($config["MQTT_CLIENT_PASS"]) { $config["MQTT_CLIENT_PASS"] }  else { "client123" }
+$cloudPass = if ($config["MQTT_CLOUD_PASS"]) { $config["MQTT_CLOUD_PASS"] } elseif ($config["MQTT_CLIENT_PASS"]) { $config["MQTT_CLIENT_PASS"] } else { "cloud123" }
 $monPass = if ($config["MQTT_MONITOR_PASS"]) { $config["MQTT_MONITOR_PASS"] } else { "monitor123" }
 $brPass = if ($config["MQTT_BRIDGE_PASS"]) { $config["MQTT_BRIDGE_PASS"] }  else { "bridge123" }
 
@@ -189,6 +188,7 @@ PASSDIR=`$(pwd)/deploy/mosquitto/passwords
 docker run --rm -v "`$PASSDIR:/passwords" eclipse-mosquitto:2.0 sh -c "
   touch /passwords/passwd
   mosquitto_passwd -b /passwords/passwd gateway '$gwPass'
+  mosquitto_passwd -b /passwords/passwd cloud   '$cloudPass'
   mosquitto_passwd -b /passwords/passwd client  '$cliPass'
   mosquitto_passwd -b /passwords/passwd monitor '$monPass'
   mosquitto_passwd -b /passwords/passwd bridge  '$brPass'
@@ -197,18 +197,31 @@ echo 'MQTT passwords generated.'
 "@
 
 # ----------------------------------------------------------
-# Step 5: Write cloud .env
+# Step 5: Prepare MQTT mTLS certificates
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "--- [5/6] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
+Write-Host "--- [5/8] Preparing MQTT mTLS certificates ---" -ForegroundColor Yellow
+
+Invoke-EC2 @"
+set -e
+cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-mqtt-mtls.sh
+bash deploy/setup-mqtt-mtls.sh '$REMOTE_DIR' '$EC2_HOST'
+"@
+
+# ----------------------------------------------------------
+# Step 6: Write cloud .env
+# ----------------------------------------------------------
+Write-Host ""
+Write-Host "--- [6/8] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
 
 $pgUser = if ($config["POSTGRES_USER"]) { $config["POSTGRES_USER"] }     else { "sb_user" }
 $pgPass = if ($config["POSTGRES_PASSWORD"]) { $config["POSTGRES_PASSWORD"] } else { "sb_pass" }
 $pgDb = if ($config["POSTGRES_DB"]) { $config["POSTGRES_DB"] }       else { "sb_cloud" }
 $sbDbUrl = if ($config["SB_DATABASE_URL"]) { $config["SB_DATABASE_URL"] }  else { "postgresql+asyncpg://${pgUser}:${pgPass}@postgres:5432/${pgDb}" }
 $sbMqttHost = if ($config["SB_MQTT_HOST"]) { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
-$sbMqttUser = if ($config["SB_MQTT_USERNAME"]) { $config["SB_MQTT_USERNAME"] } else { "client" }
-$sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } else { "client123" }
+$sbMqttUser = "cloud"
+$sbMqttPass = $cloudPass
 $sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { "hust" }
 $sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
 $sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
@@ -230,9 +243,14 @@ fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$sbDbUrl
 SB_MQTT_HOST=$sbMqttHost
-SB_MQTT_PORT=1883
+SB_MQTT_PORT=8883
 SB_MQTT_USERNAME=$sbMqttUser
 SB_MQTT_PASSWORD=$sbMqttPass
+SB_MQTT_TLS_ENABLED=true
+SB_MQTT_MTLS_ENABLED=true
+SB_MQTT_CA_CERT_PATH=/mosquitto/certs/ca.crt
+SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud.crt
+SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud.key
 SB_TENANT_ID=$sbTenant
 SB_SITE_ID=$sbSite
 SB_GATEWAY_ID=$sbGw
@@ -244,24 +262,25 @@ echo 'cloud/.env written.'
 "@
 
 # ----------------------------------------------------------
-# Step 6: Prepare HTTPS certificate
+# Step 7: Prepare HTTPS certificate
 # ----------------------------------------------------------
 Write-Host ""
 $httpsHost = if ($config["HTTPS_HOST"]) { $config["HTTPS_HOST"] } else { $EC2_HOST }
 
-Write-Host "--- [6/7] Preparing HTTPS certificate ---" -ForegroundColor Yellow
+Write-Host "--- [7/8] Preparing HTTPS certificate ---" -ForegroundColor Yellow
 
 Invoke-EC2 @"
 set -e
 cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-https.sh
 bash deploy/setup-https.sh '$httpsHost' '$REMOTE_DIR'
 "@
 
 # ----------------------------------------------------------
-# Step 7: Docker compose up
+# Step 8: Docker compose up
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "--- [7/7] Building and starting containers ---" -ForegroundColor Yellow
+Write-Host "--- [8/8] Building and starting containers ---" -ForegroundColor Yellow
 
 Invoke-EC2 @"
 set -e
@@ -279,6 +298,8 @@ cp    ../cloud/__main__.py cloud/
 export POSTGRES_USER='$pgUser'
 export POSTGRES_PASSWORD='$pgPass'
 export POSTGRES_DB='$pgDb'
+export MQTT_MONITOR_PASSWORD='$monPass'
+export MQTT_CERT_DIR='../mqtt/certs'
 
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
@@ -314,5 +335,5 @@ Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  Deploy complete!" -ForegroundColor Green
 Write-Host "  API HTTPS: https://${httpsHost}" -ForegroundColor Green
 Write-Host "  API Swagger: http://${EC2_HOST}:8000/docs" -ForegroundColor Green
-Write-Host "  MQTT Broker: ${EC2_HOST}:1883" -ForegroundColor Green
+Write-Host "  MQTT Broker: ${EC2_HOST}:8883 (TLS/mTLS)" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green

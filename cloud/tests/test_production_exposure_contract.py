@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SECURE_COMPOSE = REPO_ROOT / "deploy" / "docker-compose.prod-secure.yml"
 NGINX_CONF = REPO_ROOT / "deploy" / "nginx" / "prod.conf"
+SETUP_HTTPS = REPO_ROOT / "deploy" / "setup-https.sh"
 
 
 def test_secure_production_compose_exposes_only_reverse_proxy_ports() -> None:
@@ -33,3 +34,11 @@ def test_nginx_production_config_redirects_http_and_proxies_https() -> None:
     assert "ssl_certificate_key" in conf
     assert "proxy_pass http://cloud-api:8000" in conf
     assert "proxy_set_header Authorization $http_authorization" in conf
+
+
+def test_https_setup_has_self_signed_fallback_when_ip_certificate_is_blocked() -> None:
+    script = SETUP_HTTPS.read_text(encoding="utf-8")
+
+    assert "generate_self_signed_certificate" in script
+    assert "WARNING: Let's Encrypt certificate request failed" in script
+    assert "openssl req -x509" in script
