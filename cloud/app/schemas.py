@@ -330,6 +330,22 @@ class AutomationOut(BaseModel):
         return _fmt_ts(v)
 
 
+class AutomationEventOut(BaseModel):
+    id: int
+    automation_id: str | None
+    event_type: str
+    status: str | None
+    reason: str | None
+    payload: dict[str, Any]
+    occurred_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("occurred_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
+
 # ---------------------------------------------------------------------------
 # Provisioning sessions (secure install-code join)
 # ---------------------------------------------------------------------------

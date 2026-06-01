@@ -174,6 +174,30 @@ class Automation(Base):
         ),
     )
 
+
+class AutomationEvent(Base):
+    """Audit row for automation lifecycle and execution events from gateway."""
+
+    __tablename__ = "automation_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    automation_id = Column(String, ForeignKey("automations.id"), nullable=True)
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=True)
+    reason = Column(String, nullable=True)
+    payload = Column(JSON, nullable=False)
+    occurred_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_automation_events_rule_occurred",
+            "automation_id",
+            "occurred_at",
+        ),
+    )
+
+
 class ProvisioningSession(Base):
     """Secure install-code join session tracked by the cloud API."""
 
