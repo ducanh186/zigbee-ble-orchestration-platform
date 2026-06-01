@@ -61,6 +61,51 @@ request_certificate() {
     "${identifier_args[@]}"
 }
 
+generate_self_signed_certificate() {
+  local live_dir="$LE_DIR/live/$HTTPS_HOST"
+  local fullchain_path="$live_dir/fullchain.pem"
+  local privkey_path="$live_dir/privkey.pem"
+  local cert_path="$live_dir/cert.pem"
+  local openssl_cfg
+  openssl_cfg="$(mktemp)"
+
+  mkdir -p "$live_dir"
+  {
+    echo "[req]"
+    echo "distinguished_name = req_distinguished_name"
+    echo "x509_extensions = v3_req"
+    echo "prompt = no"
+    echo "[req_distinguished_name]"
+    echo "CN = $HTTPS_HOST"
+    echo "[v3_req]"
+    echo "basicConstraints = CA:FALSE"
+    echo "keyUsage = digitalSignature, keyEncipherment"
+    echo "extendedKeyUsage = serverAuth"
+    if is_ip_address "$HTTPS_HOST"; then
+      echo "subjectAltName = IP:$HTTPS_HOST"
+    else
+      echo "subjectAltName = DNS:$HTTPS_HOST"
+    fi
+  } > "$openssl_cfg"
+
+  openssl req -x509 -nodes -newkey rsa:2048 -sha256 -days 30 \
+    -keyout "$privkey_path" \
+    -out "$fullchain_path" \
+    -config "$openssl_cfg"
+  cp "$fullchain_path" "$cert_path"
+  rm -f "$openssl_cfg"
+  echo "Generated temporary self-signed HTTPS certificate for $HTTPS_HOST."
+}
+
+prepare_certificate() {
+  if request_certificate; then
+    return 0
+  fi
+
+  echo "WARNING: Let's Encrypt certificate request failed; using temporary self-signed HTTPS certificate."
+  generate_self_signed_certificate
+}
+
 install_renew_timer() {
   local renew_script="/usr/local/bin/iot-platform-renew-ip-cert.sh"
 
@@ -121,7 +166,7 @@ EOF
   sudo systemctl enable --now iot-platform-renew-ip-cert.timer >/dev/null
 }
 
-request_certificate
+prepare_certificate
 render_nginx_config
 install_renew_timer
 

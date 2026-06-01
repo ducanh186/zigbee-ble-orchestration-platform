@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     mqtt_port: int = 1883
     mqtt_username: str = "client"
     mqtt_password: str = "client"
+    mqtt_tls_enabled: bool = False
+    mqtt_mtls_enabled: bool = False
+    mqtt_ca_cert_path: str | None = None
+    mqtt_client_cert_path: str | None = None
+    mqtt_client_key_path: str | None = None
     tenant_id: str = "hust"
     site_id: str = "lab01"
     gateway_id: str = "gw-ubuntu-01"

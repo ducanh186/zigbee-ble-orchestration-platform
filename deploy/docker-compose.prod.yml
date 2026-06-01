@@ -18,16 +18,18 @@ services:
     container_name: sb-mosquitto
     restart: unless-stopped
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "8883:8883"
     volumes:
-      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./mosquitto/config/acl.conf:/mosquitto/config/acl.conf:ro
-      - ./mosquitto/config/conf.d:/mosquitto/config/conf.d:ro
+      - ../mqtt/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../mqtt/config/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro
+      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
       - ./mosquitto/passwords:/mosquitto/passwords
       - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    environment:
+      MQTT_MONITOR_PASSWORD: ${MQTT_MONITOR_PASSWORD:-monitor123}
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -u monitor -P monitor123 -t '$$SYS/broker/uptime' -C 1 -W 3"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt --cert /mosquitto/certs/clients/monitor.crt --key /mosquitto/certs/clients/monitor.key -u monitor -P $$MQTT_MONITOR_PASSWORD -t '$$SYS/broker/uptime' -C 1 -W 3"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,6 +64,8 @@ services:
       - "8000:8000"
     env_file:
       - ./cloud/.env
+    volumes:
+      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
     depends_on:
       mosquitto:
         condition: service_healthy
@@ -76,4 +80,5 @@ services:
 
 volumes:
   mosquitto-data:
+  mosquitto-log:
   postgres-data:

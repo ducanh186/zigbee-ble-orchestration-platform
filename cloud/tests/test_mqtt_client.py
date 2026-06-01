@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -75,6 +76,67 @@ async def test_handle_motion_event_auto_registers_and_persists():
     assert event.payload["occupancy"] == "occupied"
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_connect_configures_tls_and_mtls_when_enabled(monkeypatch):
+    from cloud.app import mqtt_client as mqtt_module
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.username = None
+            self.password = None
+            self.tls_kwargs = None
+            self.connect_args = None
+            self.loop_started = False
+
+        def username_pw_set(self, username, password):
+            self.username = username
+            self.password = password
+
+        def tls_set(self, **kwargs):
+            self.tls_kwargs = kwargs
+
+        def connect(self, host, port):
+            self.connect_args = (host, port)
+
+        def loop_start(self):
+            self.loop_started = True
+
+    fake_client = FakeClient()
+    monkeypatch.setattr(
+        mqtt_module.mqtt,
+        "Client",
+        lambda *args, **kwargs: fake_client,
+    )
+
+    service = mqtt_module.MQTTService()
+    service.settings = SimpleNamespace(
+        mqtt_host="mosquitto",
+        mqtt_port=8883,
+        mqtt_username="client",
+        mqtt_password="client-pass",
+        mqtt_tls_enabled=True,
+        mqtt_mtls_enabled=True,
+        mqtt_ca_cert_path="/mosquitto/certs/ca.crt",
+        mqtt_client_cert_path="/mosquitto/certs/clients/cloud.crt",
+        mqtt_client_key_path="/mosquitto/certs/clients/cloud.key",
+        tenant_id="hust",
+        site_id="lab01",
+        gateway_id="gw-ubuntu-01",
+    )
+
+    service.connect()
+
+    assert fake_client.username == "client"
+    assert fake_client.password == "client-pass"
+    assert fake_client.tls_kwargs == {
+        "ca_certs": "/mosquitto/certs/ca.crt",
+        "certfile": "/mosquitto/certs/clients/cloud.crt",
+        "keyfile": "/mosquitto/certs/clients/cloud.key",
+    }
+    assert fake_client.connect_args == ("mosquitto", 8883)
+    assert fake_client.loop_started is True
 
 
 @pytest.mark.asyncio

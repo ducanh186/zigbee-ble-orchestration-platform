@@ -4,9 +4,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+EC2_COMPOSE = REPO_ROOT / "deploy" / "docker-compose.prod.yml"
 SECURE_COMPOSE = REPO_ROOT / "deploy" / "docker-compose.prod-secure.yml"
 PROD_MOSQUITTO_CONF = REPO_ROOT / "mqtt" / "config" / "mosquitto.prod.conf"
 PROD_ACL_CONF = REPO_ROOT / "mqtt" / "config" / "acl.prod.conf"
+DEPLOY_PS1 = REPO_ROOT / "deploy" / "deploy.ps1"
+DEPLOY_SH = REPO_ROOT / "deploy" / "deploy.sh"
 
 
 def test_secure_compose_uses_mqtt_tls_config_and_certs() -> None:
@@ -17,6 +20,31 @@ def test_secure_compose_uses_mqtt_tls_config_and_certs() -> None:
     assert "${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro" in compose
     assert 'expose:\n      - "8883"' in compose
     assert '"1883"' not in compose
+
+
+def test_ec2_compose_uses_mqtt_mtls_without_plaintext_ports() -> None:
+    compose = EC2_COMPOSE.read_text(encoding="utf-8")
+
+    assert "../mqtt/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro" in compose
+    assert "../mqtt/config/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro" in compose
+    assert "${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro" in compose
+    assert '"8883:8883"' in compose
+    assert '"1883:1883"' not in compose
+    assert '"9001:9001"' not in compose
+    assert "mosquitto_sub -h localhost -p 8883 --cafile" in compose
+
+
+def test_deploy_scripts_write_cloud_mqtt_mtls_environment() -> None:
+    for script in (DEPLOY_PS1, DEPLOY_SH):
+        text = script.read_text(encoding="utf-8")
+
+        assert "setup-mqtt-mtls.sh" in text
+        assert "SB_MQTT_PORT=8883" in text
+        assert "SB_MQTT_TLS_ENABLED=true" in text
+        assert "SB_MQTT_MTLS_ENABLED=true" in text
+        assert "SB_MQTT_CA_CERT_PATH=/mosquitto/certs/ca.crt" in text
+        assert "SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud.crt" in text
+        assert "SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud.key" in text
 
 
 def test_production_mosquitto_requires_mtls_on_8883() -> None:
