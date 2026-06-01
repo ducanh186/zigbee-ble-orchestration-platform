@@ -2,20 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../domain/models/smart_device.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
+import '../../../core/widgets/status_badge.dart';
+import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../view_models/automation_view_model.dart';
-import '../widgets/create_rule_sheet.dart';
-import '../widgets/empty_rules.dart';
-import '../widgets/new_rule_cta.dart';
-import '../widgets/rule_card.dart';
 
-/// Automation tab — list-first design.
-///
-/// Rules occupy the screen. Creating a rule opens [CreateRuleSheet]; after
-/// a successful save, a green success banner shows and the new rule's card
-/// is outlined with the primary color until the next interaction.
 class AutomationRulesView extends StatefulWidget {
   const AutomationRulesView({super.key});
 
@@ -24,15 +19,44 @@ class AutomationRulesView extends StatefulWidget {
 }
 
 class _AutomationRulesViewState extends State<AutomationRulesView> {
-  String? _justCreatedRuleId;
+  final TextEditingController _nameController = TextEditingController();
+  AutomationRuleTemplate _template =
+      AutomationRuleTemplate.motionOccupiedTurnsOnLights;
+  bool _enabled = true;
+  String? _triggerDeviceId;
+  Set<String> _targetLightIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  @override
+  void dispose() {
+    _nameController
+      ..removeListener(_onNameChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onNameChanged() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Consumer<AutomationViewModel>(
-      builder: (context, automation, _) {
-        final rules = automation.rules;
+    return Consumer2<AutomationViewModel, DeviceDashboardViewModel>(
+      builder: (context, automation, dashboard, _) {
+        final devices = dashboard.devices;
+        final lights = devices.where((device) => device.isLight).toList();
+        final triggerDevices = devices
+            .where(
+              (device) =>
+                  device.deviceType == _template.triggerDeviceType.wireValue,
+            )
+            .toList();
+        _syncSelections(triggerDevices, lights);
 
         return CustomScrollView(
           slivers: [
@@ -47,64 +71,57 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                 ),
               ],
             ),
-            if (automation.errorMessage != null)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                sliver: SliverToBoxAdapter(
-                  child: ErrorBanner(
-                    message: automation.errorMessage!,
-                    onRetry: automation.load,
-                  ),
-                ),
-              ),
-            if (rules.isEmpty && !automation.isLoading)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyRules(onCreate: _openCreate),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                sliver: SliverList.list(
-                  children: [
-                    if (_justCreatedRuleId != null) ...[
-                      _SavedBanner(palette: palette),
-                      const SizedBox(height: 12),
-                    ],
-                    NewRuleCta(onTap: _openCreate),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SectionTitle(
-                            title: 'Rules',
-                            action: Text(
-                              '${rules.length} rule'
-                              '${rules.length == 1 ? '' : 's'}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'JetBrains Mono',
-                                color: palette.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (automation.isLoading)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                      ],
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              sliver: SliverList.list(
+                children: [
+                  if (automation.errorMessage != null) ...[
+                    ErrorBanner(
+                      message: automation.errorMessage!,
+                      onRetry: automation.load,
                     ),
-                    const SizedBox(height: 8),
-                    for (final rule in rules)
-                      Padding(
+                    const SizedBox(height: 16),
+                  ],
+                  _CreateRuleCard(
+                    nameController: _nameController,
+                    template: _template,
+                    enabled: _enabled,
+                    triggerDevices: triggerDevices,
+                    lights: lights,
+                    triggerDeviceId: _triggerDeviceId,
+                    targetLightIds: _targetLightIds,
+                    isSaving: automation.isSaving,
+                    onTemplateChanged: _setTemplate,
+                    onEnabledChanged: (value) =>
+                        setState(() => _enabled = value),
+                    onTriggerChanged: (value) =>
+                        setState(() => _triggerDeviceId = value),
+                    onLightChanged: _setLightSelected,
+                    onSave: _canSave(triggerDevices, lights, automation)
+                        ? () => _submit(automation)
+                        : null,
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Expanded(child: SectionTitle(title: 'Rules')),
+                      if (automation.isLoading)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (automation.rules.isEmpty && !automation.isLoading)
+                    const AppCard(child: Text('No automation rules yet'))
+                  else
+                    ...automation.rules.map(
+                      (rule) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: RuleCard(
+                        child: _AutomationRuleCard(
                           rule: rule,
-                          template: _templateFor(rule),
-                          highlight: rule.id == _justCreatedRuleId,
                           onEnabledChanged: automation.isSaving
                               ? null
                               : (value) => value
@@ -112,83 +129,387 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                                     : automation.disableRule(rule.id),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
+            ),
           ],
         );
       },
     );
   }
 
-  Future<void> _openCreate() async {
-    final ruleId = await CreateRuleSheet.show(context);
-    if (!mounted || ruleId == null) {
-      return;
+  void _syncSelections(
+    List<SmartDevice> triggerDevices,
+    List<SmartDevice> lights,
+  ) {
+    if (!triggerDevices.any((device) => device.id == _triggerDeviceId)) {
+      _triggerDeviceId = triggerDevices.isEmpty
+          ? null
+          : triggerDevices.first.id;
     }
-    setState(() => _justCreatedRuleId = ruleId);
+
+    final validLightIds = lights.map((device) => device.id).toSet();
+    _targetLightIds = _targetLightIds
+        .where((deviceId) => validLightIds.contains(deviceId))
+        .toSet();
+    if (_targetLightIds.isEmpty && lights.isNotEmpty) {
+      _targetLightIds = {lights.first.id};
+    }
+    if (!_template.allowsMultipleTargets && _targetLightIds.length > 1) {
+      _targetLightIds = {_targetLightIds.first};
+    }
   }
 
-  /// Best-effort mapping rule → template so the rule card can pick an icon
-  /// and a subtitle. Falls back to a switch-based template if the trigger
-  /// device type is unknown.
-  AutomationRuleTemplate _templateFor(AutomationRule rule) {
-    final firstAction = rule.actions.isEmpty
-        ? null
-        : rule.actions.first.command;
-    switch (rule.trigger.event) {
-      case AutomationTriggerEvent.occupancyChanged:
-        final occupancy = rule.trigger.state['occupancy'];
-        if (occupancy == 'unoccupied') {
-          return AutomationRuleTemplate.motionUnoccupiedTurnsOffLights;
-        }
-        return AutomationRuleTemplate.motionOccupiedTurnsOnLights;
-      case AutomationTriggerEvent.switchToggle:
-        if (rule.actions.length <= 1 ||
-            firstAction != AutomationActionCommand.toggle) {
-          return AutomationRuleTemplate.switchTogglesOneLight;
-        }
-        return AutomationRuleTemplate.switchTogglesLights;
+  bool _canSave(
+    List<SmartDevice> triggerDevices,
+    List<SmartDevice> lights,
+    AutomationViewModel automation,
+  ) {
+    return !automation.isSaving &&
+        _nameController.text.trim().isNotEmpty &&
+        triggerDevices.isNotEmpty &&
+        lights.isNotEmpty &&
+        _triggerDeviceId != null &&
+        _targetLightIds.isNotEmpty;
+  }
+
+  void _setTemplate(AutomationRuleTemplate? template) {
+    if (template == null) {
+      return;
     }
+    setState(() {
+      _template = template;
+      _triggerDeviceId = null;
+      if (!template.allowsMultipleTargets && _targetLightIds.length > 1) {
+        _targetLightIds = {_targetLightIds.first};
+      }
+    });
+  }
+
+  void _setLightSelected(String deviceId, bool selected) {
+    setState(() {
+      if (selected) {
+        _targetLightIds = _template.allowsMultipleTargets
+            ? {..._targetLightIds, deviceId}
+            : {deviceId};
+      } else {
+        _targetLightIds = _targetLightIds
+            .where((selectedId) => selectedId != deviceId)
+            .toSet();
+      }
+    });
+  }
+
+  Future<void> _submit(AutomationViewModel automation) async {
+    final triggerDeviceId = _triggerDeviceId;
+    if (triggerDeviceId == null || _targetLightIds.isEmpty) {
+      return;
+    }
+
+    await automation.createRule(
+      AutomationRuleDraft(
+        name: _nameController.text.trim(),
+        enabled: _enabled,
+        template: _template,
+        triggerDeviceId: triggerDeviceId,
+        targetLightIds: _targetLightIds.toList(growable: false),
+      ),
+    );
+
+    if (!mounted || automation.errorMessage != null) {
+      return;
+    }
+
+    setState(() {
+      _nameController.clear();
+    });
   }
 }
 
-class _SavedBanner extends StatelessWidget {
-  const _SavedBanner({required this.palette});
+class _CreateRuleCard extends StatelessWidget {
+  const _CreateRuleCard({
+    required this.nameController,
+    required this.template,
+    required this.enabled,
+    required this.triggerDevices,
+    required this.lights,
+    required this.triggerDeviceId,
+    required this.targetLightIds,
+    required this.isSaving,
+    required this.onTemplateChanged,
+    required this.onEnabledChanged,
+    required this.onTriggerChanged,
+    required this.onLightChanged,
+    required this.onSave,
+  });
 
-  final AppPalette palette;
+  final TextEditingController nameController;
+  final AutomationRuleTemplate template;
+  final bool enabled;
+  final List<SmartDevice> triggerDevices;
+  final List<SmartDevice> lights;
+  final String? triggerDeviceId;
+  final Set<String> targetLightIds;
+  final bool isSaving;
+  final ValueChanged<AutomationRuleTemplate?> onTemplateChanged;
+  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<String?> onTriggerChanged;
+  final void Function(String deviceId, bool selected) onLightChanged;
+  final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.successTint,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: palette.success.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Row(
+    final palette = context.palette;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 16,
-            color: palette.success,
+          const SectionTitle(title: 'Create rule'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: nameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Rule name',
+              hintText: 'Motion turns on lab lights',
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Rule created. Waiting for gateway sync.',
-              style: TextStyle(
-                color: palette.success,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+          const SizedBox(height: 12),
+          DropdownButtonFormField<AutomationRuleTemplate>(
+            initialValue: template,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Template'),
+            items: AutomationRuleTemplate.values
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item.label, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: isSaving ? null : onTemplateChanged,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: triggerDeviceId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: '${template.triggerDeviceType.label} device',
+            ),
+            items: triggerDevices
+                .map(
+                  (device) => DropdownMenuItem(
+                    value: device.id,
+                    child: Text(device.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: isSaving || triggerDevices.isEmpty
+                ? null
+                : onTriggerChanged,
+          ),
+          if (triggerDevices.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'No ${template.triggerDeviceType.label.toLowerCase()} devices available',
+              style: TextStyle(color: palette.warning),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Enabled'),
+            value: enabled,
+            onChanged: isSaving ? null : onEnabledChanged,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            template.actionLabel,
+            style: TextStyle(
+              color: palette.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (lights.isEmpty)
+            Text(
+              'No light devices available',
+              style: TextStyle(color: palette.warning),
+            )
+          else
+            ...lights.map(
+              (light) => CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(light.name, overflow: TextOverflow.ellipsis),
+                subtitle: Text(light.id),
+                value: targetLightIds.contains(light.id),
+                onChanged: isSaving
+                    ? null
+                    : (value) => onLightChanged(light.id, value ?? false),
               ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: const Text('Save rule'),
+              onPressed: onSave,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AutomationRuleCard extends StatelessWidget {
+  const _AutomationRuleCard({
+    required this.rule,
+    required this.onEnabledChanged,
+  });
+
+  final AutomationRule rule;
+  final ValueChanged<bool>? onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  rule.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Switch(value: rule.enabled, onChanged: onEnabledChanged),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              StatusBadge(
+                label: rule.syncStatus.label,
+                tone: _syncTone(rule.syncStatus),
+              ),
+              StatusBadge(
+                label: rule.lastRunStatus.label,
+                tone: _runTone(rule.lastRunStatus),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _RuleLine(
+            icon: Icons.sensors,
+            label: 'When',
+            value: _triggerSummary(rule.trigger),
+            color: palette.primary,
+          ),
+          const SizedBox(height: 10),
+          _RuleLine(
+            icon: Icons.lightbulb_outline,
+            label: 'Then',
+            value: _actionSummary(rule.actions),
+            color: palette.warning,
+          ),
+          if (rule.lastError != null && rule.lastError!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(rule.lastError!, style: TextStyle(color: palette.error)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  BadgeTone _syncTone(AutomationSyncStatus status) {
+    return switch (status) {
+      AutomationSyncStatus.synced => BadgeTone.success,
+      AutomationSyncStatus.failed => BadgeTone.error,
+      AutomationSyncStatus.pending => BadgeTone.warning,
+    };
+  }
+
+  BadgeTone _runTone(AutomationLastRunStatus status) {
+    return switch (status) {
+      AutomationLastRunStatus.executed => BadgeTone.success,
+      AutomationLastRunStatus.failed ||
+      AutomationLastRunStatus.timeout => BadgeTone.error,
+      AutomationLastRunStatus.neverRun => BadgeTone.neutral,
+    };
+  }
+
+  String _triggerSummary(AutomationTrigger trigger) {
+    final occupancy = trigger.state['occupancy'];
+    if (occupancy != null) {
+      return '${trigger.deviceId} ${trigger.event.label}: $occupancy';
+    }
+    return '${trigger.deviceId} ${trigger.event.label}';
+  }
+
+  String _actionSummary(List<AutomationAction> actions) {
+    if (actions.isEmpty) {
+      return 'No action';
+    }
+    return actions
+        .map((action) => '${action.command.label} ${action.deviceId}')
+        .join(', ');
+  }
+}
+
+class _RuleLine extends StatelessWidget {
+  const _RuleLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 52,
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: palette.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+      ],
     );
   }
 }

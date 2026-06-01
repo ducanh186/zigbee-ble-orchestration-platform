@@ -18,8 +18,6 @@ for boundary definitions.
 | [DEVICE_CAPABILITY_MATRIX.md](./DEVICE_CAPABILITY_MATRIX.md) | device_type × capability freeze |
 | [OTA_CAMPAIGN_CONTRACT.md](./OTA_CAMPAIGN_CONTRACT.md) | OTA artifact staging workflow |
 | [CLOUD_IMPLEMENTATION_PLAN.md](./CLOUD_IMPLEMENTATION_PLAN.md) | Cloud DB schema + API design |
-| [AUTOMATION_APP_DESIGN_BRIEF.md](./AUTOMATION_APP_DESIGN_BRIEF.md) | Mobile Automation screen design brief |
-| [AUTOMATION_USER_GUIDE.md](./AUTOMATION_USER_GUIDE.md) | User guide for the Automation feature |
 | [plan.md](./plan.md) | Gateway architecture plan (frozen) |
 | [iot_zigbee_sprint_plan.md](./iot_zigbee_sprint_plan.md) | Original sprint plan (historical) |
 | [FLASHING.md](./FLASHING.md) | Firmware flashing instructions |

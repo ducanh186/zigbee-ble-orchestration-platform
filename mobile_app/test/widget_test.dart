@@ -38,7 +38,7 @@ void main() {
     expect(find.text('Lab Light 01'), findsOneWidget);
   });
 
-  testWidgets('automation tab shows rule list and opens create sheet', (
+  testWidgets('automation tab shows MVP rule list and create flow', (
     tester,
   ) async {
     await pumpDashboard(tester, useMockApi: true);
@@ -46,32 +46,11 @@ void main() {
     await tester.tap(find.text('Automation'));
     await tester.pumpAndSettle();
 
-    // List screen: title, dashed CTA, mock rule + section header. The mock
-    // rule's template label ("Motion becomes occupied") shows as the card
-    // subtitle.
     expect(find.text('Automation Rules'), findsWidgets);
-    expect(find.text('New rule'), findsWidgets);
-    expect(find.text('Motion turns on lab lights'), findsOneWidget);
-    expect(find.text('RULES'), findsOneWidget);
-    expect(find.text('Motion becomes occupied'), findsOneWidget);
-    // Save button only exists inside the sheet.
-    expect(find.text('Save rule'), findsNothing);
-
-    // Open the bottom sheet and verify the create form.
-    await tester.tap(find.text('New rule').last);
-    await tester.pumpAndSettle();
-
     expect(find.text('CREATE RULE'), findsOneWidget);
-    expect(find.text('Switch toggles one light'), findsOneWidget);
+    expect(find.text('Motion becomes occupied'), findsOneWidget);
     expect(find.text('Save rule'), findsOneWidget);
-    // Template "Motion becomes occupied" now also appears in the grid,
-    // alongside the rule card behind the scrim.
-    expect(find.text('Motion becomes occupied'), findsWidgets);
-
-    // Dismiss via Cancel to confirm Cancel works.
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(find.text('Save rule'), findsNothing);
+    expect(find.text('Rule setup placeholder'), findsNothing);
 
     await tester.tap(find.text('Provisioning'));
     await tester.pumpAndSettle();
