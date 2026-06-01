@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cloud.app.access_control import is_admin, visible_device_ids
+from cloud.app.auth import get_current_user
 from cloud.app.database import get_db
-from cloud.app.models import Event
+from cloud.app.models import Event, User
 from cloud.app.schemas import EventOut
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -16,8 +18,12 @@ async def list_events(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = select(Event)
+    if not is_admin(current_user):
+        allowed_device_ids = await visible_device_ids(db, current_user)
+        stmt = stmt.where(Event.device_id.in_(allowed_device_ids))
 
     if device_id is not None:
         stmt = stmt.where(Event.device_id == device_id)

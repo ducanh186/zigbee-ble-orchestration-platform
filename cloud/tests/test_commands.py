@@ -86,7 +86,7 @@ async def test_post_command_publishes_and_persists(
     assert pub["target"]["command"] == "on"
 
     # GET returns same
-    r2 = await client.get(f"/api/commands/{cmd['id']}")
+    r2 = await client.get(f"/api/commands/{cmd['id']}", headers=headers)
     assert r2.status_code == 200
     assert r2.json()["id"] == cmd["id"]
 
@@ -104,8 +104,10 @@ async def test_post_command_unknown_device_404(client, db_session_factory, fake_
 
 
 @pytest.mark.asyncio
-async def test_get_command_unknown_404(client):
-    r = await client.get("/api/commands/deadbeef")
+async def test_get_command_unknown_404(client, db_session_factory):
+    headers = await _operator_headers(client, db_session_factory)
+
+    r = await client.get("/api/commands/deadbeef", headers=headers)
     assert r.status_code == 404
 
 

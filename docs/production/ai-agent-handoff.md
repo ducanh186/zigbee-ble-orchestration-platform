@@ -137,8 +137,9 @@ Markdown files may be ignored by repo rules. When adding new `docs/**/*.md`, use
 5. Real backup/restore dry-run evidence is pending.
    - Run in an operator-approved environment before stable release.
 
-6. Mobile login-state integration remains separate under `SCRUM-91`.
-   - The backend auth slice is done, but mobile integration output was not integrated in this session.
+6. Cloud-App auth hardening now has a follow-up PR in progress.
+   - The follow-up covers Cloud endpoint auth/scoping gaps, Mobile release guard, and the `SB_AUTH_TOKEN_SECRET` env canonical name.
+   - Do not treat this as stable production readiness until the PR is merged and live/operator validation is captured.
 
 7. Stable production release is deferred.
    - Current release is `v0.9.0-rc.1` pre-release only.

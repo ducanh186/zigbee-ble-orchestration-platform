@@ -6,6 +6,20 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from cloud.tests.auth_helpers import create_auth_user, login_headers
+
+
+async def _viewer_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "viewer", "viewer-pass")
+
 
 @pytest.mark.asyncio
 async def test_device_out_exposes_last_seen_at(client, seed_light, db_session_factory):
@@ -18,7 +32,9 @@ async def test_device_out_exposes_last_seen_at(client, seed_light, db_session_fa
         device.last_seen_at = datetime(2026, 5, 21, 10, 0)
         await s.commit()
 
-    r = await client.get(f"/api/devices/{seed_light}")
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.get(f"/api/devices/{seed_light}", headers=headers)
     assert r.status_code == 200
     body = r.json()
     assert "last_seen_at" in body

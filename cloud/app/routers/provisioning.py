@@ -16,10 +16,14 @@ import qrcode.image.svg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cloud.app.auth import require_admin
+from cloud.app.access_control import (
+    ensure_provisioning_session_visible,
+    ensure_room_visible,
+)
+from cloud.app.auth import get_current_user, require_admin, require_operator
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command, ProvisioningSession, Room
+from cloud.app.models import Command, ProvisioningSession, Room, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.provisioning_install_code import generate_install_code
 from cloud.app.schemas import (
@@ -107,6 +111,7 @@ async def _get_session_or_404(
 async def create_provisioning_session(
     body: ProvisioningSessionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
 ):
     if body.gateway_id != settings.gateway_id:
         _raise_contract_error(
@@ -124,6 +129,7 @@ async def create_provisioning_session(
             ProvisioningErrorCode.ROOM_NOT_FOUND,
             f"room_id '{body.room_id}' not found",
         )
+    await ensure_room_visible(db, room, current_user)
 
     active = (
         await db.execute(
@@ -187,16 +193,21 @@ async def create_provisioning_session(
 async def get_provisioning_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return await _get_session_or_404(db, session_id)
+    session = await _get_session_or_404(db, session_id)
+    await ensure_provisioning_session_visible(db, session, current_user)
+    return session
 
 
 @router.delete("/{session_id}", response_model=ProvisioningSessionOut)
 async def cancel_provisioning_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
 ):
     session = await _get_session_or_404(db, session_id)
+    await ensure_provisioning_session_visible(db, session, current_user)
     if session.status in TERMINAL_STATUSES:
         raise HTTPException(
             status_code=409,
@@ -208,4 +219,3 @@ async def cancel_provisioning_session(
     await db.commit()
     await db.refresh(session)
     return session
-from cloud.app.auth import require_admin

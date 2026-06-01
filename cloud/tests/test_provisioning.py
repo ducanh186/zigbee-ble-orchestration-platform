@@ -16,6 +16,7 @@ from cloud.app.schemas import (
     ProvisioningSessionOut,
     ProvisioningStatus,
 )
+from cloud.tests.auth_helpers import create_auth_user, login_headers
 
 VALID_EUI64 = "A8D417FEFF570B00"
 VALID_INSTALL_CODE = "83FED3407A939723A5C639B26916D505C3B5"  # 36 hex = 18 bytes
@@ -184,6 +185,18 @@ async def _seed_room(db_session_factory, room_id: str = "room-1"):
         await s.commit()
 
 
+async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="operator-1",
+        username="operator",
+        role="operator",
+        password="operator-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "operator", "operator-pass")
+
+
 def _create_body(**overrides):
     body = {
         "gateway_id": settings.gateway_id,
@@ -208,8 +221,11 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
     from cloud.app.models import Command, ProvisioningSession
 
     await _seed_room(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
-    r = await client.post("/api/provisioning/sessions", json=_create_body())
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert r.status_code == 201, r.text
     data = r.json()
@@ -255,11 +271,17 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
 @pytest.mark.asyncio
 async def test_get_provisioning_session_api(client, db_session_factory):
     await _seed_room(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     created = (
-        await client.post("/api/provisioning/sessions", json=_create_body())
+        await client.post(
+            "/api/provisioning/sessions", json=_create_body(), headers=headers
+        )
     ).json()
 
-    r = await client.get(f"/api/provisioning/sessions/{created['session_id']}")
+    r = await client.get(
+        f"/api/provisioning/sessions/{created['session_id']}",
+        headers=headers,
+    )
 
     assert r.status_code == 200, r.text
     data = r.json()
@@ -269,10 +291,15 @@ async def test_get_provisioning_session_api(client, db_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_create_provisioning_session_unknown_gateway_404(client, fake_mqtt):
+async def test_create_provisioning_session_unknown_gateway_404(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _operator_headers(client, db_session_factory)
+
     r = await client.post(
         "/api/provisioning/sessions",
         json=_create_body(gateway_id="unknown-gateway"),
+        headers=headers,
     )
 
     assert r.status_code == 404
@@ -281,8 +308,14 @@ async def test_create_provisioning_session_unknown_gateway_404(client, fake_mqtt
 
 
 @pytest.mark.asyncio
-async def test_create_provisioning_session_unknown_room_404(client, fake_mqtt):
-    r = await client.post("/api/provisioning/sessions", json=_create_body())
+async def test_create_provisioning_session_unknown_room_404(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _operator_headers(client, db_session_factory)
+
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert r.status_code == 404
     assert r.json()["detail"]["error_code"] == ProvisioningErrorCode.ROOM_NOT_FOUND
@@ -294,10 +327,15 @@ async def test_create_provisioning_session_duplicate_active_409(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
-    first = await client.post("/api/provisioning/sessions", json=_create_body())
+    headers = await _operator_headers(client, db_session_factory)
+    first = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
     assert first.status_code == 201, first.text
 
-    second = await client.post("/api/provisioning/sessions", json=_create_body())
+    second = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert second.status_code == 409
     assert (
@@ -312,11 +350,17 @@ async def test_delete_provisioning_session_cancels_non_terminal(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     created = (
-        await client.post("/api/provisioning/sessions", json=_create_body())
+        await client.post(
+            "/api/provisioning/sessions", json=_create_body(), headers=headers
+        )
     ).json()
 
-    r = await client.delete(f"/api/provisioning/sessions/{created['session_id']}")
+    r = await client.delete(
+        f"/api/provisioning/sessions/{created['session_id']}",
+        headers=headers,
+    )
 
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "cancelled"
@@ -345,7 +389,11 @@ async def test_delete_provisioning_session_rejects_terminal(
         )
         await s.commit()
 
-    r = await client.delete("/api/provisioning/sessions/prov-joined")
+    headers = await _operator_headers(client, db_session_factory)
+
+    r = await client.delete(
+        "/api/provisioning/sessions/prov-joined", headers=headers
+    )
 
     assert r.status_code == 409
 

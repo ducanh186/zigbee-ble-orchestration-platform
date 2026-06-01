@@ -6,6 +6,32 @@ from datetime import datetime
 
 import pytest
 
+from cloud.tests.auth_helpers import create_auth_user, login_headers
+
+
+async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="operator-1",
+        username="operator",
+        role="operator",
+        password="operator-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "operator", "operator-pass")
+
+
+async def _admin_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="admin-1",
+        username="admin",
+        role="admin",
+        password="admin-pass",
+        home_id=None,
+    )
+    return await login_headers(client, "admin", "admin-pass")
+
 
 async def _seed_rule(db_session_factory) -> str:
     from cloud.app.models import Automation, Device, Home, Room
@@ -203,7 +229,12 @@ async def test_get_automation_events_filters_by_rule(client, db_session_factory)
         )
         await session.commit()
 
-    resp = await client.get("/api/automation-events?automation_id=rule-evt-01")
+    headers = await _operator_headers(client, db_session_factory)
+
+    resp = await client.get(
+        "/api/automation-events?automation_id=rule-evt-01",
+        headers=headers,
+    )
 
     assert resp.status_code == 200
     items = resp.json()
@@ -233,11 +264,15 @@ async def test_get_automation_events_respects_limit_and_offset(
             )
         await session.commit()
 
+    headers = await _admin_headers(client, db_session_factory)
+
     page1 = await client.get(
-        "/api/automation-events?automation_id=rule-x&limit=2&offset=0"
+        "/api/automation-events?automation_id=rule-x&limit=2&offset=0",
+        headers=headers,
     )
     page2 = await client.get(
-        "/api/automation-events?automation_id=rule-x&limit=2&offset=2"
+        "/api/automation-events?automation_id=rule-x&limit=2&offset=2",
+        headers=headers,
     )
 
     assert page1.status_code == 200 and page2.status_code == 200

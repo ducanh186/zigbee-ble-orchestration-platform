@@ -61,7 +61,7 @@ Container state: sb-cloud-api healthy, sb-mosquitto healthy, sb-postgres healthy
 ## Current Open Items
 
 - Phase 1: HTTPS reverse proxy and exposure lockdown is locally verified, but live EC2 security group state still needs operator confirmation.
-- Phase 2: Backend REST API auth/RBAC is locally verified; mobile login-state integration remains under `SCRUM-91`.
+- Phase 2: Cloud-App REST API auth/RBAC and Mobile release guard are locally verified; live/operator validation remains pending.
 - Phase 3: MQTT TLS/mTLS and ACL config is locally verified; live broker negative tests need operator-approved certificates/environment.
 - Phase 4: Gateway production config hardening is locally verified; live gateway startup on hardware remains pending.
 - Phase 5: Zigbee secure commissioning is locally verified; live default global key rejection evidence remains pending on gateway hardware.
