@@ -5,6 +5,32 @@ from datetime import datetime
 
 import pytest
 
+from cloud.tests.auth_helpers import create_auth_user, login_headers
+
+
+async def _viewer_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "viewer", "viewer-pass")
+
+
+async def _admin_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="admin-1",
+        username="admin",
+        role="admin",
+        password="admin-pass",
+        home_id=None,
+    )
+    return await login_headers(client, "admin", "admin-pass")
+
 
 @pytest.mark.asyncio
 async def test_health(client):
@@ -14,20 +40,26 @@ async def test_health(client):
 
 
 @pytest.mark.asyncio
-async def test_list_and_get_devices(client, seed_light):
-    r = await client.get("/api/devices/")
+async def test_list_and_get_devices(client, seed_light, db_session_factory):
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.get("/api/devices/", headers=headers)
     assert r.status_code == 200
     devices = r.json()
     assert any(d["id"] == seed_light for d in devices)
 
-    r = await client.get(f"/api/devices/{seed_light}")
+    r = await client.get(f"/api/devices/{seed_light}", headers=headers)
     assert r.status_code == 200
     assert r.json()["device_type"] == "light"
 
 
 @pytest.mark.asyncio
-async def test_get_device_state_404_when_no_state(client, seed_light):
-    r = await client.get(f"/api/devices/{seed_light}/state")
+async def test_get_device_state_404_when_no_state(
+    client, seed_light, db_session_factory
+):
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.get(f"/api/devices/{seed_light}/state", headers=headers)
     assert r.status_code == 404
 
 
@@ -54,18 +86,22 @@ async def test_get_device_state_returns_latest(
         )
         await s.commit()
 
-    r = await client.get(f"/api/devices/{seed_light}/state")
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.get(f"/api/devices/{seed_light}/state", headers=headers)
     assert r.status_code == 200
     assert r.json()["state"]["power"] == "on"
 
 
 @pytest.mark.asyncio
-async def test_list_devices_filter_by_room(client, seed_light):
-    r = await client.get("/api/devices/?room_id=room-1")
+async def test_list_devices_filter_by_room(client, seed_light, db_session_factory):
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.get("/api/devices/?room_id=room-1", headers=headers)
     assert r.status_code == 200
     assert [d["id"] for d in r.json()] == [seed_light]
 
-    r = await client.get("/api/devices/?room_id=no-such-room")
+    r = await client.get("/api/devices/?room_id=no-such-room", headers=headers)
     assert r.json() == []
 
 
@@ -100,10 +136,12 @@ async def test_delete_device_cascades(client, seed_light, db_session_factory):
         )
         await s.commit()
 
-    r = await client.delete(f"/api/devices/{seed_light}")
+    headers = await _admin_headers(client, db_session_factory)
+
+    r = await client.delete(f"/api/devices/{seed_light}", headers=headers)
     assert r.status_code == 204
 
-    r = await client.get(f"/api/devices/{seed_light}")
+    r = await client.get(f"/api/devices/{seed_light}", headers=headers)
     assert r.status_code == 404
 
     from sqlalchemy import select
@@ -117,6 +155,8 @@ async def test_delete_device_cascades(client, seed_light, db_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_delete_device_404_when_missing(client):
-    r = await client.delete("/api/devices/nope")
+async def test_delete_device_404_when_missing(client, db_session_factory):
+    headers = await _admin_headers(client, db_session_factory)
+
+    r = await client.delete("/api/devices/nope", headers=headers)
     assert r.status_code == 404

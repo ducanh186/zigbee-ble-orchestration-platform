@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +19,7 @@ import 'domain/repositories/automation_repository.dart';
 import 'domain/repositories/device_repository.dart';
 import 'domain/repositories/provisioning_repository.dart';
 import 'l10n/app_localizations.dart';
+import 'security/runtime_config_guard.dart';
 import 'ui/core/localization/locale_controller.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/features/auth/view_models/auth_view_model.dart';
@@ -35,6 +37,12 @@ const _apiBaseUrl = String.fromEnvironment(
 const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: false);
 
 void main() {
+  validateRuntimeSecurityConfig(
+    apiBaseUrl: _apiBaseUrl,
+    hideLogin: _hideLogin,
+    isReleaseMode: kReleaseMode,
+  );
+
   final apiClient = ApiClient(baseUrl: _apiBaseUrl);
   final DeviceRepository repository = _useMockApi
       ? MockDeviceRepository()

@@ -57,6 +57,11 @@ Status: Verified locally. Live EC2 security group state is not testable in this 
 - [x] JWT access tokens are issued and validated.
 - [x] Refresh/logout/me behavior is implemented or explicitly deferred with rationale.
 - [x] Phase 2 high-risk actuator endpoints require authentication.
+- [x] Cloud-App read endpoints require authentication except `/health`, `/auth/login`, and `/auth/logout`.
+- [x] Device, event, command, automation, automation-event, and provisioning session reads are scoped by `home_id` where applicable.
+- [x] Automation and provisioning writes reject `viewer` and require same-home referenced devices/rooms.
+- [x] Device delete and rediscover are admin-only.
+- [x] Mobile release builds fail early for non-HTTPS `API_BASE_URL` or `HIDE_LOGIN=true`.
 - [x] Role-based access control covers `viewer`, `operator`, and `admin`.
 - [x] Unauthenticated command request returns `401`.
 - [x] Viewer command request returns `403`.
@@ -66,13 +71,16 @@ Status: Verified locally. Live EC2 security group state is not testable in this 
 - [x] Invalid token returns `401`.
 - [x] Expired token returns `401`.
 
-Status: Backend REST API slice verified locally. Mobile login-state work remains delegated under `SCRUM-91`.
+Status: Cloud-App REST API slice and Mobile release guard verified locally. Live/operator validation remains pending before production readiness.
 
 Evidence:
 
 ```text
-python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q
-23 passed in 9.54s
+python -m pytest cloud/tests -q
+172 passed, 21 skipped
+
+flutter test
+93 passed
 ```
 
 Runbook: docs/production/production-auth.md

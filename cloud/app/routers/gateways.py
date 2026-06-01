@@ -150,6 +150,7 @@ devices_router = APIRouter(prefix="/api/devices", tags=["gateways"])
 async def device_rediscover(
     device_id: str,
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Trigger ZDO Simple Descriptor classification for `device_id`.
 

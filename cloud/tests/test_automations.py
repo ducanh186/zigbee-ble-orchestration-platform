@@ -2,6 +2,20 @@ from __future__ import annotations
 
 import pytest
 
+from cloud.tests.auth_helpers import create_auth_user, login_headers
+
+
+async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="operator-1",
+        username="operator",
+        role="operator",
+        password="operator-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "operator", "operator-pass")
+
 
 async def _seed_automation_devices(db_session_factory) -> None:
     from cloud.app.models import Device, Home, Room
@@ -66,8 +80,11 @@ async def test_create_automation_persists_pending_rule(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
-    response = await client.post("/api/automations", json=_motion_on_rule())
+    response = await client.post(
+        "/api/automations", json=_motion_on_rule(), headers=headers
+    )
 
     assert response.status_code == 201
     data = response.json()
@@ -92,10 +109,17 @@ async def test_create_automation_persists_pending_rule(
 @pytest.mark.asyncio
 async def test_list_and_detail_automations(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+    headers = await _operator_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
 
-    list_response = await client.get("/api/automations")
-    detail_response = await client.get(f"/api/automations/{created['id']}")
+    list_response = await client.get("/api/automations", headers=headers)
+    detail_response = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
 
     assert list_response.status_code == 200
     assert [item["id"] for item in list_response.json()] == [created["id"]]
@@ -108,11 +132,18 @@ async def test_enable_disable_automation_marks_sync_pending(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
-    created = (await client.post("/api/automations", json=body)).json()
+    created = (
+        await client.post("/api/automations", json=body, headers=headers)
+    ).json()
 
-    enable_response = await client.post(f"/api/automations/{created['id']}/enable")
-    disable_response = await client.post(f"/api/automations/{created['id']}/disable")
+    enable_response = await client.post(
+        f"/api/automations/{created['id']}/enable", headers=headers
+    )
+    disable_response = await client.post(
+        f"/api/automations/{created['id']}/disable", headers=headers
+    )
 
     assert enable_response.status_code == 200
     assert enable_response.json()["enabled"] is True
@@ -132,7 +163,12 @@ async def test_update_automation_bumps_version_and_rejects_stale_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+    headers = await _operator_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
 
     update_body = {
         "name": "Motion turns lights off",
@@ -153,10 +189,12 @@ async def test_update_automation_bumps_version_and_rejects_stale_version(
     update_response = await client.put(
         f"/api/automations/{created['id']}",
         json=update_body,
+        headers=headers,
     )
     stale_response = await client.put(
         f"/api/automations/{created['id']}",
         json=update_body,
+        headers=headers,
     )
 
     assert update_response.status_code == 200
@@ -173,10 +211,19 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+    headers = await _operator_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
 
-    delete_response = await client.delete(f"/api/automations/{created['id']}")
-    detail_response = await client.get(f"/api/automations/{created['id']}")
+    delete_response = await client.delete(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    detail_response = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
 
     assert delete_response.status_code == 200
     deleted = delete_response.json()
@@ -192,9 +239,11 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
 @pytest.mark.asyncio
 async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
+        headers=headers,
         json={
             "name": "Switch toggles lights",
             "enabled": True,
@@ -229,9 +278,11 @@ async def test_create_switch_rule_normalizes_legacy_toggle_event(
     the rule does not get rejected with `unsupported_trigger`.
     """
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
+        headers=headers,
         json={
             "name": "Switch toggles lights",
             "enabled": True,
@@ -259,9 +310,11 @@ async def test_create_switch_rule_normalizes_legacy_toggle_event(
 @pytest.mark.asyncio
 async def test_create_switch_rule_rejects_unknown_event(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
+        headers=headers,
         json={
             "name": "Bogus switch rule",
             "enabled": True,
@@ -285,9 +338,11 @@ async def test_update_normalizes_legacy_toggle_event(
 ):
     """PUT update path must also normalize `toggle` → `switch_toggle`."""
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations",
+            headers=headers,
             json={
                 "name": "Switch rule",
                 "enabled": True,
@@ -309,6 +364,7 @@ async def test_update_normalizes_legacy_toggle_event(
 
     response = await client.put(
         f"/api/automations/{created['id']}",
+        headers=headers,
         json={
             "trigger": {
                 "device_id": "switch-01",
@@ -327,12 +383,13 @@ async def test_update_normalizes_legacy_toggle_event(
 @pytest.mark.asyncio
 async def test_accepts_manual_motion_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
         {"device_id": "light-01", "device_type": "light", "command": "off"}
     ]
 
-    response = await client.post("/api/automations", json=body)
+    response = await client.post("/api/automations", json=body, headers=headers)
 
     assert response.status_code == 201
     assert response.json()["actions"][0]["command"] == "off"
@@ -341,9 +398,11 @@ async def test_accepts_manual_motion_action_choice(client, db_session_factory):
 @pytest.mark.asyncio
 async def test_accepts_manual_switch_light_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
+        headers=headers,
         json={
             "name": "Switch turns on lights",
             "enabled": True,
@@ -365,20 +424,23 @@ async def test_accepts_manual_switch_light_action_choice(client, db_session_fact
 @pytest.mark.asyncio
 async def test_rejects_non_light_action_device(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
         {"device_id": "switch-01", "device_type": "switch", "command": "toggle"}
     ]
 
-    response = await client.post("/api/automations", json=body)
+    response = await client.post("/api/automations", json=body, headers=headers)
 
     assert response.status_code == 422
     assert "light" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_get_unknown_automation_404(client):
-    response = await client.get("/api/automations/missing")
+async def test_get_unknown_automation_404(client, db_session_factory):
+    headers = await _operator_headers(client, db_session_factory)
+
+    response = await client.get("/api/automations/missing", headers=headers)
 
     assert response.status_code == 404
 
@@ -392,8 +454,11 @@ async def test_create_publishes_retained_desired_upsert(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
 
-    response = await client.post("/api/automations", json=_motion_on_rule())
+    response = await client.post(
+        "/api/automations", json=_motion_on_rule(), headers=headers
+    )
 
     assert response.status_code == 201
     rule = response.json()
@@ -415,11 +480,14 @@ async def test_enable_disable_publish_desired_with_bumped_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
+    headers = await _operator_headers(client, db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
-    created = (await client.post("/api/automations", json=body)).json()
+    created = (
+        await client.post("/api/automations", json=body, headers=headers)
+    ).json()
 
-    await client.post(f"/api/automations/{created['id']}/enable")
-    await client.post(f"/api/automations/{created['id']}/disable")
+    await client.post(f"/api/automations/{created['id']}/enable", headers=headers)
+    await client.post(f"/api/automations/{created['id']}/disable", headers=headers)
 
     pubs = _auto_pubs(fake_mqtt)
     # create + enable + disable = 3 publishes
@@ -437,11 +505,17 @@ async def test_put_update_publishes_desired_with_bumped_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+    headers = await _operator_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
 
     response = await client.put(
         f"/api/automations/{created['id']}",
         json={"name": "Renamed", "enabled": False},
+        headers=headers,
     )
 
     assert response.status_code == 200
@@ -461,9 +535,16 @@ async def test_delete_publishes_retained_tombstone(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    created = (await client.post("/api/automations", json=_motion_on_rule())).json()
+    headers = await _operator_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
 
-    response = await client.delete(f"/api/automations/{created['id']}")
+    response = await client.delete(
+        f"/api/automations/{created['id']}", headers=headers
+    )
 
     assert response.status_code == 200
     deleted = response.json()
@@ -474,7 +555,7 @@ async def test_delete_publishes_retained_tombstone(
     assert pubs[-1]["op"] == "delete"
     assert pubs[-1]["version"] == 2
     # Detail GET still finds the row (gateway has not acked yet).
-    detail = await client.get(f"/api/automations/{created['id']}")
+    detail = await client.get(f"/api/automations/{created['id']}", headers=headers)
     assert detail.status_code == 200
 
 

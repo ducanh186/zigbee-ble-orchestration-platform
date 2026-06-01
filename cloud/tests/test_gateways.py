@@ -147,7 +147,7 @@ async def test_open_then_get_command(client, db_session_factory, fake_mqtt):
     assert r.status_code == 201
     cmd_id = r.json()["id"]
 
-    r2 = await client.get(f"/api/commands/{cmd_id}")
+    r2 = await client.get(f"/api/commands/{cmd_id}", headers=headers)
     assert r2.status_code == 200
     got = r2.json()
     assert got["id"] == cmd_id
