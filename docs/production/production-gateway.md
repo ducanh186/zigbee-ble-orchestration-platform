@@ -6,6 +6,11 @@ Scope: SCRUM-96, Phase 4 gateway config hardening and secret fallback removal.
 
 Gateway production config is locally verified by static contract tests. Live startup on physical gateway hardware is not run in this environment.
 
+Implementation requirements for the Gateway owner are tracked in
+`docs/production/gateway-localzigbee-security-requirements.md`. That document
+is the checklist for live Gateway evidence and must be satisfied before stable
+production readiness is claimed.
+
 ## Production Mode
 
 The gateway MQTT module treats either of these as production mode:

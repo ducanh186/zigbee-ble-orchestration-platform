@@ -34,6 +34,7 @@ Reason:
 | Production MQTT TLS/ACL evidence | `docs/production/production-mqtt.md` |
 | Production gateway config evidence | `docs/production/production-gateway.md` |
 | Production secure commissioning evidence | `docs/production/production-commissioning.md` |
+| Gateway and local Zigbee security requirements | `docs/production/gateway-localzigbee-security-requirements.md` |
 | Production operations runbook | `docs/production/production-operations.md` |
 | Production release runbook | `docs/production/production-release.md` |
 | Release notes | `docs/production/release-notes-v0.9.0-rc.1.md` |
@@ -65,6 +66,7 @@ Container state: sb-cloud-api healthy, sb-mosquitto healthy, sb-postgres healthy
 - Phase 3: MQTT TLS/mTLS and ACL config is locally verified; live broker negative tests need operator-approved certificates/environment.
 - Phase 4: Gateway production config hardening is locally verified; live gateway startup on hardware remains pending.
 - Phase 5: Zigbee secure commissioning is locally verified; live default global key rejection evidence remains pending on gateway hardware.
+- Gateway/local Zigbee: implementation requirements and evidence checklist are documented; owner evidence remains pending.
 - Phase 6: Backup, restore, monitoring, and alerting are locally documented and verified; real backup/restore dry-run evidence remains pending in an operator-approved environment.
 - Phase 7: CI/CD, release, rollback, and final evidence are locally verified for the release candidate.
 - Stable production release is deferred until secure compose cutover and operator validation items are complete.

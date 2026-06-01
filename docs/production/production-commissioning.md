@@ -15,6 +15,9 @@ This phase hardens the Zigbee commissioning path. The production target is not s
 3. The gateway stages the install code for that EUI64 through `netMgrOpenForJoinSecure`.
 4. Zigbee BDB security rejects default global key joins.
 
+The cross-team implementation checklist for Gateway and local Zigbee owners is
+`docs/production/gateway-localzigbee-security-requirements.md`.
+
 ## Source Evidence
 
 | Contract | Evidence |
