@@ -55,6 +55,11 @@ class RemoteAutomationRepository implements AutomationRepository {
     return json == null ? fetchRule(ruleId) : _ruleFromJson(json);
   }
 
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    await _apiClient.deleteJson('/api/automations/$ruleId');
+  }
+
   AutomationRule _ruleFromJson(Object? json) {
     return AutomationRuleApiModel.fromJson(
       Map<String, Object?>.from(json as Map),

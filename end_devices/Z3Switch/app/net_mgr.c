@@ -37,12 +37,27 @@ void netMgrInit(void)
   sl_zigbee_event_init(&g_searchEvent,   searchHandler);
   sl_zigbee_event_init(&g_findBindEvent, findBindHandler);
 
+#if !SWITCH_AUTO_FIND_BIND
+  // Production: cloud automation rule owns the switch->light path
+  // (SB_AUTOMATION_SWITCH_HOOK=1 on the gateway). Wipe any binding NVM3
+  // entry left over from a previous SWITCH_AUTO_FIND_BIND=1 flash so the
+  // direct ZCL Toggle from PB1 cannot race the cloud rule and double-fire
+  // the light. Cheap: NVM3 holds at most EMBER_BINDING_TABLE_SIZE rows.
+  emberClearBindingTable();
+#endif
+
   if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
     sl_led_turn_on(STATUS_LED);
-    // Already joined — try find-and-bind in case binding was lost
+#if SWITCH_AUTO_FIND_BIND
+    // Already joined — try find-and-bind in case binding was lost.
     g_findBindRetry = 0;
     g_bindingDone = false;
     sl_zigbee_event_set_delay_ms(&g_findBindEvent, FIND_BIND_DELAY_MS);
+#else
+    // Auto find-and-bind disabled (see app_config.h SWITCH_AUTO_FIND_BIND).
+    // Cloud automation rule owns switch -> light routing.
+    emberAfCorePrintln("NET: auto find-bind disabled (cloud rule owns routing)");
+#endif
   } else {
     sl_led_turn_off(STATUS_LED);
     g_searching = true;
@@ -126,10 +141,14 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_inactive(&g_searchEvent);
     sl_led_turn_on(STATUS_LED);
 
+#if SWITCH_AUTO_FIND_BIND
     // Start find-and-bind after joining
     g_findBindRetry = 0;
     g_bindingDone = false;
     sl_zigbee_event_set_delay_ms(&g_findBindEvent, FIND_BIND_DELAY_MS);
+#else
+    emberAfCorePrintln("NET: joined; auto find-bind disabled (cloud rule owns routing)");
+#endif
   } else if (status == EMBER_NETWORK_DOWN) {
     sl_led_turn_off(STATUS_LED);
     g_bindingDone = false;

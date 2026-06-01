@@ -39,15 +39,34 @@ longer part of the active architecture.
 - device list and device state through the mobile app
 - light on/off commands from the app through Cloud and Gateway
 - command status tracking
-- motion occupancy display
+- motion occupancy display when Cloud has occupancy state or event data
 - automation rule creation from the app
-- Cloud automation rule storage and API
+- Cloud automation rule storage, validation, and retained desired-state publish
 - event history through Cloud
 - EC2 deployment scripts for the backend stack
 
 Automation is intentionally simple in this version. The app creates and displays
-rules. Cloud stores them. Gateway execution remains the device-side
-responsibility.
+rules. Cloud stores them and publishes desired rule messages. Gateway command
+dispatch is implemented, but live app-created automation execution still needs
+SCRUM-51 hardware/EC2 evidence before it should be claimed as fully end-to-end.
+
+## Current Verification Status
+
+Last local audit: 2026-05-21 on branch
+`docs/51-scrum51-evidence-scrum8-ready`.
+
+- Cloud automation tests: `python -m pytest cloud/tests/ -q` -> 80 passed.
+- Mobile tests: `flutter test` in `mobile_app/` -> 56 passed.
+- SCRUM-51 still needs live evidence for final-report confidence: API evidence
+  against EC2, MQTT trace, gateway log slice, cloud DB rows, and mobile
+  screenshots/video tied to the same run.
+- Current gateway code subscribes to `commands/+/request`; no
+  `desired/automation/{id}` subscription was found in `gateway/Z3GatewayHost/app/`.
+  Treat Cloud->Gateway dynamic automation sync as not proven live until that path
+  is implemented and captured.
+- OTA/SCRUM-8 is a planned contract: Cloud should orchestrate metadata only,
+  Z3Gateway C should download and verify firmware from an artifact URL, and
+  firmware binaries must not be sent as MQTT payloads.
 
 ## Run Locally
 
@@ -59,13 +78,6 @@ docker compose up -d
 ```
 
 Run the Cloud API:
-
-```powershell
-Copy-Item cloud\.env.example cloud\.env
-# Edit cloud\.env and set SB_API_AUTH_TOKEN to a private token.
-$token = (Get-Content cloud\.env | Where-Object { $_ -match '^SB_API_AUTH_TOKEN=' }) -replace '^SB_API_AUTH_TOKEN=', ''
-[Environment]::SetEnvironmentVariable('SB_API_AUTH_TOKEN', $token, 'User')
-```
 
 ```bash
 pip install -r cloud/requirements.txt
@@ -81,26 +93,13 @@ pytest cloud/tests -q
 
 Run the Flutter app:
 
-```powershell
+```bash
 cd mobile_app
-$token = [Environment]::GetEnvironmentVariable('SB_API_AUTH_TOKEN', 'User')
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000 --dart-define=ALLOW_INSECURE_API=true --dart-define=API_AUTH_TOKEN=$token
+flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
 For an Android emulator talking to a host machine API, use `10.0.2.2` instead
 of `localhost`.
-
-For a shared or deployed Cloud API, use HTTPS and the same private token:
-
-```powershell
-flutter build apk `
-  --dart-define=API_BASE_URL=https://your-api-domain.example.com `
-  --dart-define=API_AUTH_TOKEN=$token
-```
-
-Keep real tokens only in local files such as `cloud\.env` or
-`deploy\.env.deploy`, and share them with teammates through a password manager
-or another private channel. Commit only the example templates.
 
 ## Deploy
 
@@ -108,7 +107,6 @@ Copy and fill the deployment environment file:
 
 ```powershell
 Copy-Item deploy\.env.deploy.example deploy\.env.deploy
-# Edit deploy\.env.deploy and set SB_API_AUTH_TOKEN to the same private token.
 ```
 
 Deploy to EC2:
@@ -129,13 +127,14 @@ powershell -File deploy\ssh.ps1
 
 | Document | Use it for |
 | --- | --- |
-| [docs/AUTOMATION_APP_DESIGN_BRIEF.md](docs/AUTOMATION_APP_DESIGN_BRIEF.md) | Automation screen brief for product/design work |
+| [docs/AUTOMATION_CONTRACT.md](docs/AUTOMATION_CONTRACT.md) | Automation rule contract and SCRUM-51 implementation audit note |
 | [docs/AUTOMATION_USER_GUIDE.md](docs/AUTOMATION_USER_GUIDE.md) | How to use the Automation feature in the app |
 | [docs/MQTT_CONTRACT.md](docs/MQTT_CONTRACT.md) | MQTT topic tree, envelopes, QoS, retain rules, and command lifecycle |
 | [docs/DEVICE_CAPABILITY_MATRIX.md](docs/DEVICE_CAPABILITY_MATRIX.md) | Supported MVP device types and capabilities |
 | [docs/ADAPTER_ACTION_MAP.md](docs/ADAPTER_ACTION_MAP.md) | Mapping between MQTT payloads and Z3Gateway C behavior |
 | [docs/CLOUD_IMPLEMENTATION_PLAN.md](docs/CLOUD_IMPLEMENTATION_PLAN.md) | Cloud API and database implementation notes |
 | [docs/OTA_CAMPAIGN_CONTRACT.md](docs/OTA_CAMPAIGN_CONTRACT.md) | OTA staging and delivery contract |
+| [docs/SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md](docs/SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md) | SCRUM-51 evidence gap audit and SCRUM-8 definition of ready |
 | [docs/README.md](docs/README.md) | Documentation index |
 
 ## Branch and PR Rules

@@ -76,7 +76,12 @@
               <h2 id="detailTitle">Device Detail</h2>
               <p id="detailMeta">Select a device</p>
             </div>
-            <span id="detailStatus" class="status-pill muted">Idle</span>
+            <div class="detail-header-actions">
+              <span id="detailStatus" class="status-pill muted">Idle</span>
+              <button id="deleteDeviceBtn" class="icon-button danger" type="button" title="Delete this device" disabled>
+                Delete
+              </button>
+            </div>
           </div>
 
           <div class="state-grid">
@@ -123,6 +128,77 @@
             <button id="openJoinBtn" class="primary" type="button">Open Join</button>
             <button id="closeJoinBtn" type="button">Close Join</button>
           </div>
+          <div class="label-generator" aria-label="Provisioning QR label generator">
+            <div class="label-generator-header">
+              <span class="field-label">Provisioning Label</span>
+              <button id="generateLabelBtn" class="primary" type="button">Generate QR</button>
+            </div>
+            <div class="label-grid">
+              <label for="labelEui64Input">
+                <span class="field-label">EUI64</span>
+                <input id="labelEui64Input" type="text" autocomplete="off" spellcheck="false" maxlength="16" />
+              </label>
+              <label for="labelDeviceType">
+                <span class="field-label">Type</span>
+                <select id="labelDeviceType">
+                  <option value="light">Light</option>
+                  <option value="switch">Switch</option>
+                  <option value="motion">Motion</option>
+                </select>
+              </label>
+              <label for="labelModelInput">
+                <span class="field-label">Model</span>
+                <input id="labelModelInput" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <label for="labelInstallCodeInput">
+                <span class="field-label">Install Code</span>
+                <input id="labelInstallCodeInput" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+            <div class="label-result">
+              <div id="labelQrPreview" class="qr-preview"></div>
+              <pre id="labelPayload" class="code-block small">No label generated</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel automations-panel" aria-label="Automation rules">
+          <div class="panel-header">
+            <div>
+              <h2>Automations</h2>
+              <p id="automationSummary">No rules loaded</p>
+            </div>
+          </div>
+
+          <div class="automation-form" id="automationForm">
+            <label for="autoName">
+              <span class="field-label">Rule name</span>
+              <input id="autoName" type="text" autocomplete="off" maxlength="120" placeholder="e.g. Motion turns on lab lights" />
+            </label>
+            <label for="autoTemplate">
+              <span class="field-label">Template</span>
+              <select id="autoTemplate">
+                <option value="motion_occupied">Motion becomes occupied → lights ON</option>
+                <option value="motion_unoccupied">Motion becomes unoccupied → lights OFF</option>
+                <option value="switch_toggle">Switch toggles → lights TOGGLE</option>
+              </select>
+            </label>
+            <label for="autoTriggerDevice">
+              <span class="field-label" id="autoTriggerLabel">Motion sensor</span>
+              <select id="autoTriggerDevice"></select>
+            </label>
+            <div class="auto-actions-block">
+              <span class="field-label">Target lights</span>
+              <div id="autoActionList" class="auto-action-list"></div>
+            </div>
+            <label class="toggle-row" for="autoEnabled">
+              <input id="autoEnabled" type="checkbox" checked />
+              <span>Enabled on save</span>
+            </label>
+            <button id="autoSaveBtn" class="primary wide" type="button">Save rule</button>
+          </div>
+
+          <div id="automationList" class="automation-list"></div>
         </section>
 
         <section class="panel activity-panel" aria-label="Events and command log">

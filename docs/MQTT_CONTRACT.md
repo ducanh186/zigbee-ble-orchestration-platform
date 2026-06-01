@@ -96,6 +96,10 @@ khi cửa permit-join mở/đóng. Payload có dạng:
 - `permit_join_failed` — kèm `reason` và `zstatus` khi gọi
   `gateway.open_network` thất bại ở stack/native (gateway vẫn reply
   command với `status="failed"`; event chỉ là kênh observability).
+- `provisioning_joined` — kèm `eui64`, `device_type`, `nwk_addr` khi một
+  thiết bị join thành công trong phiên secure provisioning (Install Code).
+  Xem [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md).
+- `provisioning_failed` — kèm `eui64` và `reason` khi secure join thất bại.
 
 ### Thiết bị (Devices)
 
@@ -132,9 +136,26 @@ sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/reply
 ```text
 sb/v1/{tenant}/{site}/{gateway}/ota/campaigns/{campaign_id}/manifest
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/cancel
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/progress
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/event
 ```
+
+`ota.start`, `ota.cancel`, `ota.progress`, and `ota.complete` are operation/event
+names used by API, logs, tests, or payload fields. They are **not** MQTT topic
+names. The official MQTT routing contract remains the topic tree above:
+
+| Operation vocabulary | MQTT topic / payload mapping |
+| --- | --- |
+| `ota.start` | Cloud publishes `ota/campaigns/{campaign_id}/manifest`, then `ota/devices/{device_id}/desired` with `payload.action = "stage_and_offer"` |
+| `ota.cancel` | Cloud publishes `ota/devices/{device_id}/cancel` with `payload.action = "cancel"` |
+| `ota.progress` | Gateway publishes `ota/devices/{device_id}/progress` |
+| `ota.complete` | Gateway publishes `ota/devices/{device_id}/event` with `payload.event = "complete"` and final progress status `completed` |
+
+OTA is a planned/deferred capability in the current repo. Cloud must not claim a
+real rollout unless Z3Gateway C has implemented artifact download, SHA/size
+verification, local `SB_OTA_DIR` staging, native Zigbee OTA offer, progress/event
+publishing, cancel, and rollback behavior.
 
 ### Nhóm (Groups)
 
@@ -149,6 +170,19 @@ sb/v1/{tenant}/{site}/{gateway}/groups/{group_id}/desired
 sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/desired
 sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 ```
+
+### Automation rules
+
+```text
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/reported
+sb/v1/{tenant}/{site}/{gateway}/automations/{automation_id}/event
+```
+
+Cloud publish `desired` (retained) cho mỗi mutation rule (upsert / delete
+tombstone); gateway publish `reported` (retained) làm sync ack và `event`
+(no-retain) khi rule fire. Chi tiết payload, enum, identity/version model
+xem [AUTOMATION_MQTT_CONTRACT.md](./AUTOMATION_MQTT_CONTRACT.md).
 
 ## Retain và QoS
 
@@ -175,12 +209,16 @@ sb/v1/{tenant}/{site}/{gateway}/scenes/{scene_id}/event
 | `commands/*/reply` | 1 | không | |
 | `ota/campaigns/*/manifest` | 1 | có | |
 | `ota/devices/*/desired` | 1 | có | |
+| `ota/devices/*/cancel` | 1 | không | Cancel intent; not retained to avoid replaying old cancels |
 | `ota/devices/*/progress` | 1 | có | |
 | `ota/devices/*/event` | 1 | không | |
 | `groups/*/reported` | 1 | có | |
 | `groups/*/desired` | 1 | không | |
 | `scenes/*/desired` | 1 | không | |
 | `scenes/*/event` | 1 | không | |
+| `automations/*/desired` | 1 | có | Cloud → gateway. `op=upsert` hoặc `op=delete` (tombstone). Xem [AUTOMATION_MQTT_CONTRACT.md](./AUTOMATION_MQTT_CONTRACT.md). |
+| `automations/*/reported` | 1 | có | Gateway → cloud sync ack (`synced`/`failed`/`deleted`). |
+| `automations/*/event` | 1 | không | Gateway → cloud execution events (rule fired, run_id). |
 
 **LWT cho `gateway/online`:**
 
@@ -263,7 +301,15 @@ Gateway publish event này khi trạng thái occupancy của motion sensor đổ
 từ giá trị trước đó. Reported state vẫn nằm ở
 `devices/motion/{id}/reported`; event dùng để cloud lưu lịch sử.
 
-Topic:
+Gateway đồng thời publish bản retained tại
+`devices/motion/{id}/reported` với payload `state.occupancy` cùng giá trị
+mới — đây là kênh duy nhất mà dashboard/cloud DeviceState đọc để hiển thị
+trạng thái hiện tại của motion sensor. Hai topic cùng fire trong một lần
+PIR transition: `event` (no-retain, lịch sử) + `reported` (retain, current
+state). Implementation: `appMqttPublishMotionReported()` trong
+`gateway/Z3GatewayHost/app/app_mqtt.c`.
+
+Topic event:
 
 ```text
 sb/v1/hust/lab01/gw-ubuntu-01/devices/motion/00124b0001aa22cc/event
@@ -339,6 +385,7 @@ Op v1:
 | --- | --- | --- |
 | `gateway.open_network` | `{ "duration_sec": 1..180 }` | Broadcast permit-join (network-creator-security plugin) trong `duration_sec` giây. Gateway tự đóng khi hết thời gian và publish `gateway/event permit_join_closed reason=timeout`. |
 | `gateway.close_network` | `{}` | Đóng permit-join ngay (broadcast permit_duration=0). Publish `gateway/event permit_join_closed reason=command`. |
+| `gateway.prepare_join` | `{ "eui64": "<hex>", "install_code": "<hex>", "duration_sec": 1..180 }` | Stage install code cho `eui64` rồi mở permit-join `duration_sec` giây (secure join bằng Install Code). Khi thiết bị join, gateway publish `gateway/event provisioning_joined`. Xem [PROVISIONING_CONTRACT.md](./PROVISIONING_CONTRACT.md). |
 
 Ví dụ commissioning open 60s:
 
@@ -396,6 +443,8 @@ sb/v1/hust/lab01/gw-ubuntu-01/commands/+/reply
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/online
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/health
 sb/v1/hust/lab01/gw-ubuntu-01/gateway/event
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/reported
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/event
 ```
 
 ### Gateway (nhận từ cloud)
@@ -405,8 +454,10 @@ sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/commands/+/request
 sb/v1/hust/lab01/gw-ubuntu-01/ota/campaigns/+/manifest
 sb/v1/hust/lab01/gw-ubuntu-01/ota/devices/+/desired
+sb/v1/hust/lab01/gw-ubuntu-01/ota/devices/+/cancel
 sb/v1/hust/lab01/gw-ubuntu-01/groups/+/desired
 sb/v1/hust/lab01/gw-ubuntu-01/scenes/+/desired
+sb/v1/hust/lab01/gw-ubuntu-01/automations/+/desired
 ```
 
 ### Debug (chỉ dùng ngắn hạn, không dùng production)

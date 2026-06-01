@@ -10,6 +10,7 @@ Flashable firmware binaries for all devices. Each subdirectory contains a manife
 | ncp-uart-hw | Zigbee NCP (UART EZSP) | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A | Ready |
 | Z3Switch | Zigbee End Device | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A | Ready |
 | Z3Light | Zigbee Router | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A | Ready |
+| Z3_Occupancy_Sensor | Zigbee Router (PIR + buttons) | EFR32MG12P332F1024GL125 | BRD4162A + BRD4001A | Ready |
 
 ## Flash Order (new board setup)
 
@@ -23,6 +24,7 @@ commander flash artifact/ncp-uart-hw/ncp-uart-hw.s37 --device EFR32MG12P332F1024
 ```bash
 commander flash artifact/Z3Switch/Z3Switch.s37 --device EFR32MG12P332F1024GL125
 commander flash artifact/Z3Light/Z3Light.s37 --device EFR32MG12P332F1024GL125
+commander flash artifact/Z3_Occupancy_Sensor/Z3_Occupancy_Sensor.s37 --device EFR32MG12P332F1024GL125
 ```
 
 ## Common Build Info

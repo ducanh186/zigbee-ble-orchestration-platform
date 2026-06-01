@@ -104,7 +104,10 @@ tar -czf "$TempZip" `
     --exclude='./.env' `
     --exclude='./.env.deploy' `
     --exclude='./cloud.db' `
+    --exclude='./releases' `
     --exclude='./ota-files' `
+    --exclude='./mqtt/passwords' `
+    --exclude='./mqtt/data' `
     --exclude='./node_modules' `
     --exclude='./.claude' `
     --exclude='./gecko_sdk' `
@@ -120,7 +123,7 @@ if ($tarExit -ne 0 -or -not (Test-Path $TempZip)) {
     # which sidesteps any Unix-tool path parsing.
     Write-Host "tar direct write failed (exit=$tarExit); retrying via stdout pipe..." -ForegroundColor Yellow
     Push-Location $ProjectDir
-    & cmd /c "tar -czf - --exclude=./.git --exclude=./__pycache__ --exclude=*.pyc --exclude=./.env --exclude=./.env.deploy --exclude=./cloud.db --exclude=./ota-files --exclude=./node_modules --exclude=./.claude --exclude=./gecko_sdk --exclude=./build --exclude=./autogen --exclude=./artifact . > `"$TempZip`""
+    & cmd /c "tar -czf - --exclude=./.git --exclude=./__pycache__ --exclude=*.pyc --exclude=./.env --exclude=./.env.deploy --exclude=./cloud.db --exclude=./releases --exclude=./ota-files --exclude=./mqtt/passwords --exclude=./mqtt/data --exclude=./node_modules --exclude=./.claude --exclude=./gecko_sdk --exclude=./build --exclude=./autogen --exclude=./artifact . > `"$TempZip`""
     Pop-Location
 }
 
@@ -141,6 +144,7 @@ ssh @SSH_OPTS $REMOTE "mkdir -p $REMOTE_DIR"
 scp @SSH_OPTS $TempZip "${REMOTE}:${REMOTE_DIR}/deploy-payload.tar.gz"
 
 Invoke-EC2 @"
+set -e
 cd $REMOTE_DIR
 tar -xzf deploy-payload.tar.gz
 rm -f deploy-payload.tar.gz
@@ -159,11 +163,9 @@ Write-Host "--- [3/6] Preparing remote directories ---" -ForegroundColor Yellow
 Invoke-EC2 @"
 set -e
 cd $REMOTE_DIR
-mkdir -p deploy/mosquitto/config/conf.d
 mkdir -p deploy/mosquitto/passwords
 mkdir -p deploy/cloud
-cp -f mqtt/config/mosquitto.conf deploy/mosquitto/config/
-cp -f mqtt/config/acl.conf       deploy/mosquitto/config/
+mkdir -p mqtt/certs/clients
 echo 'Directories prepared.'
 "@
 
@@ -175,6 +177,7 @@ Write-Host "--- [4/6] Generating MQTT passwords ---" -ForegroundColor Yellow
 
 $gwPass = if ($config["MQTT_GATEWAY_PASS"]) { $config["MQTT_GATEWAY_PASS"] } else { "gateway123" }
 $cliPass = if ($config["MQTT_CLIENT_PASS"]) { $config["MQTT_CLIENT_PASS"] }  else { "client123" }
+$cloudPass = if ($config["MQTT_CLOUD_PASS"]) { $config["MQTT_CLOUD_PASS"] } elseif ($config["MQTT_CLIENT_PASS"]) { $config["MQTT_CLIENT_PASS"] } else { "cloud123" }
 $monPass = if ($config["MQTT_MONITOR_PASS"]) { $config["MQTT_MONITOR_PASS"] } else { "monitor123" }
 $brPass = if ($config["MQTT_BRIDGE_PASS"]) { $config["MQTT_BRIDGE_PASS"] }  else { "bridge123" }
 
@@ -185,6 +188,7 @@ PASSDIR=`$(pwd)/deploy/mosquitto/passwords
 docker run --rm -v "`$PASSDIR:/passwords" eclipse-mosquitto:2.0 sh -c "
   touch /passwords/passwd
   mosquitto_passwd -b /passwords/passwd gateway '$gwPass'
+  mosquitto_passwd -b /passwords/passwd cloud   '$cloudPass'
   mosquitto_passwd -b /passwords/passwd client  '$cliPass'
   mosquitto_passwd -b /passwords/passwd monitor '$monPass'
   mosquitto_passwd -b /passwords/passwd bridge  '$brPass'
@@ -193,52 +197,90 @@ echo 'MQTT passwords generated.'
 "@
 
 # ----------------------------------------------------------
-# Step 5: Write cloud .env
+# Step 5: Prepare MQTT mTLS certificates
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "--- [5/6] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
+Write-Host "--- [5/8] Preparing MQTT mTLS certificates ---" -ForegroundColor Yellow
+
+Invoke-EC2 @"
+set -e
+cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-mqtt-mtls.sh
+bash deploy/setup-mqtt-mtls.sh '$REMOTE_DIR' '$EC2_HOST'
+"@
+
+# ----------------------------------------------------------
+# Step 6: Write cloud .env
+# ----------------------------------------------------------
+Write-Host ""
+Write-Host "--- [6/8] Writing cloud .env on EC2 ---" -ForegroundColor Yellow
 
 $pgUser = if ($config["POSTGRES_USER"]) { $config["POSTGRES_USER"] }     else { "sb_user" }
 $pgPass = if ($config["POSTGRES_PASSWORD"]) { $config["POSTGRES_PASSWORD"] } else { "sb_pass" }
 $pgDb = if ($config["POSTGRES_DB"]) { $config["POSTGRES_DB"] }       else { "sb_cloud" }
 $sbDbUrl = if ($config["SB_DATABASE_URL"]) { $config["SB_DATABASE_URL"] }  else { "postgresql+asyncpg://${pgUser}:${pgPass}@postgres:5432/${pgDb}" }
 $sbMqttHost = if ($config["SB_MQTT_HOST"]) { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
-$sbMqttUser = if ($config["SB_MQTT_USERNAME"]) { $config["SB_MQTT_USERNAME"] } else { "client" }
-$sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } else { "client123" }
-$sbApiAuthToken = if ($config["SB_API_AUTH_TOKEN"]) { $config["SB_API_AUTH_TOKEN"] } else { "" }
+$sbMqttUser = "cloud"
+$sbMqttPass = $cloudPass
 $sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { "hust" }
 $sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
 $sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
-
-if ([string]::IsNullOrWhiteSpace($sbApiAuthToken)) {
-    Write-Host "ERROR: SB_API_AUTH_TOKEN is not set in deploy\.env.deploy" -ForegroundColor Red
-    Write-Host "  Generate one with:"
-    Write-Host "  [System.Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))"
-    exit 1
-}
+$sbAuthSecret = if ($config["SB_AUTH_TOKEN_SECRET"]) { $config["SB_AUTH_TOKEN_SECRET"] } else { "" }
 
 Invoke-EC2 @"
+set -e
+AUTH_SECRET='$sbAuthSecret'
+if [ -z "`$AUTH_SECRET" ]; then
+  AUTH_SECRET=`$(grep -s '^SB_AUTH_TOKEN_SECRET=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$AUTH_SECRET" ] || [ "`$AUTH_SECRET" = "dev-only-change-me" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    AUTH_SECRET=`$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+  else
+    AUTH_SECRET=`$(openssl rand -hex 48)
+  fi
+fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$sbDbUrl
 SB_MQTT_HOST=$sbMqttHost
-SB_MQTT_PORT=1883
+SB_MQTT_PORT=8883
 SB_MQTT_USERNAME=$sbMqttUser
 SB_MQTT_PASSWORD=$sbMqttPass
-SB_API_AUTH_TOKEN=$sbApiAuthToken
+SB_MQTT_TLS_ENABLED=true
+SB_MQTT_MTLS_ENABLED=true
+SB_MQTT_CA_CERT_PATH=/mosquitto/certs/ca.crt
+SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud.crt
+SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud.key
 SB_TENANT_ID=$sbTenant
 SB_SITE_ID=$sbSite
 SB_GATEWAY_ID=$sbGw
 SB_API_HOST=0.0.0.0
 SB_API_PORT=8000
 ENVEOF
+printf 'SB_AUTH_TOKEN_SECRET=%s\n' "`$AUTH_SECRET" >> $REMOTE_DIR/deploy/cloud/.env
 echo 'cloud/.env written.'
 "@
 
 # ----------------------------------------------------------
-# Step 6: Docker compose up
+# Step 7: Prepare HTTPS certificate
 # ----------------------------------------------------------
 Write-Host ""
-Write-Host "--- [6/6] Building and starting containers ---" -ForegroundColor Yellow
+$httpsHost = if ($config["HTTPS_HOST"]) { $config["HTTPS_HOST"] } else { $EC2_HOST }
+
+Write-Host "--- [7/8] Preparing HTTPS certificate ---" -ForegroundColor Yellow
+
+Invoke-EC2 @"
+set -e
+cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-https.sh
+bash deploy/setup-https.sh '$httpsHost' '$REMOTE_DIR'
+"@
+
+# ----------------------------------------------------------
+# Step 8: Docker compose up
+# ----------------------------------------------------------
+Write-Host ""
+Write-Host "--- [8/8] Building and starting containers ---" -ForegroundColor Yellow
 
 Invoke-EC2 @"
 set -e
@@ -256,30 +298,42 @@ cp    ../cloud/__main__.py cloud/
 export POSTGRES_USER='$pgUser'
 export POSTGRES_PASSWORD='$pgPass'
 export POSTGRES_DB='$pgDb'
+export MQTT_MONITOR_PASSWORD='$monPass'
+export MQTT_CERT_DIR='../mqtt/certs'
+
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  echo 'ERROR: Docker Compose is not installed.'
+  exit 1
+fi
 
 # Build and start
-docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
-docker compose -f docker-compose.prod.yml up --build -d
+`$COMPOSE -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+`$COMPOSE -f docker-compose.prod.yml up --build -d
 
 echo ''
 echo 'Waiting for services to start...'
 sleep 10
 
-docker compose -f docker-compose.prod.yml ps
+`$COMPOSE -f docker-compose.prod.yml ps
 
 echo ''
-if curl -sf http://localhost:8000/health; then
+if docker exec sb-cloud-api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"; then
     echo ''
     echo 'API is healthy!'
 else
     echo 'WARNING: API not responding yet. Check logs with:'
-    echo '  docker compose -f docker-compose.prod.yml logs cloud-api'
+    echo "  `$COMPOSE -f docker-compose.prod.yml logs cloud-api"
 fi
 "@
 
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  Deploy complete!" -ForegroundColor Green
+Write-Host "  API HTTPS: https://${httpsHost}" -ForegroundColor Green
 Write-Host "  API Swagger: http://${EC2_HOST}:8000/docs" -ForegroundColor Green
-Write-Host "  MQTT Broker: ${EC2_HOST}:1883" -ForegroundColor Green
+Write-Host "  MQTT Broker: ${EC2_HOST}:8883 (TLS/mTLS)" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green

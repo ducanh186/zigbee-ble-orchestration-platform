@@ -3,15 +3,24 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from cloud.app.auth import require_api_token
 from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
+from cloud.app.device_lifecycle import run_offline_reaper
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.routers import automations, commands, devices, events, gateways, health
+from cloud.app.routers import (
+    auth,
+    automations,
+    commands,
+    devices,
+    events,
+    gateways,
+    health,
+    provisioning,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,15 +45,20 @@ async def lifespan(app: FastAPI):
         run_timeout_worker(async_session, stop_event),
         name="command-timeout-worker",
     )
+    reaper_task = asyncio.create_task(
+        run_offline_reaper(async_session, stop_event),
+        name="device-offline-reaper",
+    )
 
     yield
 
     # -- Shutdown --
     stop_event.set()
-    try:
-        await asyncio.wait_for(timeout_task, timeout=3.0)
-    except asyncio.TimeoutError:
-        timeout_task.cancel()
+    for task in (timeout_task, reaper_task):
+        try:
+            await asyncio.wait_for(task, timeout=3.0)
+        except asyncio.TimeoutError:
+            task.cancel()
     mqtt_service.disconnect()
     logger.info("MQTT client stopped")
 
@@ -56,13 +70,15 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
-protected_api = [Depends(require_api_token)]
-app.include_router(devices.router, dependencies=protected_api)
-app.include_router(events.router, dependencies=protected_api)
-app.include_router(commands.router, dependencies=protected_api)
-app.include_router(automations.router, dependencies=protected_api)
-app.include_router(gateways.router, dependencies=protected_api)
-app.include_router(gateways.devices_router, dependencies=protected_api)
+app.include_router(auth.router)
+app.include_router(devices.router)
+app.include_router(events.router)
+app.include_router(commands.router)
+app.include_router(automations.router)
+app.include_router(gateways.router)
+app.include_router(gateways.devices_router)
+app.include_router(provisioning.router)
+app.include_router(provisioning.labels_router)
 
 # -- Serve web dashboard --
 _webdev_dir = Path(__file__).resolve().parent.parent / "webdev"

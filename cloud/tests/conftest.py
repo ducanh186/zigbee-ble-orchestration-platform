@@ -9,7 +9,6 @@ import os
 
 # Force sqlite before cloud modules import and instantiate the engine.
 os.environ.setdefault("SB_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("SB_API_AUTH_TOKEN", "test-api-token")
 
 import asyncio  # noqa: E402
 from typing import Any  # noqa: E402
@@ -71,6 +70,30 @@ class FakeMQTTPublisher:
             }
         )
 
+    def publish_automation_desired(
+        self,
+        automation_id: str,
+        op: str,
+        version: int,
+        *,
+        name: str | None = None,
+        enabled: bool | None = None,
+        trigger: dict | None = None,
+        actions: list[dict] | None = None,
+    ) -> None:
+        self.published.append(
+            {
+                "kind": "automation_desired",
+                "automation_id": automation_id,
+                "op": op,
+                "version": version,
+                "name": name,
+                "enabled": enabled,
+                "trigger": trigger,
+                "actions": actions,
+            }
+        )
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -111,12 +134,16 @@ async def db_session_factory(monkeypatch):
 async def fake_mqtt(monkeypatch):
     fake = FakeMQTTPublisher()
     import cloud.app.mqtt_client as mqttmod
+    import cloud.app.routers.automations as automod
     import cloud.app.routers.commands as cmdmod
     import cloud.app.routers.gateways as gwmod
+    import cloud.app.routers.provisioning as provmod
 
     monkeypatch.setattr(mqttmod, "mqtt_service", fake)
+    monkeypatch.setattr(automod, "mqtt_service", fake)
     monkeypatch.setattr(cmdmod, "mqtt_service", fake)
     monkeypatch.setattr(gwmod, "mqtt_service", fake)
+    monkeypatch.setattr(provmod, "mqtt_service", fake)
     yield fake
 
 
@@ -126,21 +153,8 @@ async def client(db_session_factory, fake_mqtt):
     from cloud.app.main import app
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(
-        transport=transport,
-        base_url="http://test",
-        headers={"Authorization": "Bearer test-api-token"},
-    ) as c:
-        # Lifespan started by ASGI transport; ensure device seed is easy via DB.
-        yield c
-
-
-@pytest_asyncio.fixture
-async def unauthenticated_client(db_session_factory, fake_mqtt):
-    from cloud.app.main import app
-
-    transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
+        # Lifespan started by ASGI transport; ensure device seed is easy via DB.
         yield c
 
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/command_result.dart';
 import '../../../../domain/models/command_status.dart';
 import '../../../../domain/models/cloud_status.dart';
@@ -18,6 +19,9 @@ class DeviceDashboardViewModel extends ChangeNotifier {
 
   List<SmartDevice> _devices = [];
   List<EventLog> _events = [];
+  final Map<String, List<EventLog>> _deviceEvents = {};
+  final Set<String> _loadingEventDeviceIds = {};
+  final Map<String, String> _deviceEventErrors = {};
   bool _isLoading = false;
   String? _errorMessage;
   CloudStatus _cloudStatus = const CloudStatus.unknown(
@@ -25,6 +29,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   );
   CommandResult? _lastCommand;
   DevicePower? _lastTarget;
+  bool _isRenamingDevice = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
   List<SmartDevice> get lights =>
@@ -35,6 +40,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   CloudStatus get cloudStatus => _cloudStatus;
   CommandResult? get lastCommand => _lastCommand;
   DevicePower? get lastTarget => _lastTarget;
+  bool get isRenamingDevice => _isRenamingDevice;
 
   int get onlineCount => _devices.where((device) => device.isOnline).length;
   int get lightsOnCount =>
@@ -42,6 +48,18 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   int get unreachableCount =>
       lights.where((device) => !device.isReachable).length;
   bool get hasPendingCommand => _lastCommand?.status.isPending ?? false;
+
+  List<EventLog> eventsForDevice(String deviceId) {
+    return List.unmodifiable(_deviceEvents[deviceId] ?? const <EventLog>[]);
+  }
+
+  bool isLoadingDeviceEvents(String deviceId) {
+    return _loadingEventDeviceIds.contains(deviceId);
+  }
+
+  String? deviceEventsError(String deviceId) {
+    return _deviceEventErrors[deviceId];
+  }
 
   SmartDevice? deviceById(String deviceId) {
     for (final device in _devices) {
@@ -63,12 +81,32 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       final events = await _repository.fetchEvents();
       _devices = devices;
       _events = events;
+      _deviceEvents.clear();
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
-      _errorMessage =
-          'Khong ket noi duoc Cloud API. Kiem tra server hoac mang. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong ket noi duoc Cloud API',
+      );
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadDeviceEvents(String deviceId) async {
+    _loadingEventDeviceIds.add(deviceId);
+    _deviceEventErrors.remove(deviceId);
+    notifyListeners();
+
+    try {
+      _deviceEvents[deviceId] = await _repository.fetchEvents(
+        deviceId: deviceId,
+      );
+    } catch (error) {
+      _deviceEventErrors[deviceId] = 'Cannot read cloud event logs';
+    } finally {
+      _loadingEventDeviceIds.remove(deviceId);
       notifyListeners();
     }
   }
@@ -103,7 +141,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
         status: CommandStatus.failed,
         reason: error.toString(),
       );
-      _errorMessage = error.toString();
+      _errorMessage = friendlyErrorMessage(error);
       notifyListeners();
     }
   }
@@ -119,6 +157,36 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       return;
     }
     await setLightPower(device, target);
+  }
+
+  Future<void> renameDevice(SmartDevice device, String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isRenamingDevice) {
+      return;
+    }
+
+    _isRenamingDevice = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final renamed = await _repository.renameDeviceName(
+        deviceId: device.id,
+        name: normalizedName,
+      );
+      final index = _devices.indexWhere((item) => item.id == device.id);
+      if (index != -1) {
+        _devices[index] = _devices[index].copyWith(name: renamed.name);
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong doi duoc ten thiet bi',
+      );
+    } finally {
+      _isRenamingDevice = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _pollCommand(DevicePower target) async {

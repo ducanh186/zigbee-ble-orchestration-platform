@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../../domain/models/device_power.dart';
 import '../../../../domain/models/smart_device.dart';
 import '../../../core/theme/app_theme.dart';
@@ -12,18 +13,25 @@ import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../widgets/gateway_status_card.dart';
 
 class HomeView extends StatelessWidget {
-  const HomeView({required this.onOpenLight, super.key});
+  const HomeView({
+    required this.onOpenLight,
+    required this.onOpenDevices,
+    super.key,
+  });
 
   final ValueChanged<SmartDevice> onOpenLight;
+  final VoidCallback onOpenDevices;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('Home'),
+              title: Text(l10n.homeTab),
               pinned: true,
               actions: [
                 IconButton(
@@ -46,7 +54,10 @@ class HomeView extends StatelessWidget {
                   ],
                   GatewayStatusCard(status: viewModel.cloudStatus),
                   const SizedBox(height: 12),
-                  _MetricRow(viewModel: viewModel),
+                  _MetricRow(
+                    viewModel: viewModel,
+                    onOpenDevices: onOpenDevices,
+                  ),
                   const SizedBox(height: 18),
                   const SectionTitle(title: 'Quick lights'),
                   const SizedBox(height: 8),
@@ -70,22 +81,27 @@ class HomeView extends StatelessWidget {
 }
 
 class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.viewModel});
+  const _MetricRow({required this.viewModel, required this.onOpenDevices});
 
   final DeviceDashboardViewModel viewModel;
+  final VoidCallback onOpenDevices;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _MetricTile(label: 'Devices', value: viewModel.devices.length),
+          child: _MetricTile(
+            label: 'Devices',
+            value: viewModel.devices.length,
+            onTap: onOpenDevices,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            label: 'On',
-            value: viewModel.lightsOnCount,
+            label: 'Online',
+            value: viewModel.onlineCount,
             tone: BadgeTone.success,
           ),
         ),
@@ -107,11 +123,13 @@ class _MetricTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.tone = BadgeTone.neutral,
+    this.onTap,
   });
 
   final String label;
   final int value;
   final BadgeTone tone;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +143,7 @@ class _MetricTile extends StatelessWidget {
     };
 
     return AppCard(
+      onTap: onTap,
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

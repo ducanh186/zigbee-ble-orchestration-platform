@@ -40,7 +40,7 @@ Nguồn chính xác của kiến trúc: [README.md](../README.md), [docs/plan.md
 |---|---|---|
 | End devices | Z3Light, Z3Switch, Z3_Occupancy_Sensor (board EFR32MG12) | Zigbee cluster servers/clients. Z3Light expose On/Off + Level Control. Z3Switch bắn On/Off commands. |
 | Coordinator/NCP | Một board EFR32MG12 flash bootloader + NCP firmware | Chỉ là Zigbee radio. Expose EZSP qua UART ở 115200 baud. **Không** chạy logic ứng dụng. |
-| Gateway host | `gateway/Z3Gateway/Z3GatewayHost/` (binary trên Ubuntu) | Sở hữu UART (`/dev/ttyACM0`), form Zigbee network, nói MQTT, giữ command lifecycle, quan sát + forward state. |
+| Gateway host | `gateway/Z3GatewayHost/` (binary trên Ubuntu) | Sở hữu UART (`/dev/ttyACM0`), form Zigbee network, nói MQTT, giữ command lifecycle, quan sát + forward state. |
 | MQTT broker | `sb-mosquitto` (podman), dùng `mqtt/config/mosquitto.conf` | Auth, ACL, optional bridge đến prod broker qua `mqtt/config/conf.d/bridge.conf`. |
 | Cloud backend | `cloud/app/` FastAPI + Postgres | REST API, dịch command, lưu device/state/command, sub/pub MQTT. |
 
@@ -72,9 +72,9 @@ bằng một env var — xem §G.
 | WSTK Mainboard BRD4001A × N | Đế cắm cho mỗi board radio EFR32 | Mỗi role một cái |
 | Radio board EFR32MG12 BRD4162A (rev A02) × N | MCU cho mọi role | Part: `EFR32MG12P332F1024GL125` |
 | Board Coordinator | Chạy `bootloader-uart-xmodem` + `ncp-uart-hw` | Cắm USB vào máy Ubuntu. Hiện ra ở `/dev/ttyACM0`. |
-| Board Z3Light | Flash `artifact/Z3Light/Z3Light.s37` | *Trạng thái build trong [docs/FIRMWARE_ARTIFACTS.md](FIRMWARE_ARTIFACTS.md) — verify `.s37` đã tồn tại trước khi flash.* |
-| Board Z3Switch | Flash `artifact/Z3Switch/Z3Switch.s37` | Cùng ghi chú ở trên. |
-| Board Z3_Occupancy_Sensor | Flash firmware occupancy sensor | *current repo gap:* `artifact/` có thể chưa có `.s37` built sẵn cho role này. Nếu thiếu, build từ `end_devices/Z3_Occupancy_Sensor/` trong Simplicity Studio. |
+| Board Z3Light | Flash `artifact/Z3Light/Z3Light.s37` | Build matrix + flash how-to: [docs/FLASHING.md](FLASHING.md). |
+| Board Z3Switch | Flash `artifact/Z3Switch/Z3Switch.s37` | Cùng tài liệu. |
+| Board Z3_Occupancy_Sensor | Flash `artifact/Z3_Occupancy_Sensor/Z3_Occupancy_Sensor.s37` | Build matrix + flash how-to: [docs/FLASHING.md](FLASHING.md). |
 
 USB connections bắt buộc:
 
@@ -95,7 +95,7 @@ USB connections bắt buộc:
 
 ### Simplicity Studio / Gecko SDK / ARM toolchain
 
-Theo [docs/FIRMWARE_ARTIFACTS.md](FIRMWARE_ARTIFACTS.md):
+Theo [docs/FLASHING.md](FLASHING.md) (section "Artifacts"):
 
 - Simplicity Studio v5 (SSv5, dựa trên Eclipse CDT).
 - Gecko SDK 4.5.0 đã cài trong SSv5.
@@ -158,7 +158,7 @@ REPO/
 │   ├─ Z3Switch/
 │   └─ Z3_Occupancy_Sensor/
 ├─ gateway/
-│   └─ Z3Gateway/Z3GatewayHost/
+│   └─ Z3GatewayHost/
 │       ├─ app.c                 — entry point Z3Gateway framework
 │       ├─ app/                  — code gateway custom
 │       │   ├─ app_mqtt.c/h      — MQTT client (libmosquitto)
@@ -187,10 +187,11 @@ REPO/
 ├─ deploy/
 │   └─ docker-compose.prod.yml   — compose production (postgres + broker)
 ├─ docs/
-│   ├─ MQTT_CONTRACT.md, DEVICE_CAPABILITY_MATRIX.md, FIRMWARE_ARTIFACTS.md,
+│   ├─ MQTT_CONTRACT.md, AUTOMATION_MQTT_CONTRACT.md, DEVICE_CAPABILITY_MATRIX.md,
 │   │  FLASHING.md, plan.md, ...
 │   └─ instruct.md           — file này
-└─ scripts/debug/            — helper debug tạm (xem §I)
+└─ scripts/                  — start-gateway.sh + deploy/ (debug helpers
+                                live under testing_tools/, gitignored)
 ```
 
 Nguồn chính xác vs file sinh tự động:
@@ -200,9 +201,9 @@ Nguồn chính xác vs file sinh tự động:
 | `end_devices/**/*.slcp`, `config/zcl/*.zap`, `app.c`, `app/*.c` | Nguồn chính — sửa ở đây |
 | `end_devices/**/autogen/` | Sinh bởi SSv5 từ `.slcp` + `.zap` — không sửa tay |
 | `artifact/**/*.s37`, `*.hex`, `*.gbl` | Artifact build — regenerate bằng SSv5 |
-| `gateway/Z3Gateway/Z3GatewayHost/app/*` | Nguồn chính |
-| `gateway/Z3Gateway/Z3GatewayHost/autogen/` | Sinh bởi SSv5 Z3Gateway sample — tránh sửa tay |
-| `gateway/Z3Gateway/Z3GatewayHost/build/debug/Z3Gateway` | Artifact build (binary host) |
+| `gateway/Z3GatewayHost/app/*` | Nguồn chính |
+| `gateway/Z3GatewayHost/autogen/` | Sinh bởi SSv5 Z3Gateway sample — tránh sửa tay |
+| `gateway/Z3GatewayHost/build/debug/Z3Gateway` | Artifact build (binary host) |
 
 ---
 
@@ -268,7 +269,7 @@ SSv5 không auto-regenerate đè lên file sửa tay:
 
 ```bash
 # 1. Copy source đã sửa từ repo này sang bản copy trong SSv5 workspace
-cp gateway/Z3Gateway/Z3GatewayHost/app/*.c \
+cp gateway/Z3GatewayHost/app/*.c \
    ~/SimplicityStudio/v5_workspace/Z3GatewayHost2/app/
 
 # 2. Build ở đó
@@ -276,7 +277,7 @@ cp gateway/Z3Gateway/Z3GatewayHost/app/*.c \
 
 # 3. Copy binary trở lại vào cây build/debug của repo này
 cp ~/SimplicityStudio/v5_workspace/Z3GatewayHost2/build/debug/Z3Gateway \
-   gateway/Z3Gateway/Z3GatewayHost/build/debug/Z3Gateway
+  gateway/Z3GatewayHost/build/debug/Z3Gateway
 ```
 
 Lưu ý:
@@ -356,10 +357,17 @@ curl -s http://localhost:8000/api/devices/ | head
 Credential monitor chỉ đọc, an toàn để trace:
 
 ```bash
-./scripts/debug/mqtt-trace.sh
-# shortcut: subscribe commands/+/request|reply, devices/+/+/{reported,event,desired},
-# và gateway/+ bằng credential monitor.
+mosquitto_sub -h localhost -u monitor -P monitor123 -v \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/commands/+/request' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/commands/+/reply' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/reported' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/desired' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/devices/+/+/event' \
+  -t 'sb/v1/hust/lab01/gw-ubuntu-01/gateway/+'
 ```
+
+(Local helper script với cùng command này nằm ở `testing_tools/debug/mqtt-trace.sh`
+— gitignored, không vào push.)
 
 Ad-hoc một dòng:
 
@@ -401,10 +409,25 @@ Deployment của project này: `tenant_id=hust`, `site_id=lab01`,
 
 ### Cách start gateway DUY NHẤT đúng
 
+Dùng helper script:
+
 ```bash
-cd "$REPO/gateway/Z3Gateway/Z3GatewayHost/build/debug"
+"$REPO/scripts/start-gateway.sh"
+```
+
+Script này pin các env var quan trọng (xem bảng phía dưới) gồm
+`SB_AUTOMATION_SWITCH_HOOK=1` và `SB_RULES_SWITCH_TO_LIGHT=0` — cấu hình
+production cho switch → light routing đi qua cloud automation rule (không
+qua Zigbee direct binding, không qua legacy wildcard relay).
+
+Nếu cần chạy thủ công, đây là dạng inline tương đương:
+
+```bash
+cd "$REPO/gateway/Z3GatewayHost/build/debug"
 ( sleep infinity | env SB_MQTT_HOST=localhost SB_MQTT_PORT=1883 \
                        SB_MQTT_USERNAME=gateway SB_MQTT_PASSWORD=gateway123 \
+                       SB_AUTOMATION_SWITCH_HOOK=1 \
+                       SB_RULES_SWITCH_TO_LIGHT=0 \
        ./Z3Gateway -p /dev/ttyACM0 -b 115200 > /tmp/z3gw.log 2>&1 ) &
 disown
 echo $(pgrep -fx './Z3Gateway -p /dev/ttyACM0 -b 115200') > /tmp/z3gw.pid
@@ -432,8 +455,10 @@ echo $(pgrep -fx './Z3Gateway -p /dev/ttyACM0 -b 115200') > /tmp/z3gw.pid
 | `SB_MQTT_PORT` | `1883` | Port broker. |
 | `SB_MQTT_USERNAME` | `gateway` | User MQTT. |
 | `SB_MQTT_PASSWORD` | `gateway123` | Password MQTT. |
-| `SB_RULES_SWITCH_TO_LIGHT` | *unset* → **0 / disabled** | Nếu `=1`, gateway sẽ cài rule wildcard relay mỗi switch toggle đến đèn đã đăng ký, song song với Zigbee direct binding. Production phải để unset. |
-| `SB_DEBUG_VERBOSE` | *unset* → quiet | Nếu `=1`, bật các dòng log TEMP DEBUG trong `scripts/debug/DEBUG.md` (SUBACK, preview payload rx, tick heartbeat, rule entry/cooldown, timing snap-back). |
+| `SB_RULES_SWITCH_TO_LIGHT` | `0` qua `scripts/start-gateway.sh` (legacy off) | Nếu `=1`, gateway sẽ cài rule wildcard relay mỗi switch toggle đến đèn đã đăng ký. Hiện không dùng vì switch → light đi qua cloud automation rule (xem flag phía dưới). Production phải `=0`. |
+| `SB_AUTOMATION_SWITCH_HOOK` | `1` qua `scripts/start-gateway.sh` | Bật Phase 3 switch automation hook trong `automation_rule.c`: khi switch toggle đến, gateway match rule trong bảng in-memory (do cloud push qua `automations/{id}/desired`) và thực thi action tương ứng. **Yêu cầu**: Zigbee direct binding switch → light phải đã được gỡ (xem §H.2), nếu không sẽ double-toggle. AUTO init log phải có `skip_switch:false,hook:true`. |
+| `SB_AUTOMATION_EXECUTE` | *unset* → `1` (execute) | Đặt `=0` để gateway vẫn store/ack rule nhưng không bắn action — dùng cho staged rollouts. |
+| `SB_DEBUG_VERBOSE` | *unset* → quiet | Nếu `=1`, bật các dòng log TEMP DEBUG (SUBACK, preview payload rx, tick heartbeat, rule entry/cooldown, timing snap-back). |
 
 ### Log đi đâu
 
@@ -507,7 +532,7 @@ Triệu chứng và recovery ở §I.
 ## H. Kiểm tra tính năng end-to-end
 
 Mọi case giả định: broker + postgres + cloud đã up (§F), và đúng một
-gateway đang chạy (§G). Script trace `./scripts/debug/mqtt-trace.sh`
+gateway đang chạy (§G). `mosquitto_sub` trace (§F "Inspect MQTT traffic")
 đang subscribe trong terminal khác.
 
 ### H.1 Cloud → gateway → light command
@@ -643,7 +668,7 @@ một chuỗi tăng đơn điệu:
 4. `executed` — APS-level TX success (lưu ý: TX-level, không phải xác
    nhận bulb đã đổi trạng thái; xem block comment quanh
    `emberAfMessageSentCallback` trong
-   [light_ctrl.c](../gateway/Z3Gateway/Z3GatewayHost/app/light_ctrl.c)).
+  [light_ctrl.c](../gateway/Z3GatewayHost/app/light_ctrl.c)).
 
 Terminal failure là `failed` (kèm field `reason`) hoặc `timeout` (do
 cloud `command_timeout.py` sweep phát ra khi không có terminal status
@@ -714,7 +739,7 @@ RAM của gateway rỗng. Nguyên nhân:
 
 - Gateway vừa restart; registry rỗng đến khi attribute report đầu tiên
   từ đèn đến (auto-pair trigger trong
-  [telemetry_rx.c](../gateway/Z3Gateway/Z3GatewayHost/app/telemetry_rx.c)).
+  [telemetry_rx.c](../gateway/Z3GatewayHost/app/telemetry_rx.c)).
 - Đèn chưa bao giờ join network Zigbee của gateway này. Verify bằng cách
   xem `@DBG PRE_CMD` trong log gateway khi bấm bất cứ device nào. Nếu
   không hiện gì, device đang ở network khác — rejoin về coordinator này.
@@ -826,8 +851,8 @@ mosquitto_pub -h localhost -u client -P client123 -r -q 1 \
       `onConnect`, một `subscribed`, không có disconnect.
 - [ ] Device seed `000000000000004F` xuất hiện trong
       `GET /api/devices/`.
-- [ ] `./scripts/debug/mqtt-trace.sh` hiện `gateway/online` với
-      timestamp gần đây.
+- [ ] `mosquitto_sub -u monitor -P monitor123 -C 1 -W 3 -t 'sb/v1/hust/lab01/gw-ubuntu-01/gateway/online'`
+      hiện envelope với timestamp gần đây.
 - [ ] §H.1 cloud command đạt `executed`; đèn đổi trạng thái vật lý.
 - [ ] §H.2 bấm switch → đèn đổi trạng thái trong 100 ms, và log gateway
       không có `LIGHT local_toggle_sent`.
@@ -843,11 +868,13 @@ mosquitto_pub -h localhost -u client -P client123 -r -q 1 \
 
 ### J.3 Debugging
 
-- [ ] Start MQTT trace lâu dài trong terminal riêng:
-      `./scripts/debug/mqtt-trace.sh`.
+- [ ] Start MQTT trace lâu dài trong terminal riêng — dùng lệnh
+      `mosquitto_sub -h localhost -u monitor -P monitor123 -v -t 'sb/v1/#'`
+      (full topic tree) hoặc copy đoạn `mosquitto_sub` chi tiết hơn ở §F
+      "Inspect MQTT traffic".
 - [ ] Bật verbose log gateway: dừng gateway, restart với
       `SB_DEBUG_VERBOSE=1` trong env. Check `/tmp/z3gw.log` tìm các
-      dòng `@DBG ...` (xem [scripts/debug/DEBUG.md](../scripts/debug/DEBUG.md)).
+      dòng `@DBG ...`.
 - [ ] **Không** launch gateway thứ hai. Dùng `/tmp/z3gw.log` + MQTT
       trace + `curl /api/...` + `pgrep`/`fuser` để quan sát (§G, §I).
 - [ ] Nếu switch-local bị duplicate, check
@@ -857,3 +884,79 @@ mosquitto_pub -h localhost -u client -P client123 -r -q 1 \
       retained từ session trước không (§I "Tin nhắn MQTT retained cũ").
 - [ ] Dừng bằng `kill "$(cat /tmp/z3gw.pid)"`, chờ `fuser /dev/ttyACM0`
       không in gì nữa, rồi restart.
+
+---
+
+## Session 2026-05-22 — Firmware LED scheme, switch binding clear, motion reported, dashboard canonical
+
+Tóm tắt những thay đổi đã chốt trong session 2026-05-22 và đã merge vào nhánh
+trước khi push. Nếu bạn pull từ remote và thấy hành vi mới so với runbook
+phía trên, đây là chỗ tra cứu nguồn gốc.
+
+### Z3Switch firmware
+
+- `netMgrInit()` (file `end_devices/Z3Switch/app/net_mgr.c`) gọi
+  `emberClearBindingTable()` mỗi lần boot khi `SWITCH_AUTO_FIND_BIND=0`
+  (default). Mục đích: xoá NVM3 binding cũ tồn lại từ những lần flash
+  có `SWITCH_AUTO_FIND_BIND=1` — nếu giữ binding, switch sẽ gửi ZCL
+  Toggle thẳng đến light qua radio (binding-table-send) song song với
+  cloud rule, gây double-toggle.
+- Reflash sau patch:
+  `commander flash artifact/Z3Switch/Z3Switch.s37 --serialno 440124173`.
+
+### Z3_Occupancy_Sensor firmware
+
+- LED0 = network status, scheme đồng nhất với Z3Switch:
+  off khi chưa joined → blink 500 ms khi đang network steering → solid
+  khi đã joined.
+- LED1 = PIR motion detection. Sáng khi `state.occupancy == "occupied"`,
+  tắt khi clear. Độc lập với LED0.
+- Auto-search network on boot nếu chưa joined (giống Switch) — user không
+  cần bấm PB0 cho lần commissioning đầu.
+- Để hỗ trợ 2 LED, đã thêm `led1` vào `simple_led` instances trong
+  `.slcp`, tạo mới `config/sl_simple_led_led1_config.h` (PF5,
+  active-high), regenerate `autogen/sl_simple_led_instances.{c,h}`
+  bằng tay. SSv5 sẽ rewrite autogen nếu re-import; check diff.
+- Reflash:
+  `commander flash artifact/Z3_Occupancy_Sensor/Z3_Occupancy_Sensor.s37 --serialno 440121812`.
+
+### Gateway — motion reported publish
+
+- `appMqttPublishMotionReported()` mới trong
+  `gateway/Z3GatewayHost/app/app_mqtt.c`: mỗi lần PIR
+  transition, gateway publish thêm `devices/motion/{eui}/reported`
+  (QoS 1, retained) với payload `state.occupancy = "occupied"|"unoccupied"`,
+  `state.reachable = true`. Cloud `_handle_reported` ghi `DeviceState`
+  → dashboard mới hiển thị được current occupancy. Trước session này
+  gateway chỉ publish `event`, UI luôn rỗng cho motion device.
+
+### Cloud / dashboard
+
+- Canonical local dev flow là **manual uvicorn + cloud/webdev/dev_server.py**
+  trên Linux. `cloud/webdev/start_dev.py` (Windows-flavoured one-shot
+  launcher) hạ xuống mức alternative. Chi tiết trong
+  `cloud/webdev/README.md`.
+- `cloud/app/seed.py._LEGACY_PLACEHOLDER_IDS` mở rộng cho 6 EUI test
+  (`00124b0001aa22bb`, `00124b0002cc33dd`, `00124b0003ee44ff`,
+  `0xPROBE`, `0xTEST`, `0xPROBE2`) — `start_dev.py` tự dọn nếu tái xuất
+  hiện trong DB.
+- `cloud/scripts/smoke_test.py` và `cloud/scripts/test_phase3_phase4.py`
+  thêm guard: refuse to run nếu `SB_API_URL` không chứa `test` / `localhost`
+  / `127.0.0.1`. Override bằng `SB_SMOKE_FORCE=1` cho CI / known-test
+  database. Lý do: lần đầu chạy bị insert vào production-shaped DB,
+  để lại 6 placeholder device gây rối dashboard.
+
+### Repo housekeeping
+
+- `evidence/`, `scripts/debug/`, `docs/samples/real/` đã được hợp nhất
+  vào `testing_tools/` (gitignored) — đây là Claude / dev workspace,
+  không lên remote. Các debug helper script
+  (`mqtt-trace.sh`, `mqtt-cmd.sh`, `DEBUG.md`) vẫn dùng được local,
+  chỉ không vào commit nữa.
+- 3 file md trong `docs/` đã consolidate:
+  `FIRMWARE_ARTIFACTS.md` merge vào `FLASHING.md` (section "## Artifacts");
+  `iot_zigbee_sprint_plan.md` và `CLOUD_IMPLEMENTATION_PLAN.md` xoá
+  hẳn (stale / historical).
+- `docs/AUTOMATION_MQTT_CONTRACT.md` được promote thành tracked
+  (`git add -f`) — `**/*.md` rule ignore nó mặc định nhưng đây là
+  contract material, reviewers cần.

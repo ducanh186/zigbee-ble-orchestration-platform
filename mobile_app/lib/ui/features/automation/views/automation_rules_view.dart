@@ -110,6 +110,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                               : (value) => value
                                     ? automation.enableRule(rule.id)
                                     : automation.disableRule(rule.id),
+                          onDelete: () => _confirmDelete(automation, rule),
                         ),
                       ),
                   ],
@@ -127,6 +128,45 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
       return;
     }
     setState(() => _justCreatedRuleId = ruleId);
+  }
+
+  Future<void> _confirmDelete(
+    AutomationViewModel automation,
+    AutomationRule rule,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final palette = context.palette;
+        return AlertDialog(
+          title: const Text('Delete rule?'),
+          content: Text(
+            'This removes "${rule.name}" from the gateway sync list.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: palette.error,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    if (_justCreatedRuleId == rule.id) {
+      setState(() => _justCreatedRuleId = null);
+    }
+    await automation.deleteRule(rule.id);
   }
 
   /// Best-effort mapping rule → template so the rule card can pick an icon
@@ -165,17 +205,11 @@ class _SavedBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.successTint,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: palette.success.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: palette.success.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 16,
-            color: palette.success,
-          ),
+          Icon(Icons.check_circle_outline, size: 16, color: palette.success),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

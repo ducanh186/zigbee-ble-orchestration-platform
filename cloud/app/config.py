@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from pydantic_settings import BaseSettings
-
-
-_CLOUD_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
@@ -16,14 +11,27 @@ class Settings(BaseSettings):
     mqtt_port: int = 1883
     mqtt_username: str = "client"
     mqtt_password: str = "client"
+    mqtt_tls_enabled: bool = False
+    mqtt_mtls_enabled: bool = False
+    mqtt_ca_cert_path: str | None = None
+    mqtt_client_cert_path: str | None = None
+    mqtt_client_key_path: str | None = None
     tenant_id: str = "hust"
     site_id: str = "lab01"
     gateway_id: str = "gw-ubuntu-01"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    api_auth_token: str | None = None
+    # How long (seconds) a device may go without a reported/event/registry
+    # before the offline reaper marks `is_online=False`. Devices that have
+    # never reported (`last_seen_at IS NULL`) are also marked offline so
+    # seed rows and probes don't masquerade as live hardware.
+    device_offline_after_seconds: int = 300
+    # How often the reaper task wakes up to scan for stale devices.
+    device_offline_scan_interval_seconds: int = 60
+    auth_token_secret: str = "dev-only-change-me"
+    auth_token_ttl_seconds: int = 8 * 60 * 60
 
-    model_config = {"env_prefix": "SB_", "env_file": _CLOUD_ENV_FILE, "extra": "ignore"}
+    model_config = {"env_prefix": "SB_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

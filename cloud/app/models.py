@@ -48,6 +48,8 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     username = Column(String, unique=True, nullable=False)
+    role = Column(String, nullable=False, default="user", server_default="user")
+    password_hash = Column(String, nullable=True)
     home_id = Column(String, ForeignKey("homes.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
 
@@ -62,7 +64,16 @@ class Device(Base):
     eui64 = Column(String, nullable=True)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     name = Column(String, nullable=True)
-    is_online = Column(Boolean, default=True)
+    # `is_online` is intentionally False by default now. Historically it
+    # defaulted to True, which made seed/probe rows that never report look
+    # ONLINE forever. Reality is derived from `last_seen_at`: an MQTT
+    # reported/event/registry handler bumps the timestamp and sets
+    # `is_online=True`; the offline reaper in `device_lifecycle` flips it
+    # back to False once `last_seen_at` is older than
+    # `settings.device_offline_after_seconds` (or stays False forever for
+    # rows that never reported).
+    is_online = Column(Boolean, default=False, nullable=False)
+    last_seen_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -140,8 +151,13 @@ class Automation(Base):
     tenant_id = Column(String, nullable=False)
     site_id = Column(String, nullable=False)
     gateway_id = Column(String, nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
     trigger = Column("trigger", JSON, nullable=False, quote=True)
     actions = Column(JSON, nullable=False)
+    # Monotonic version bumped on every cloud-side mutation. Gateway uses this
+    # to reject stale retained desired messages on reconnect / replay. See
+    # docs/AUTOMATION_MQTT_CONTRACT.md §7.
+    version = Column(Integer, nullable=False, default=1, server_default="1")
     sync_status = Column(String, nullable=False, default="pending")
     last_run_status = Column(String, nullable=False, default="never_run")
     last_error = Column(String, nullable=True)
@@ -153,6 +169,34 @@ class Automation(Base):
             "ix_automations_gateway_created",
             "tenant_id",
             "site_id",
+            "gateway_id",
+            "created_at",
+        ),
+    )
+
+class ProvisioningSession(Base):
+    """Secure install-code join session tracked by the cloud API."""
+
+    __tablename__ = "provisioning_sessions"
+
+    id = Column(String, primary_key=True)
+    gateway_id = Column(String, nullable=False)
+    room_id = Column(String, ForeignKey("rooms.id"), nullable=False)
+    eui64 = Column(String, nullable=False)
+    install_code = Column(String, nullable=False)
+    device_type = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", server_default="pending")
+    reason = Column(String, nullable=True)
+    command_id = Column(String, ForeignKey("commands.id"), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_provisioning_sessions_eui64_status", "eui64", "status"),
+        Index(
+            "ix_provisioning_sessions_gateway_created",
             "gateway_id",
             "created_at",
         ),

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
+
+from cloud.app.provisioning_install_code import normalize_install_code
 
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
 
@@ -13,6 +23,11 @@ def _fmt_ts(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.strftime(TS_DISPLAY_FORMAT)
+
+
+_HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
+_EUI64_RE = re.compile(r"^[0-9a-fA-F]{16}$")
+_INSTALL_CODE_HEX_LENGTHS = {16, 20, 28, 36}
 
 
 # ---------------------------------------------------------------------------
@@ -195,14 +210,37 @@ class DeviceOut(BaseModel):
     room_id: str | None
     name: str | None
     is_online: bool
+    last_seen_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("created_at", "updated_at")
+    @field_serializer("last_seen_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
+
+
+class DeviceUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class AuthLogin(BaseModel):
+    username: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1)
+
+
+class AuthSessionOut(BaseModel):
+    access_token: str
+    username: str
+    user_id: str
+    role: Literal["admin", "operator", "viewer", "user"]
+    home_id: str | None = None
+    expires_at: datetime
+
+    @field_serializer("expires_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return v.isoformat() if v is not None else None
 
 
 class DeviceStateOut(BaseModel):
@@ -259,6 +297,16 @@ class AutomationCreate(BaseModel):
     actions: list[dict[str, Any]] = Field(min_length=1)
 
 
+class AutomationUpdate(BaseModel):
+    """PUT body. All fields optional; only provided fields are mutated."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    enabled: bool | None = None
+    version: int | None = Field(default=None, ge=1)
+    trigger: dict[str, Any] | None = None
+    actions: list[dict[str, Any]] | None = Field(default=None, min_length=1)
+
+
 class AutomationOut(BaseModel):
     id: str
     name: str
@@ -266,9 +314,10 @@ class AutomationOut(BaseModel):
     tenant_id: str
     site_id: str
     gateway_id: str
+    version: int
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
-    sync_status: Literal["pending", "synced", "failed"]
+    sync_status: Literal["pending", "synced", "failed", "deleted"]
     last_run_status: Literal["never_run", "executed", "failed", "timeout"]
     last_error: str | None
     created_at: datetime
@@ -277,6 +326,115 @@ class AutomationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer("created_at", "updated_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
+
+# ---------------------------------------------------------------------------
+# Provisioning sessions (secure install-code join)
+# ---------------------------------------------------------------------------
+
+
+class ProvisioningStatus(str, Enum):
+    pending = "pending"
+    permit_open = "permit_open"
+    joining = "joining"
+    joined = "joined"
+    failed = "failed"
+    expired = "expired"
+    cancelled = "cancelled"
+
+
+class ProvisioningErrorCode(str, Enum):
+    INVALID_QR_PAYLOAD = "INVALID_QR_PAYLOAD"
+    INVALID_EUI64 = "INVALID_EUI64"
+    INVALID_INSTALL_CODE = "INVALID_INSTALL_CODE"
+    UNSUPPORTED_DEVICE_TYPE = "UNSUPPORTED_DEVICE_TYPE"
+    GATEWAY_NOT_FOUND = "GATEWAY_NOT_FOUND"
+    ROOM_NOT_FOUND = "ROOM_NOT_FOUND"
+    SESSION_ALREADY_ACTIVE = "SESSION_ALREADY_ACTIVE"
+
+
+class ProvisioningDevicePayload(BaseModel):
+    eui64: str
+    install_code: str
+    device_type: Literal["light", "switch", "motion"]
+    model: str | None = None
+
+    @field_validator("eui64")
+    @classmethod
+    def _validate_eui64(cls, value: str) -> str:
+        if not _EUI64_RE.fullmatch(value):
+            raise ValueError("eui64 must be 16 hex characters")
+        return value.upper()
+
+    @field_validator("install_code")
+    @classmethod
+    def _validate_install_code(cls, value: str) -> str:
+        if (
+            not _HEX_RE.fullmatch(value)
+            or len(value) not in _INSTALL_CODE_HEX_LENGTHS
+        ):
+            raise ValueError("install_code must be valid hex with CRC length")
+        return value.upper()
+
+
+class ProvisioningLabelCreate(BaseModel):
+    eui64: str
+    install_code: str | None = None
+    device_type: Literal["light", "switch", "motion"]
+    model: str | None = None
+
+    @field_validator("eui64")
+    @classmethod
+    def _validate_eui64(cls, value: str) -> str:
+        if not _EUI64_RE.fullmatch(value):
+            raise ValueError("eui64 must be 16 hex characters")
+        return value.upper()
+
+    @field_validator("install_code")
+    @classmethod
+    def _validate_install_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return normalize_install_code(value)
+        except ValueError as exc:
+            raise ValueError("install_code must be valid hex with CRC length") from exc
+
+
+class ProvisioningLabelOut(BaseModel):
+    payload: dict[str, Any]
+    payload_json: str
+    qr_svg: str
+
+
+class ProvisioningSessionCreate(BaseModel):
+    gateway_id: str = Field(min_length=1)
+    room_id: str = Field(min_length=1)
+    device: ProvisioningDevicePayload
+
+
+class ProvisioningSessionOut(BaseModel):
+    session_id: str = Field(validation_alias="id")
+    status: ProvisioningStatus
+    gateway_id: str
+    room_id: str
+    eui64: str
+    device_type: Literal["light", "switch", "motion"]
+    model: str | None
+    reason: str | None = None
+    expires_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        use_enum_values=True,
+    )
+
+    @field_serializer("expires_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
 

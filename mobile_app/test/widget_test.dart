@@ -1,29 +1,185 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:zigbee_smart_building/data/repositories/mock_automation_repository.dart';
 import 'package:zigbee_smart_building/data/repositories/mock_device_repository.dart';
+import 'package:zigbee_smart_building/domain/models/automation_rule.dart';
+import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
+import 'package:zigbee_smart_building/domain/models/device_power.dart';
+import 'package:zigbee_smart_building/domain/models/event_log.dart';
+import 'package:zigbee_smart_building/domain/models/smart_device.dart';
+import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
+import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
+import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
 import 'package:zigbee_smart_building/main.dart';
+import 'package:zigbee_smart_building/ui/core/localization/locale_controller.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
+import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
+import 'package:zigbee_smart_building/ui/features/devices/view_models/device_dashboard_view_model.dart';
 import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_card.dart';
+
+class _PreAuthedRepository implements AuthRepository {
+  @override
+  Future<AuthSession?> restoreSession() async => AuthSession(
+    accessToken: 'test-token',
+    username: 'operator',
+    userId: 'operator-1',
+    role: 'operator',
+    homeId: 'home-01',
+    expiresAt: DateTime.utc(2026, 6, 1, 12),
+  );
+
+  @override
+  Future<AuthSession> login({
+    required String username,
+    required String password,
+  }) async => AuthSession(
+    accessToken: 'test-token',
+    username: username,
+    userId: 'operator-1',
+    role: 'operator',
+    homeId: 'home-01',
+    expiresAt: DateTime.utc(2026, 6, 1, 12),
+  );
+
+  @override
+  Future<void> logout() async {}
+}
+
+class _GatewayHealthRepository extends MockDeviceRepository {
+  @override
+  Future<List<EventLog>> fetchEvents({String? deviceId}) async {
+    return const [
+      EventLog(
+        id: 'gateway-1',
+        eventType: 'gateway_health',
+        message: '{uptime_ms: 1444096, network_status: connected}',
+        occurredAt: '11:53 05/17/2026',
+        source: 'cloud/gateway',
+      ),
+    ];
+  }
+}
+
+class _DeviceEventsRepository extends MockDeviceRepository {
+  final List<String?> requestedDeviceIds = [];
+
+  @override
+  Future<List<EventLog>> fetchEvents({String? deviceId}) async {
+    requestedDeviceIds.add(deviceId);
+    if (deviceId == 'pir-01') {
+      return const [
+        EventLog(
+          id: 'motion-event-1',
+          deviceId: 'pir-01',
+          eventType: 'occupancy_changed',
+          message: 'occupied',
+          occurredAt: '07:20 05/21/2026',
+          source: 'gateway',
+        ),
+      ];
+    }
+    if (deviceId == 'light-01') {
+      return const [
+        EventLog(
+          id: 'light-registry-1',
+          deviceId: 'light-01',
+          eventType: 'device_registry',
+          message:
+              '{eui64: 000000000000004F, clusters: [0x0006, 0x0008], metadata_source: gateway_mvp_inferred}',
+          occurredAt: '07:18 05/21/2026',
+          source: 'gateway',
+        ),
+      ];
+    }
+    return super.fetchEvents(deviceId: deviceId);
+  }
+}
+
+class _ImmediateRenameRepository extends MockDeviceRepository {
+  String? renamedDeviceId;
+  String? renamedName;
+  String _lightName = 'Lab Light 01';
+
+  @override
+  Future<List<SmartDevice>> fetchDevices() async {
+    final devices = await super.fetchDevices();
+    return [
+      for (final device in devices)
+        device.id == 'light-01' ? device.copyWith(name: _lightName) : device,
+    ];
+  }
+
+  @override
+  Future<SmartDevice> renameDeviceName({
+    required String deviceId,
+    required String name,
+  }) async {
+    renamedDeviceId = deviceId;
+    renamedName = name;
+    _lightName = name;
+    return SmartDevice(
+      id: deviceId,
+      deviceType: 'light',
+      name: name,
+      eui64: '00124b0001aa22bb',
+      roomId: 'lab01',
+      isOnline: true,
+      power: DevicePower.on,
+    );
+  }
+}
 
 void main() {
   Future<void> pumpDashboard(
     WidgetTester tester, {
     required bool useMockApi,
+    DeviceRepository? repository,
+    AutomationRepository? automationRepository,
   }) async {
+    SharedPreferences.setMockInitialValues({});
+    // SCRUM-29 wraps the app in an auth gate. Pre-authenticate the dashboard
+    // tests so they continue to render the shell on first frame.
+    final authViewModel = AuthViewModel(repository: _PreAuthedRepository());
+    await authViewModel.login(username: 'operator', password: 'password');
+
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
-        repository: MockDeviceRepository(),
-        automationRepository: MockAutomationRepository(),
+        repository: repository ?? MockDeviceRepository(),
+        automationRepository:
+            automationRepository ?? MockAutomationRepository(),
         apiBaseUrl: useMockApi ? 'mock' : 'http://98.83.4.87:8000',
         useMockApi: useMockApi,
+        authViewModelOverride: authViewModel,
       ),
     );
 
     await tester.pumpAndSettle();
   }
+
+  test('theme and language controllers restore saved preferences', () async {
+    SharedPreferences.setMockInitialValues({
+      'app_theme_mode': 'grey',
+      'locale_language_code': 'vi',
+    });
+
+    final themeController = ThemeController();
+    final localeController = LocaleController();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(themeController.mode, AppThemeMode.grey);
+    expect(localeController.locale.languageCode, 'vi');
+
+    themeController.setMode(AppThemeMode.light);
+    localeController.setLocaleCode('en');
+    final prefs = await SharedPreferences.getInstance();
+
+    expect(prefs.getString('app_theme_mode'), 'light');
+    expect(prefs.getString('locale_language_code'), 'en');
+  });
 
   testWidgets('renders LIGHT control dashboard', (tester) async {
     await pumpDashboard(tester, useMockApi: true);
@@ -36,23 +192,6 @@ void main() {
     expect(find.text('Logs'), findsNothing);
     expect(find.text('QUICK LIGHTS'), findsOneWidget);
     expect(find.text('Lab Light 01'), findsOneWidget);
-  });
-
-  testWidgets('blocks remote HTTP startup without auth token', (tester) async {
-    await tester.pumpWidget(
-      ZigbeeSmartBuildingApp(
-        repository: MockDeviceRepository(),
-        automationRepository: MockAutomationRepository(),
-        apiBaseUrl: 'http://98.83.4.87:8000',
-        useMockApi: false,
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    expect(find.text('Remote API configuration blocked'), findsOneWidget);
-    expect(find.textContaining('API_AUTH_TOKEN'), findsOneWidget);
-    expect(find.text('Home'), findsNothing);
   });
 
   testWidgets('automation tab shows rule list and opens create sheet', (
@@ -79,11 +218,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATE RULE'), findsOneWidget);
-    expect(find.text('Switch toggles one light'), findsOneWidget);
+    expect(find.text('QUICK TEMPLATE'), findsOneWidget);
+    expect(find.text('Switch toggles one light'), findsNothing);
     expect(find.text('Save rule'), findsOneWidget);
-    // Template "Motion becomes occupied" now also appears in the grid,
-    // alongside the rule card behind the scrim.
-    expect(find.text('Motion becomes occupied'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('quick-template-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Switch toggles one light'), findsOneWidget);
 
     // Dismiss via Cancel to confirm Cancel works.
     await tester.tap(find.text('Cancel'));
@@ -94,7 +235,186 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Provisioning'), findsWidgets);
-    expect(find.text('Provisioning placeholder'), findsOneWidget);
+    expect(find.text('PROVISIONING WIZARD'), findsOneWidget);
+    expect(find.text('Device identity required'), findsOneWidget);
+  });
+
+  testWidgets('automation create sheet saves a manual rule without template', (
+    tester,
+  ) async {
+    final automationRepository = _WidgetAutomationRepository();
+    await pumpDashboard(
+      tester,
+      useMockApi: true,
+      automationRepository: automationRepository,
+    );
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New rule').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, 'Manual motion rule');
+    await tester.ensureVisible(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Occupied'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Occupied'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Lab Light 01').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Light 01').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Turn on').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Turn on'), findsWidgets);
+    expect(find.text('Turn off'), findsOneWidget);
+    expect(find.text('Toggle'), findsOneWidget);
+    await tester.tap(find.text('Turn off'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Hallway Light').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hallway Light').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Turn on').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Turn on').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save rule'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save rule'));
+    await tester.pumpAndSettle();
+
+    expect(automationRepository.createdDrafts, hasLength(1));
+    final draft = automationRepository.createdDrafts.single;
+    expect(draft.template, isNull);
+    expect(draft.triggerDeviceId, 'pir-01');
+    expect(draft.triggerDeviceType, AutomationDeviceType.motion);
+    expect(draft.triggerState, {'occupancy': 'occupied'});
+    expect(draft.targetLightIds, ['light-01', 'light-02']);
+    expect(draft.targetActionCommands, {
+      'light-01': AutomationActionCommand.off,
+      'light-02': AutomationActionCommand.on,
+    });
+    expect(draft.actions.map((action) => action.command), [
+      AutomationActionCommand.off,
+      AutomationActionCommand.on,
+    ]);
+  });
+
+  testWidgets('automation rule delete button opens confirmation dialog', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete rule').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete rule?'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+  });
+
+  testWidgets('device inventory opens motion detail and loads device events', (
+    tester,
+  ) async {
+    final repository = _DeviceEventsRepository();
+    await pumpDashboard(tester, useMockApi: true, repository: repository);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -350),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Device inventory'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Device inventory'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Motion'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Device detail'), findsOneWidget);
+    expect(find.text('Lab Motion'), findsOneWidget);
+    expect(find.text('OCCUPIED'), findsWidgets);
+    expect(
+      find.text('OCCUPANCY TIMELINE', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.text('Latest occupancy', skipOffstage: false), findsOneWidget);
+    expect(find.text('RECENT EVENTS', skipOffstage: false), findsOneWidget);
+    expect(find.text('occupancy_changed', skipOffstage: false), findsOneWidget);
+    expect(repository.requestedDeviceIds, contains('pir-01'));
+  });
+
+  testWidgets('shell does not show sticky notification popup', (tester) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    expect(find.byTooltip('Notifications'), findsNothing);
+    expect(find.text('Notification Center'), findsNothing);
+  });
+
+  testWidgets('device detail keeps verbose cloud event payloads compact', (
+    tester,
+  ) async {
+    final repository = _DeviceEventsRepository();
+    await pumpDashboard(tester, useMockApi: true, repository: repository);
+
+    await tester.tap(
+      find
+          .ancestor(
+            of: find.text('Lab Light 01'),
+            matching: find.byType(InkWell),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Device detail'), findsOneWidget);
+    expect(find.text('Device registry updated'), findsOneWidget);
+    expect(find.textContaining('metadata_source'), findsNothing);
+    expect(repository.requestedDeviceIds, contains('light-01'));
+  });
+
+  testWidgets('device detail renames display label only', (tester) async {
+    final repository = _ImmediateRenameRepository();
+    await pumpDashboard(tester, useMockApi: true, repository: repository);
+
+    await tester.tap(
+      find
+          .ancestor(
+            of: find.text('Lab Light 01'),
+            matching: find.byType(InkWell),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Rename device'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Desk lamp');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(repository.renamedDeviceId, 'light-01');
+    expect(repository.renamedName, 'Desk lamp');
+    final viewModel = Provider.of<DeviceDashboardViewModel>(
+      tester.element(find.byType(MaterialApp)),
+      listen: false,
+    );
+    expect(viewModel.deviceById('light-01')?.name, 'Desk lamp');
+    expect(find.text('Desk lamp', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('light-01'), findsOneWidget);
   });
 
   testWidgets('settings owns devices logs account logout and runtime toggle', (
@@ -102,28 +422,58 @@ void main() {
   ) async {
     await pumpDashboard(tester, useMockApi: true);
 
-    await tester.tap(find.text('Settings'));
+    await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
     expect(find.text('Account'), findsOneWidget);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
+    expect(find.text('APPEARANCE'), findsOneWidget);
+    expect(find.text('Language'), findsNothing);
+    expect(find.textContaining('Run remote mode'), findsNothing);
+
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('operator'), findsWidgets);
+    expect(find.text('operator-1'), findsWidgets);
+    expect(find.text('home-01'), findsOneWidget);
+    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -250),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('CLOUD'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-cloud-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Poll interval'), findsOneWidget);
+    expect(find.text('Command timeout'), findsOneWidget);
+
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -350),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
     expect(find.text('Device inventory'), findsOneWidget);
     expect(find.text('Cloud logs'), findsOneWidget);
-    expect(find.text('Runtime'), findsOneWidget);
-    expect(find.textContaining('Run remote mode'), findsNothing);
-    expect(find.text('API_BASE_URL'), findsNothing);
-
-    await tester.tap(find.text('Runtime'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('API_BASE_URL'), findsOneWidget);
 
     await tester.drag(
       find.byType(CustomScrollView).last,
       const Offset(0, -500),
     );
     await tester.pumpAndSettle();
-
-    expect(find.text('Logout'), findsOneWidget);
+    expect(find.text('ABOUT'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('settings-about-toggle')));
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Device inventory'));
     await tester.pumpAndSettle();
@@ -131,15 +481,228 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Devices'), findsWidgets);
+    expect(find.text('Search devices'), findsOneWidget);
+    expect(find.text('All'), findsOneWidget);
+    expect(find.text('Light'), findsOneWidget);
+    expect(find.text('Motion'), findsOneWidget);
     expect(find.text('Lab Light 01'), findsOneWidget);
 
+    await tester.enterText(find.byType(TextField), 'hallway');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hallway Light'), findsOneWidget);
+    expect(find.text('Lab Light 01'), findsNothing);
+
     await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -350),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-workspace-toggle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cloud logs'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cloud logs'));
     await tester.pumpAndSettle();
 
     expect(find.text('Logs'), findsWidgets);
-    expect(find.text('LIGHT light-01'), findsOneWidget);
+    expect(
+      find.text('Success - light-01 - State reported - on'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Success - light-02 - Command executed - off'),
+      findsOneWidget,
+    );
+    expect(find.text('Event payload'), findsNothing);
+  });
+
+  testWidgets('settings language switch updates localized copy', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-language-toggle')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Vi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cài đặt'), findsWidgets);
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
+    expect(find.text('Tài khoản'), findsOneWidget);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
+    expect(find.text('Ngôn ngữ'), findsOneWidget);
+
+    await tester.tap(find.text('Tài khoản'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hồ sơ'), findsOneWidget);
+    expect(find.text('operator'), findsWidgets);
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -350),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Đổi mật khẩu'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -350),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-workspace-toggle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nhật ký cloud'), findsOneWidget);
+  });
+
+  testWidgets('settings profile and logs sections collapse and expand', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Theme'), findsNothing);
+    expect(find.text('Language'), findsNothing);
+    expect(find.textContaining('Affects all'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('Grey'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('settings-theme-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Grey'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('settings-theme-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Grey'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Theme'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('Theme'), findsOneWidget);
+
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('profile-session-toggle')), findsNothing);
+    expect(find.text('operator-1'), findsWidgets);
+    expect(find.text('operator'), findsWidgets);
+    expect(find.text('home-01'), findsOneWidget);
+    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
+    expect(find.text('HUST - IoT Lab'), findsNothing);
+    expect(find.text('07:01 05/16/2026'), findsNothing);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-workspace-toggle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cloud logs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cloud logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('State reported: on'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('log-toggle-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('State reported: on'), findsOneWidget);
+  });
+
+  testWidgets('gateway health logs use a compact consistent summary', (
+    tester,
+  ) async {
+    await pumpDashboard(
+      tester,
+      useMockApi: true,
+      repository: _GatewayHealthRepository(),
+    );
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cloud logs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cloud logs'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Success - gateway - Health reported - connected, 1444096ms'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('{uptime_ms: 1444096, network_status: connected}'),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('log-toggle-gateway-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('{uptime_ms: 1444096, network_status: connected}'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('home Devices metric opens device inventory', (tester) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.text('DEVICES'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Devices'), findsWidgets);
+    expect(find.text('Search devices'), findsOneWidget);
+    expect(find.text('Lab Light 01'), findsOneWidget);
+  });
+
+  test('theme defaults to dark mode', () {
+    expect(ThemeController().mode, AppThemeMode.dark);
   });
 
   testWidgets('does not present mock data as a real gateway status', (
@@ -185,9 +748,60 @@ void main() {
     );
   });
 
-  test('grey theme uses a neutral blue grey palette', () {
-    expect(AppPalette.grey.background, const Color(0xFFF1F5F9));
-    expect(AppPalette.grey.primary, const Color(0xFF475569));
-    expect(AppPalette.grey.textSecondary, const Color(0xFF64748B));
-  });
+  test(
+    'grey theme uses the cream / be sá»¯a palette from the design system',
+    () {
+      // Tokens mirror /colors_and_type.css [data-theme="grey"] in the design
+      // system. The enum value is still called `grey` but visually it's
+      // warm milk-beige (log-friendly), not slate.
+      expect(AppPalette.grey.background, const Color(0xFFF0EBE0));
+      expect(AppPalette.grey.surface, const Color(0xFFF8F4EB));
+      expect(AppPalette.grey.primary, const Color(0xFF6B5F4E));
+      expect(AppPalette.grey.textPrimary, const Color(0xFF1F1A12));
+      expect(AppPalette.grey.textSecondary, const Color(0xFF756B5D));
+      expect(AppPalette.grey.border, const Color(0xFFDDD6C7));
+    },
+  );
+}
+
+class _WidgetAutomationRepository implements AutomationRepository {
+  final List<AutomationRule> _rules = [];
+  final List<AutomationRuleDraft> createdDrafts = [];
+  final List<String> deletedRuleIds = [];
+
+  @override
+  Future<List<AutomationRule>> fetchRules() async => List.unmodifiable(_rules);
+
+  @override
+  Future<AutomationRule> fetchRule(String ruleId) async {
+    return _rules.firstWhere((rule) => rule.id == ruleId);
+  }
+
+  @override
+  Future<AutomationRule> createRule(AutomationRuleDraft draft) async {
+    createdDrafts.add(draft);
+    final rule = AutomationRule(
+      id: 'automation-widget-01',
+      name: draft.name,
+      enabled: draft.enabled,
+      trigger: draft.trigger,
+      actions: draft.actions,
+      syncStatus: AutomationSyncStatus.synced,
+      lastRunStatus: AutomationLastRunStatus.neverRun,
+    );
+    _rules.add(rule);
+    return rule;
+  }
+
+  @override
+  Future<AutomationRule> enableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<AutomationRule> disableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    deletedRuleIds.add(ruleId);
+    _rules.removeWhere((rule) => rule.id == ruleId);
+  }
 }

@@ -35,30 +35,109 @@ void main() {
     expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
   });
 
-  test('createRule surfaces API errors without adding fake success', () async {
-    final repository = _FakeAutomationRepository(createError: 'network down');
+  test(
+    'createRule surfaces friendly error without leaking raw exception',
+    () async {
+      final repository = _FakeAutomationRepository(createError: 'network down');
+      final viewModel = AutomationViewModel(repository: repository);
+
+      await viewModel.createRule(_draft());
+
+      expect(viewModel.rules, isEmpty);
+      expect(viewModel.errorMessage, isNotNull);
+      expect(
+        viewModel.errorMessage,
+        contains('Khong tao duoc automation rule'),
+      );
+      // Raw repository exception text must not be surfaced to the user.
+      expect(viewModel.errorMessage, isNot(contains('network down')));
+    },
+  );
+
+  test('deleteRule refreshes the rules from repository after delete', () async {
+    final repository = _FakeAutomationRepository(
+      initialRules: [
+        _rule(syncStatus: AutomationSyncStatus.synced),
+        _rule(id: 'automation-02', syncStatus: AutomationSyncStatus.synced),
+      ],
+      rulesAfterDelete: [
+        _rule(id: 'automation-02', syncStatus: AutomationSyncStatus.synced),
+      ],
+    );
     final viewModel = AutomationViewModel(repository: repository);
 
-    await viewModel.createRule(_draft());
+    await viewModel.load();
+    await viewModel.deleteRule('automation-01');
 
-    expect(viewModel.rules, isEmpty);
-    expect(viewModel.errorMessage, contains('network down'));
+    expect(repository.deletedRuleIds, ['automation-01']);
+    expect(repository.fetchRulesCount, 2);
+    expect(viewModel.rules.map((rule) => rule.id), ['automation-02']);
+    expect(viewModel.errorMessage, isNull);
   });
+
+  test(
+    'deleteRule surfaces an error when cloud reload still returns deleted rule',
+    () async {
+      final repository = _FakeAutomationRepository(
+        initialRules: [_rule(syncStatus: AutomationSyncStatus.synced)],
+        rulesAfterDelete: [_rule(syncStatus: AutomationSyncStatus.synced)],
+      );
+      final viewModel = AutomationViewModel(repository: repository);
+
+      await viewModel.load();
+      await viewModel.deleteRule('automation-01');
+
+      expect(repository.deletedRuleIds, ['automation-01']);
+      expect(repository.fetchRulesCount, 2);
+      expect(viewModel.rules.single.id, 'automation-01');
+      expect(
+        viewModel.errorMessage,
+        'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.',
+      );
+    },
+  );
+
+  test(
+    'deleteRule keeps the rule and surfaces friendly error on failure',
+    () async {
+      final repository = _FakeAutomationRepository(
+        initialRules: [_rule(syncStatus: AutomationSyncStatus.synced)],
+        deleteError: 'delete failed',
+      );
+      final viewModel = AutomationViewModel(repository: repository);
+
+      await viewModel.load();
+      await viewModel.deleteRule('automation-01');
+
+      expect(viewModel.rules.single.id, 'automation-01');
+      expect(
+        viewModel.errorMessage,
+        contains('Khong xoa duoc automation rule'),
+      );
+      expect(viewModel.errorMessage, isNot(contains('delete failed')));
+    },
+  );
 }
 
 AutomationRuleDraft _draft() {
   return const AutomationRuleDraft(
     name: 'Motion turns on lab lights',
     enabled: true,
-    template: AutomationRuleTemplate.motionOccupiedTurnsOnLights,
     triggerDeviceId: 'pir-01',
+    triggerDeviceType: AutomationDeviceType.motion,
+    triggerEvent: AutomationTriggerEvent.occupancyChanged,
+    triggerState: {'occupancy': 'occupied'},
+    actionCommand: AutomationActionCommand.on,
     targetLightIds: ['light-01'],
   );
 }
 
-AutomationRule _rule({required AutomationSyncStatus syncStatus}) {
+AutomationRule _rule({
+  String id = 'automation-01',
+  required AutomationSyncStatus syncStatus,
+}) {
   return AutomationRule(
-    id: 'automation-01',
+    id: id,
     name: 'Motion turns on lab lights',
     enabled: true,
     trigger: const AutomationTrigger(
@@ -86,21 +165,35 @@ class _FakeAutomationRepository implements AutomationRepository {
     List<AutomationRule>? initialRules,
     AutomationRule? createdRule,
     AutomationRule? fetchedRule,
+    List<AutomationRule>? rulesAfterDelete,
     String? createError,
+    String? deleteError,
   }) : _rules = List.of(initialRules ?? []),
        _createdRule = createdRule,
        _fetchedRule = fetchedRule,
-       _createError = createError;
+       _rulesAfterDelete = rulesAfterDelete,
+       _createError = createError,
+       _deleteError = deleteError;
 
   final List<AutomationRule> _rules;
   final AutomationRule? _createdRule;
   final AutomationRule? _fetchedRule;
+  final List<AutomationRule>? _rulesAfterDelete;
   final String? _createError;
+  final String? _deleteError;
   final List<AutomationRuleDraft> createdDrafts = [];
   final List<String> fetchedRuleIds = [];
+  final List<String> deletedRuleIds = [];
+  int fetchRulesCount = 0;
 
   @override
-  Future<List<AutomationRule>> fetchRules() async => List.unmodifiable(_rules);
+  Future<List<AutomationRule>> fetchRules() async {
+    fetchRulesCount++;
+    if (deletedRuleIds.isNotEmpty && _rulesAfterDelete != null) {
+      return List.unmodifiable(_rulesAfterDelete);
+    }
+    return List.unmodifiable(_rules);
+  }
 
   @override
   Future<AutomationRule> fetchRule(String ruleId) async {
@@ -125,4 +218,13 @@ class _FakeAutomationRepository implements AutomationRepository {
 
   @override
   Future<AutomationRule> disableRule(String ruleId) async => fetchRule(ruleId);
+
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    if (_deleteError != null) {
+      throw Exception(_deleteError);
+    }
+    deletedRuleIds.add(ruleId);
+    _rules.removeWhere((rule) => rule.id == ruleId);
+  }
 }

@@ -7,7 +7,6 @@ void main() {
   test('attaches bearer token to API requests', () async {
     final apiClient = ApiClient(
       baseUrl: 'https://cloud.example.test',
-      accessToken: 'test-api-token',
       httpClient: MockClient((request) async {
         expect(request.headers['Authorization'], 'Bearer test-api-token');
         return http.Response(
@@ -17,6 +16,7 @@ void main() {
         );
       }),
     );
+    apiClient.setAccessToken('test-api-token');
 
     await apiClient.getJson('/api/devices');
   });

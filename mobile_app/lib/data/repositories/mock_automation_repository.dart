@@ -69,6 +69,12 @@ class MockAutomationRepository implements AutomationRepository {
     return _setEnabled(ruleId, false);
   }
 
+  @override
+  Future<void> deleteRule(String ruleId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _rules.removeWhere((rule) => rule.id == ruleId);
+  }
+
   Future<AutomationRule> _setEnabled(String ruleId, bool enabled) async {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     final index = _rules.indexWhere((rule) => rule.id == ruleId);

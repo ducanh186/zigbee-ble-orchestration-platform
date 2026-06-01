@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/automation_rule.dart';
 import '../../../../domain/repositories/automation_repository.dart';
 
@@ -34,8 +35,10 @@ class AutomationViewModel extends ChangeNotifier {
     try {
       _rules = await _repository.fetchRules();
     } catch (error) {
-      _errorMessage =
-          'Khong tai duoc automation rules. Kiem tra Cloud API hoac mang. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong tai duoc automation rules',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -60,8 +63,10 @@ class AutomationViewModel extends ChangeNotifier {
         await _pollRule(created.id);
       }
     } catch (error) {
-      _errorMessage =
-          'Khong tao duoc automation rule. Cloud API tra loi loi: $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong tao duoc automation rule',
+      );
     } finally {
       _isSaving = false;
       notifyListeners();
@@ -76,6 +81,30 @@ class AutomationViewModel extends ChangeNotifier {
     await _updateEnabled(ruleId, enabled: false);
   }
 
+  Future<void> deleteRule(String ruleId) async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteRule(ruleId);
+      final refreshedRules = await _repository.fetchRules();
+      if (refreshedRules.any((rule) => rule.id == ruleId)) {
+        _rules = refreshedRules;
+        _errorMessage =
+            'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.';
+        return;
+      }
+      _rules = refreshedRules;
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong xoa duoc automation rule',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
+
   Future<void> _updateEnabled(String ruleId, {required bool enabled}) async {
     _errorMessage = null;
     notifyListeners();
@@ -86,7 +115,10 @@ class AutomationViewModel extends ChangeNotifier {
           : await _repository.disableRule(ruleId);
       _upsert(rule);
     } catch (error) {
-      _errorMessage = 'Khong cap nhat duoc automation rule. $error';
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Khong cap nhat duoc automation rule',
+      );
     } finally {
       notifyListeners();
     }

@@ -30,11 +30,101 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 # Table creation helper -------------------------------------------------------
+async def ensure_automation_version_column(target_engine=None) -> None:
+    """Idempotent backfill of the `automations.version` column on legacy DBs.
+
+    SQLAlchemy ``Base.metadata.create_all()`` does not add columns to existing
+    tables, so any DB created before Phase 1 of automation sync (which added
+    ``Automation.version``) must be patched in place. This helper:
+
+    - inspects the live schema first; if ``automations`` doesn't exist yet
+      (fresh DB pre-``create_all``) it returns without action,
+    - otherwise checks whether ``version`` is already present and, if not,
+      runs a single ``ALTER TABLE`` (syntax valid on both SQLite and
+      PostgreSQL).
+
+    Running twice is a no-op because the inspector check short-circuits.
+    """
+    from sqlalchemy import inspect, text
+
+    eng = target_engine if target_engine is not None else engine
+
+    def _needs_column(sync_conn) -> bool:
+        insp = inspect(sync_conn)
+        if not insp.has_table("automations"):
+            return False
+        cols = {c["name"] for c in insp.get_columns("automations")}
+        return "version" not in cols
+
+    async with eng.begin() as conn:
+        if await conn.run_sync(_needs_column):
+            # Works for both SQLite and PostgreSQL.
+            await conn.execute(
+                text(
+                    "ALTER TABLE automations "
+                    "ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
+                )
+            )
+
+
+async def ensure_device_last_seen_column(target_engine=None) -> None:
+    """Idempotent backfill of ``devices.last_seen_at`` on legacy DBs.
+
+    Same shape as ``ensure_automation_version_column``: cross-dialect inspect
+    + single ``ALTER TABLE`` if missing. Required because pre-2026-05-21 DBs
+    don't have this column and the offline reaper queries it.
+    """
+    from sqlalchemy import inspect, text
+
+    eng = target_engine if target_engine is not None else engine
+
+    def _needs_column(sync_conn) -> bool:
+        insp = inspect(sync_conn)
+        if not insp.has_table("devices"):
+            return False
+        cols = {c["name"] for c in insp.get_columns("devices")}
+        return "last_seen_at" not in cols
+
+    async with eng.begin() as conn:
+        if await conn.run_sync(_needs_column):
+            await conn.execute(
+                text("ALTER TABLE devices ADD COLUMN last_seen_at TIMESTAMP")
+            )
+
+
+async def ensure_user_auth_columns(target_engine=None) -> None:
+    """Idempotent backfill for minimal auth/RBAC columns on users."""
+    from sqlalchemy import inspect, text
+
+    eng = target_engine if target_engine is not None else engine
+
+    def _missing_columns(sync_conn) -> set[str]:
+        insp = inspect(sync_conn)
+        if not insp.has_table("users"):
+            return set()
+        cols = {c["name"] for c in insp.get_columns("users")}
+        return {"role", "password_hash"} - cols
+
+    async with eng.begin() as conn:
+        missing = await conn.run_sync(_missing_columns)
+        if "role" in missing:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN role VARCHAR NOT NULL DEFAULT 'user'"
+                )
+            )
+        if "password_hash" in missing:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN password_hash VARCHAR")
+            )
+
+
 async def init_db() -> None:
     """Create missing tables and apply lightweight column migrations.
 
     `create_all` does not add columns to existing tables, so for evolving
-    schemas we append idempotent ALTER TABLE statements for Postgres.
+    schemas we append idempotent ALTER TABLE statements.
     """
     from sqlalchemy import text
 
@@ -63,3 +153,8 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE commands ALTER COLUMN device_id DROP NOT NULL")
             )
+
+    # Cross-dialect column backfill — runs on every startup, idempotent.
+    await ensure_automation_version_column()
+    await ensure_device_last_seen_column()
+    await ensure_user_auth_columns()

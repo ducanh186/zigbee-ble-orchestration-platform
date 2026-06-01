@@ -16,6 +16,47 @@ const state = {
   selectedCommand: null,
   deviceFilter: "all",
   refreshTimer: null,
+  automations: [],
+  automationForm: {
+    template: "motion_occupied",
+    triggerDeviceId: "",
+    actionDeviceIds: new Set(),
+  },
+};
+
+const AUTOMATION_TEMPLATES = {
+  motion_occupied: {
+    triggerType: "motion",
+    triggerLabel: "Motion sensor",
+    actionCommand: "on",
+    buildTrigger: (deviceId) => ({
+      event: "occupancy_changed",
+      device_id: deviceId,
+      device_type: "motion",
+      state: { occupancy: "occupied" },
+    }),
+  },
+  motion_unoccupied: {
+    triggerType: "motion",
+    triggerLabel: "Motion sensor",
+    actionCommand: "off",
+    buildTrigger: (deviceId) => ({
+      event: "occupancy_changed",
+      device_id: deviceId,
+      device_type: "motion",
+      state: { occupancy: "unoccupied" },
+    }),
+  },
+  switch_toggle: {
+    triggerType: "switch",
+    triggerLabel: "Switch",
+    actionCommand: "toggle",
+    buildTrigger: (deviceId) => ({
+      event: "toggle",
+      device_id: deviceId,
+      device_type: "switch",
+    }),
+  },
 };
 
 const els = {
@@ -43,9 +84,17 @@ const els = {
   lightOffBtn: byId("lightOffBtn"),
   sendLevelBtn: byId("sendLevelBtn"),
   sendRawBtn: byId("sendRawBtn"),
+  deleteDeviceBtn: byId("deleteDeviceBtn"),
   gatewayMeta: byId("gatewayMeta"),
   openJoinBtn: byId("openJoinBtn"),
   closeJoinBtn: byId("closeJoinBtn"),
+  labelEui64Input: byId("labelEui64Input"),
+  labelDeviceType: byId("labelDeviceType"),
+  labelModelInput: byId("labelModelInput"),
+  labelInstallCodeInput: byId("labelInstallCodeInput"),
+  generateLabelBtn: byId("generateLabelBtn"),
+  labelQrPreview: byId("labelQrPreview"),
+  labelPayload: byId("labelPayload"),
   activitySummary: byId("activitySummary"),
   eventTypeFilter: byId("eventTypeFilter"),
   deviceFilterInput: byId("deviceFilterInput"),
@@ -55,6 +104,15 @@ const els = {
   commandList: byId("commandList"),
   commandPayload: byId("commandPayload"),
   toast: byId("toast"),
+  autoName: byId("autoName"),
+  autoTemplate: byId("autoTemplate"),
+  autoTriggerLabel: byId("autoTriggerLabel"),
+  autoTriggerDevice: byId("autoTriggerDevice"),
+  autoActionList: byId("autoActionList"),
+  autoEnabled: byId("autoEnabled"),
+  autoSaveBtn: byId("autoSaveBtn"),
+  automationList: byId("automationList"),
+  automationSummary: byId("automationSummary"),
 };
 
 init();
@@ -79,8 +137,19 @@ function bindEvents() {
   els.lightOffBtn.addEventListener("click", () => sendLightPower("off"));
   els.sendLevelBtn.addEventListener("click", sendLightLevel);
   els.sendRawBtn.addEventListener("click", sendRawTarget);
+  els.deleteDeviceBtn.addEventListener("click", deleteSelectedDevice);
   els.openJoinBtn.addEventListener("click", openJoin);
   els.closeJoinBtn.addEventListener("click", closeJoin);
+  els.generateLabelBtn.addEventListener("click", generateProvisioningLabel);
+  els.autoTemplate.addEventListener("change", () => {
+    state.automationForm.template = els.autoTemplate.value;
+    state.automationForm.triggerDeviceId = "";
+    renderAutomationForm();
+  });
+  els.autoTriggerDevice.addEventListener("change", () => {
+    state.automationForm.triggerDeviceId = els.autoTriggerDevice.value;
+  });
+  els.autoSaveBtn.addEventListener("click", saveAutomation);
   els.eventTypeFilter.addEventListener("change", refreshEvents);
   els.deviceFilterInput.addEventListener("input", debounce(refreshEvents, 250));
   els.autoRefreshToggle.addEventListener("change", scheduleRefresh);
@@ -111,10 +180,11 @@ function saveSettings() {
 async function refreshAll() {
   setBusy(true);
   try {
-    const [health, devices, events] = await Promise.all([
+    const [health, devices, events, automations] = await Promise.all([
       fetchJson("/health").catch((error) => ({ error })),
       fetchJson("/api/devices/").catch((error) => ({ error })),
       loadEvents().catch((error) => ({ error })),
+      fetchJson("/api/automations").catch((error) => ({ error })),
     ]);
 
     if (health.error) {
@@ -133,12 +203,18 @@ async function refreshAll() {
       await loadStatesForDevices(devices);
       renderDevices();
       renderDetail();
+      renderAutomationForm();
     }
 
     if (!events.error) {
       state.events = events;
       renderEvents();
       updateEventTypeFilter(events);
+    }
+
+    if (!automations.error) {
+      state.automations = automations;
+      renderAutomations();
     }
 
     updateMetrics();
@@ -235,12 +311,14 @@ function renderDetail() {
     els.statePayload.textContent = "No state loaded";
     setDetailStatus("Idle", "muted");
     setCommandControls(false);
+    els.deleteDeviceBtn.disabled = true;
     return;
   }
 
   const currentState = state.deviceStates.get(device.id);
   els.detailTitle.textContent = device.name || device.id;
   els.detailMeta.textContent = `${device.device_type} / ${device.id}`;
+  els.deleteDeviceBtn.disabled = false;
 
   if (device.device_type === "light" && currentState && !currentState.error) {
     els.statePayload.innerHTML = buildLightStateVisual(currentState);
@@ -358,6 +436,238 @@ async function sendRawTarget() {
   });
 }
 
+async function deleteSelectedDevice() {
+  const device = selectedDevice();
+  if (!device) return toast("Select a device first");
+  const label = device.name || device.id;
+  const confirmed = window.confirm(
+    `Delete device "${label}" (${device.device_type})?\n\n` +
+    `This removes the cloud row, its states, events, and commands. ` +
+    `On the next attribute report the gateway will auto-pair it as a fresh device.\n\n` +
+    `Type OK to confirm.`
+  );
+  if (!confirmed) return;
+  try {
+    await fetchJson(`/api/devices/${encodeURIComponent(device.id)}`, { method: "DELETE" });
+    state.deviceStates.delete(device.id);
+    state.selectedDeviceId = null;
+    toast(`Deleted ${label}`);
+    await refreshAll();
+  } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
+function renderAutomationForm() {
+  const tpl = AUTOMATION_TEMPLATES[state.automationForm.template];
+  if (!tpl) return;
+  els.autoTriggerLabel.textContent = tpl.triggerLabel;
+
+  const triggerDevices = state.devices.filter((d) => d.device_type === tpl.triggerType);
+  const previous = state.automationForm.triggerDeviceId;
+  els.autoTriggerDevice.innerHTML = "";
+  if (triggerDevices.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = `No ${tpl.triggerType} devices`;
+    opt.disabled = true;
+    els.autoTriggerDevice.append(opt);
+  } else {
+    triggerDevices.forEach((device) => {
+      const opt = document.createElement("option");
+      opt.value = device.id;
+      opt.textContent = device.name ? `${device.name} (${device.id})` : device.id;
+      els.autoTriggerDevice.append(opt);
+    });
+    if (previous && triggerDevices.some((d) => d.id === previous)) {
+      els.autoTriggerDevice.value = previous;
+    } else {
+      els.autoTriggerDevice.value = triggerDevices[0].id;
+      state.automationForm.triggerDeviceId = triggerDevices[0].id;
+    }
+  }
+
+  const lights = state.devices.filter((d) => d.device_type === "light");
+  els.autoActionList.innerHTML = "";
+  if (lights.length === 0) {
+    els.autoActionList.innerHTML = `<div class="empty">No light devices</div>`;
+  } else {
+    lights.forEach((light) => {
+      const id = `autoAct_${light.id}`;
+      const row = document.createElement("label");
+      row.className = "toggle-row";
+      row.htmlFor = id;
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = id;
+      checkbox.checked = state.automationForm.actionDeviceIds.has(light.id);
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) state.automationForm.actionDeviceIds.add(light.id);
+        else state.automationForm.actionDeviceIds.delete(light.id);
+      });
+      const span = document.createElement("span");
+      span.textContent = light.name ? `${light.name} (${light.id})` : light.id;
+      row.append(checkbox, span);
+      els.autoActionList.append(row);
+    });
+  }
+}
+
+function renderAutomations() {
+  const rules = state.automations;
+  els.automationSummary.textContent = `${rules.length} rule${rules.length === 1 ? "" : "s"}`;
+  els.automationList.innerHTML = "";
+  if (rules.length === 0) {
+    els.automationList.innerHTML = `<div class="empty">No automations defined</div>`;
+    return;
+  }
+  rules.forEach((rule) => {
+    const card = document.createElement("div");
+    card.className = "automation-row";
+
+    const head = document.createElement("div");
+    head.className = "automation-head";
+    const title = document.createElement("div");
+    title.className = "automation-title";
+    title.textContent = rule.name || rule.id;
+    const meta = document.createElement("div");
+    meta.className = "automation-meta";
+    meta.append(automationStatusTag(rule.sync_status, "sync"));
+    meta.append(automationStatusTag(rule.last_run_status, "run"));
+    head.append(title, meta);
+
+    const summary = document.createElement("div");
+    summary.className = "automation-summary";
+    summary.textContent = summarizeRule(rule);
+
+    const actions = document.createElement("div");
+    actions.className = "automation-actions";
+
+    const toggleLabel = document.createElement("label");
+    toggleLabel.className = "toggle-row";
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.checked = !!rule.enabled;
+    toggle.addEventListener("change", () => toggleAutomation(rule, toggle.checked));
+    const toggleSpan = document.createElement("span");
+    toggleSpan.textContent = rule.enabled ? "Enabled" : "Disabled";
+    toggleLabel.append(toggle, toggleSpan);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "icon-button danger";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => deleteAutomation(rule));
+
+    actions.append(toggleLabel, deleteBtn);
+    card.append(head, summary, actions);
+    els.automationList.append(card);
+  });
+}
+
+function automationStatusTag(value, kind) {
+  const text = value || (kind === "sync" ? "pending" : "never_run");
+  const tone = (() => {
+    if (kind === "sync") {
+      if (text === "synced") return "ok";
+      if (text === "failed") return "danger";
+      return "warning";
+    }
+    if (text === "executed") return "ok";
+    if (text === "failed" || text === "timeout") return "danger";
+    return "muted";
+  })();
+  return tag(text.replace(/_/g, " "), tone);
+}
+
+function summarizeRule(rule) {
+  const trig = rule.trigger || {};
+  const acts = rule.actions || [];
+  const triggerStr = trig.device_type === "switch"
+    ? `Switch ${shortId(trig.device_id)} toggles`
+    : `Motion ${shortId(trig.device_id)} ${(trig.state || {}).occupancy || ""}`.trim();
+  const actsStr = acts
+    .map((a) => `${a.command} ${shortId(a.device_id)}`)
+    .join(", ");
+  return `When ${triggerStr} → ${actsStr || "no actions"}`;
+}
+
+function shortId(value) {
+  if (!value) return "?";
+  return value.length > 8 ? `…${value.slice(-6)}` : value;
+}
+
+async function saveAutomation() {
+  const tpl = AUTOMATION_TEMPLATES[state.automationForm.template];
+  if (!tpl) return toast("Pick a template");
+  const name = els.autoName.value.trim();
+  if (!name) return toast("Rule name is required");
+  const triggerDeviceId = state.automationForm.triggerDeviceId;
+  if (!triggerDeviceId) return toast(`Pick a ${tpl.triggerType} device`);
+  const lights = [...state.automationForm.actionDeviceIds];
+  if (lights.length === 0) return toast("Pick at least one light");
+
+  const body = {
+    name,
+    enabled: !!els.autoEnabled.checked,
+    trigger: tpl.buildTrigger(triggerDeviceId),
+    actions: lights.map((id) => ({
+      device_id: id,
+      device_type: "light",
+      command: tpl.actionCommand,
+    })),
+  };
+
+  try {
+    const rule = await fetchJson("/api/automations", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    toast(`Rule created: ${rule.name}`);
+    els.autoName.value = "";
+    state.automationForm.actionDeviceIds.clear();
+    await refreshAutomations();
+    renderAutomationForm();
+  } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
+async function toggleAutomation(rule, enabled) {
+  const action = enabled ? "enable" : "disable";
+  try {
+    const updated = await fetchJson(`/api/automations/${encodeURIComponent(rule.id)}/${action}`, {
+      method: "POST",
+    });
+    toast(`Rule ${updated.enabled ? "enabled" : "disabled"}`);
+    await refreshAutomations();
+  } catch (error) {
+    toast(cleanError(error));
+    await refreshAutomations();
+  }
+}
+
+async function deleteAutomation(rule) {
+  const ok = window.confirm(`Delete automation "${rule.name}"?`);
+  if (!ok) return;
+  try {
+    await fetchJson(`/api/automations/${encodeURIComponent(rule.id)}`, { method: "DELETE" });
+    toast(`Rule deleted: ${rule.name}`);
+    await refreshAutomations();
+  } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
+async function refreshAutomations() {
+  try {
+    state.automations = await fetchJson("/api/automations");
+    renderAutomations();
+  } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
 async function createDeviceCommand(deviceId, body) {
   try {
     const command = await fetchJson(`/api/devices/${encodeURIComponent(deviceId)}/command`, {
@@ -402,6 +712,31 @@ async function createGatewayCommand(action, body) {
     await trackCommand(command);
     toast(`Gateway command ${command.status}: ${command.id}`);
   } catch (error) {
+    toast(cleanError(error));
+  }
+}
+
+async function generateProvisioningLabel() {
+  const body = {
+    eui64: els.labelEui64Input.value.trim(),
+    device_type: els.labelDeviceType.value,
+  };
+  const model = els.labelModelInput.value.trim();
+  const installCode = els.labelInstallCodeInput.value.trim();
+  if (model) body.model = model;
+  if (installCode) body.install_code = installCode;
+
+  try {
+    const label = await fetchJson("/api/provisioning/labels", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    els.labelQrPreview.innerHTML = label.qr_svg;
+    els.labelPayload.textContent = label.payload_json;
+    els.labelInstallCodeInput.value = label.payload.install_code;
+    toast("Provisioning QR label generated");
+  } catch (error) {
+    els.labelQrPreview.innerHTML = "";
     toast(cleanError(error));
   }
 }

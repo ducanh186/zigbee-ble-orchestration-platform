@@ -15,6 +15,8 @@ from cloud.app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+PROVISIONING_TERMINAL_STATUSES = {"joined", "failed", "expired", "cancelled"}
+
 
 def _now_ms() -> int:
     return int(datetime.now(UTC).timestamp() * 1000)
@@ -74,6 +76,7 @@ class MQTTService:
         self.client.username_pw_set(
             self.settings.mqtt_username, self.settings.mqtt_password
         )
+        self._configure_tls()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.connect(self.settings.mqtt_host, self.settings.mqtt_port)
@@ -82,6 +85,34 @@ class MQTTService:
     def disconnect(self) -> None:
         self.client.loop_stop()
         self.client.disconnect()
+
+    def _configure_tls(self) -> None:
+        if not self.settings.mqtt_tls_enabled:
+            return
+        if not self.settings.mqtt_ca_cert_path:
+            raise RuntimeError(
+                "SB_MQTT_CA_CERT_PATH is required when SB_MQTT_TLS_ENABLED=true"
+            )
+
+        certfile = None
+        keyfile = None
+        if self.settings.mqtt_mtls_enabled:
+            if (
+                not self.settings.mqtt_client_cert_path
+                or not self.settings.mqtt_client_key_path
+            ):
+                raise RuntimeError(
+                    "SB_MQTT_CLIENT_CERT_PATH and SB_MQTT_CLIENT_KEY_PATH are "
+                    "required when SB_MQTT_MTLS_ENABLED=true"
+                )
+            certfile = self.settings.mqtt_client_cert_path
+            keyfile = self.settings.mqtt_client_key_path
+
+        self.client.tls_set(
+            ca_certs=self.settings.mqtt_ca_cert_path,
+            certfile=certfile,
+            keyfile=keyfile,
+        )
 
     # ------------------------------------------------------------------
     # Callbacks
@@ -101,6 +132,9 @@ class MQTTService:
         client.subscribe(f"{prefix}/gateway/online", qos=0)
         client.subscribe(f"{prefix}/gateway/health", qos=0)
         client.subscribe(f"{prefix}/gateway/event", qos=0)
+        # Automation sync (see docs/AUTOMATION_MQTT_CONTRACT.md).
+        client.subscribe(f"{prefix}/automations/+/reported", qos=0)
+        client.subscribe(f"{prefix}/automations/+/event", qos=0)
 
     def _on_message(self, client, userdata, msg):
         """Route incoming MQTT messages to the appropriate handler."""
@@ -133,6 +167,10 @@ class MQTTService:
                 self._handle_gateway_health(payload)
             elif topic.endswith("/gateway/event"):
                 self._handle_gateway_event(payload)
+            elif "/automations/" in topic and topic.endswith("/reported"):
+                self._handle_automation_reported(topic, payload)
+            elif "/automations/" in topic and topic.endswith("/event"):
+                self._handle_automation_event(topic, payload)
             else:
                 logger.debug("Unhandled topic: %s", topic)
         except Exception:
@@ -172,6 +210,7 @@ class MQTTService:
                     select(Device).where(Device.id == device_id)
                 )
                 device = result.scalar_one_or_none()
+                last_seen = _ts_ms_to_naive_utc(envelope.get("ts"))
                 if not device:
                     device = Device(
                         id=device_id,
@@ -179,17 +218,19 @@ class MQTTService:
                         eui64=inner.get("eui64"),
                         name=device_id,
                         is_online=True,
+                        last_seen_at=last_seen,
                     )
                     session.add(device)
                 else:
                     device.is_online = True
+                    device.last_seen_at = last_seen
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
 
                 state_row = DeviceState(
                     device_id=device_id,
                     state=inner.get("state", inner),
-                    reported_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                    reported_at=last_seen,
                 )
                 session.add(state_row)
                 await session.commit()
@@ -227,6 +268,7 @@ class MQTTService:
                     select(Device).where(Device.id == device_id)
                 )
                 device = result.scalar_one_or_none()
+                last_seen = _ts_ms_to_naive_utc(envelope.get("ts"))
                 if not device:
                     device = Device(
                         id=device_id,
@@ -234,10 +276,14 @@ class MQTTService:
                         eui64=validated.get("eui64"),
                         name=device_id,
                         is_online=True,
+                        last_seen_at=last_seen,
                     )
                     session.add(device)
                     logger.info("Auto-registered device %s (type=%s) from event",
                                 device_id, device_type)
+                else:
+                    device.is_online = True
+                    device.last_seen_at = last_seen
 
                 event = Event(
                     device_id=device_id,
@@ -245,7 +291,7 @@ class MQTTService:
                         "event", validated.get("event_type", "unknown")
                     ),
                     payload=validated,
-                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                    occurred_at=last_seen,
                 )
                 session.add(event)
                 await session.commit()
@@ -277,7 +323,12 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Command, Device, DeviceState
+            from cloud.app.models import (
+                Command,
+                Device,
+                DeviceState,
+                ProvisioningSession,
+            )
             from sqlalchemy import select, update
 
             async with self._db_session_factory() as session:
@@ -309,6 +360,23 @@ class MQTTService:
                 logger.info(
                     "Updated command %s status=%s", command_id, new_status
                 )
+
+                prov_result = await session.execute(
+                    select(ProvisioningSession).where(
+                        ProvisioningSession.command_id == command_id,
+                        ProvisioningSession.status.notin_(
+                            list(PROVISIONING_TERMINAL_STATUSES)
+                        ),
+                    )
+                )
+                prov = prov_result.scalar_one_or_none()
+                if prov is not None and new_status in TERMINAL_STATUSES:
+                    if new_status == "executed":
+                        prov.status = "permit_open"
+                        prov.reason = None
+                    else:
+                        prov.status = "failed"
+                        prov.reason = inner.get("reason") or new_status
 
                 # When a light command is executed, infer the new device state
                 # so the dashboard can show updated status immediately.
@@ -415,6 +483,7 @@ class MQTTService:
                     select(Device).where(Device.id == device_id)
                 )
                 device = result.scalar_one_or_none()
+                last_seen = _ts_ms_to_naive_utc(envelope.get("ts"))
                 if not device:
                     device = Device(
                         id=device_id,
@@ -422,6 +491,7 @@ class MQTTService:
                         eui64=inner.get("eui64"),
                         name=device_id,
                         is_online=True,
+                        last_seen_at=last_seen,
                     )
                     session.add(device)
                     logger.info(
@@ -429,6 +499,8 @@ class MQTTService:
                         device_id, device_type,
                     )
                 else:
+                    device.is_online = True
+                    device.last_seen_at = last_seen
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
                     new_type = inner.get("device_type")
@@ -444,7 +516,7 @@ class MQTTService:
                     device_id=device_id,
                     event_type="device_registry",
                     payload=inner,
-                    occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                    occurred_at=last_seen,
                 )
                 session.add(event)
                 await session.commit()
@@ -452,16 +524,233 @@ class MQTTService:
 
         self._run_async(_write)
 
-    def _handle_gateway_event(self, envelope: dict) -> None:
-        """Log gateway lifecycle events (e.g. permit_join_opened/closed/failed).
+    def _handle_automation_reported(self, topic: str, envelope: dict) -> None:
+        """Gateway acked a desired upsert/delete. Update Automation row.
 
-        v1: log only.  Persistence into the events table is intentionally
-        deferred until we agree how to model gateway-level events without a
-        device_id.
+        Topic: .../automations/{automation_id}/reported. Retained per contract.
+        Payload carries automation_id, version, sync_status, last_error.
+
+        sync_status="deleted" hard-deletes the row (matches the DELETE handler
+        contract — keep row in pending state until gateway confirms).
         """
+        parts = topic.split("/")
+        try:
+            idx = parts.index("automations")
+            automation_id = parts[idx + 1]
+        except (ValueError, IndexError):
+            logger.warning("automation reported: bad topic %s", topic)
+            return
+        inner = envelope.get("payload") or {}
+        if inner.get("automation_id") and inner["automation_id"] != automation_id:
+            logger.warning(
+                "automation reported: payload id %s != topic id %s; trusting topic",
+                inner.get("automation_id"), automation_id,
+            )
+        sync_status = inner.get("sync_status")
+        if sync_status not in {"synced", "failed", "deleted"}:
+            logger.warning(
+                "automation reported: invalid sync_status=%s for %s",
+                sync_status, automation_id,
+            )
+            return
+        gateway_version = inner.get("version")
+        last_error = inner.get("last_error")
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Automation
+
+            async with self._db_session_factory() as session:
+                rule = await session.get(Automation, automation_id)
+                if rule is None:
+                    logger.info(
+                        "automation reported for unknown id=%s (ignored)",
+                        automation_id,
+                    )
+                    return
+                if (
+                    isinstance(gateway_version, int)
+                    and gateway_version < (rule.version or 0)
+                ):
+                    # Stale ack from an earlier desired payload. Log and skip
+                    # without mutating row — contract §7.
+                    logger.info(
+                        "automation reported stale: id=%s gateway_v=%s db_v=%s",
+                        automation_id, gateway_version, rule.version,
+                    )
+                    return
+                if sync_status == "deleted":
+                    await session.delete(rule)
+                    await session.commit()
+                    logger.info(
+                        "automation %s deleted (gateway ack)", automation_id,
+                    )
+                    return
+                rule.sync_status = sync_status
+                rule.last_error = last_error if sync_status == "failed" else None
+                await session.commit()
+                logger.info(
+                    "automation %s sync_status=%s", automation_id, sync_status,
+                )
+
+        self._run_async(_write)
+
+    def _handle_automation_event(self, topic: str, envelope: dict) -> None:
+        """Gateway emitted an automation execution event (rule_fired etc.).
+
+        Topic: .../automations/{automation_id}/event. Non-retained per contract.
+        Inserts an `Event` row (event_type=automation_<event>) and updates the
+        Automation row's last_run_status / last_error so the dashboard reflects
+        the most recent execution.
+        """
+        parts = topic.split("/")
+        try:
+            idx = parts.index("automations")
+            automation_id = parts[idx + 1]
+        except (ValueError, IndexError):
+            logger.warning("automation event: bad topic %s", topic)
+            return
+        inner = envelope.get("payload") or {}
+        # `event` is the gateway-emitted kind (rule_fired, rule_skipped…); we
+        # encode it into Event.event_type as automation_<event>.
+        event_kind = inner.get("event", "rule_fired")
+        status = inner.get("status", "executed")
+        last_error = inner.get("last_error")
+        occurred_at = _ts_ms_to_naive_utc(envelope.get("ts"))
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Automation, Event
+
+            async with self._db_session_factory() as session:
+                event_row = Event(
+                    device_id=None,
+                    event_type=f"automation_{event_kind}",
+                    payload={"automation_id": automation_id, **inner},
+                    occurred_at=occurred_at,
+                )
+                session.add(event_row)
+                rule = await session.get(Automation, automation_id)
+                # last_run_status / last_error are only mutated on **terminal**
+                # statuses. Non-terminal (e.g. "skipped") still inserts an
+                # Event row but leaves the rule's last-run summary untouched.
+                if rule is not None and status in {"executed", "failed", "timeout"}:
+                    rule.last_run_status = status
+                    rule.last_error = (
+                        last_error if status in {"failed", "timeout"} else None
+                    )
+                await session.commit()
+                logger.info(
+                    "automation %s event=%s status=%s saved",
+                    automation_id, event_kind, status,
+                )
+
+        self._run_async(_write)
+
+    def _handle_gateway_event(self, envelope: dict) -> None:
+        """Persist gateway-level events and fold automation status updates."""
         inner = envelope.get("payload", {})
         event = inner.get("event", "unknown")
         logger.info("Gateway event: %s payload=%s", event, inner)
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import (
+                Automation,
+                Device,
+                Event,
+                ProvisioningSession,
+            )
+            from sqlalchemy import select
+
+            payload = dict(inner)
+            payload["gateway_id"] = envelope.get("gateway_id")
+            payload["source"] = envelope.get("source")
+            rule_id = payload.get("rule_id") or payload.get("automation_id")
+
+            async with self._db_session_factory() as session:
+                session.add(
+                    Event(
+                        device_id=None,
+                        event_type=event,
+                        payload=payload,
+                        occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                    )
+                )
+
+                if event in ("provisioning_joined", "provisioning_failed"):
+                    eui64 = payload.get("eui64")
+                    gateway_id = envelope.get("gateway_id")
+                    if isinstance(eui64, str) and isinstance(gateway_id, str):
+                        prov_result = await session.execute(
+                            select(ProvisioningSession)
+                            .where(
+                                ProvisioningSession.eui64 == eui64,
+                                ProvisioningSession.gateway_id == gateway_id,
+                                ProvisioningSession.status.notin_(
+                                    list(PROVISIONING_TERMINAL_STATUSES)
+                                ),
+                            )
+                            .order_by(ProvisioningSession.created_at.desc())
+                            .limit(1)
+                        )
+                        prov = prov_result.scalar_one_or_none()
+                        if prov is not None:
+                            if event == "provisioning_joined":
+                                device = await session.get(Device, eui64)
+                                if device is None:
+                                    device = Device(
+                                        id=eui64,
+                                        device_type=payload.get(
+                                            "device_type", prov.device_type
+                                        ),
+                                        eui64=eui64,
+                                        room_id=prov.room_id,
+                                        name=prov.model or eui64,
+                                        is_online=True,
+                                    )
+                                    session.add(device)
+                                else:
+                                    device.device_type = payload.get(
+                                        "device_type", device.device_type
+                                    )
+                                    device.eui64 = eui64
+                                    device.room_id = prov.room_id
+                                    device.is_online = True
+                                prov.status = "joined"
+                                prov.reason = None
+                                prov.install_code = ""
+                            else:
+                                prov.status = "failed"
+                                prov.reason = payload.get("reason") or "failed"
+
+                if isinstance(rule_id, str) and rule_id:
+                    rule = await session.get(Automation, rule_id)
+                    if rule is not None:
+                        if event == "automation_synced":
+                            rule.sync_status = "synced"
+                            rule.last_error = None
+                        elif event == "automation_sync_failed":
+                            rule.sync_status = "failed"
+                            rule.last_error = payload.get("reason")
+                        elif event == "automation_executed":
+                            result = payload.get("result")
+                            if result == "ok":
+                                rule.last_run_status = "executed"
+                                rule.last_error = None
+                            elif result == "timeout":
+                                rule.last_run_status = "timeout"
+                                rule.last_error = payload.get("reason")
+                            else:
+                                rule.last_run_status = "failed"
+                                rule.last_error = payload.get("reason")
+
+                await session.commit()
+
+        self._run_async(_write)
 
     def _handle_gateway_health(self, envelope: dict) -> None:
         """Persist a gateway health snapshot as an unattached event.
@@ -564,6 +853,59 @@ class MQTTService:
         }
         self.client.publish(topic, json.dumps(envelope), qos=0)
         logger.info("Published gateway command %s op=%s", command_id, op)
+
+    def publish_automation_desired(
+        self,
+        automation_id: str,
+        op: str,
+        version: int,
+        *,
+        name: str | None = None,
+        enabled: bool | None = None,
+        trigger: dict | None = None,
+        actions: list[dict] | None = None,
+    ) -> None:
+        """Publish a retained automation desired envelope.
+
+        See docs/AUTOMATION_MQTT_CONTRACT.md §4. op must be "upsert" or
+        "delete". For upsert, name/enabled/trigger/actions are required; for
+        delete, the payload carries op=delete + deleted=true (tombstone).
+        """
+        if op not in {"upsert", "delete"}:
+            raise ValueError(f"publish_automation_desired: bad op={op!r}")
+        s = self.settings
+        topic = f"{self.topic_prefix}/automations/{automation_id}/desired"
+        payload: dict = {
+            "automation_id": automation_id,
+            "op": op,
+            "version": version,
+        }
+        if op == "upsert":
+            payload.update({
+                "name": name,
+                "enabled": bool(enabled),
+                "trigger": trigger or {},
+                "actions": actions or [],
+            })
+        else:
+            payload["deleted"] = True
+        envelope = {
+            "schema": "sb.v1",
+            "msg_id": uuid4().hex,
+            "ts": _now_ms(),
+            "tenant_id": s.tenant_id,
+            "site_id": s.site_id,
+            "gateway_id": s.gateway_id,
+            "source": "cloud",
+            "correlation_id": f"auto_{automation_id}",
+            "payload": payload,
+        }
+        # Demo: QoS 0. Production: QoS 1 per docs/MQTT_CONTRACT.md.
+        # Retained per contract §4 (both upsert and delete tombstone).
+        self.client.publish(topic, json.dumps(envelope), qos=0, retain=True)
+        logger.info(
+            "Published automation %s op=%s version=%s", automation_id, op, version,
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers

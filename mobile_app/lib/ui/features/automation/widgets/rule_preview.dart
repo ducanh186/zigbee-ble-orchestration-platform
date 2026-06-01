@@ -9,25 +9,29 @@ import 'automation_visuals.dart';
 /// sentence. Mirrors the design's RulePreview block.
 class RulePreview extends StatelessWidget {
   const RulePreview({
-    required this.template,
+    required this.triggerEvent,
+    required this.triggerState,
+    required this.actionCommand,
     required this.trigger,
     required this.targets,
     super.key,
   });
 
-  final AutomationRuleTemplate template;
+  final AutomationTriggerEvent triggerEvent;
+  final Map<String, Object?> triggerState;
+  final AutomationActionCommand actionCommand;
   final SmartDevice? trigger;
   final List<SmartDevice> targets;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final verb = switch (template.actionCommand) {
+    final verb = switch (actionCommand) {
       AutomationActionCommand.toggle => 'Toggle',
       AutomationActionCommand.on => 'Turn',
       AutomationActionCommand.off => 'Turn',
     };
-    final tail = switch (template.actionCommand) {
+    final tail = switch (actionCommand) {
       AutomationActionCommand.toggle => '',
       AutomationActionCommand.on => ' on',
       AutomationActionCommand.off => ' off',
@@ -64,7 +68,8 @@ class RulePreview extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 TextSpan(
-                  text: ' ${AutomationVisuals.triggerEventLabel(template)}',
+                  text:
+                      ' ${AutomationVisuals.triggerEventLabel(triggerEvent, triggerState)}',
                   style: TextStyle(color: palette.textSecondary),
                 ),
               ],

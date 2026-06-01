@@ -67,3 +67,56 @@ async def test_list_devices_filter_by_room(client, seed_light):
 
     r = await client.get("/api/devices/?room_id=no-such-room")
     assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_delete_device_cascades(client, seed_light, db_session_factory):
+    from cloud.app.models import Command, DeviceState, Event
+
+    async with db_session_factory() as s:
+        s.add(
+            DeviceState(
+                device_id=seed_light,
+                state={"power": "on"},
+                reported_at=datetime(2026, 5, 19, 10, 0),
+            )
+        )
+        s.add(
+            Event(
+                device_id=seed_light,
+                event_type="device_registry",
+                payload={"trigger": "attr_report"},
+                occurred_at=datetime(2026, 5, 19, 10, 1),
+            )
+        )
+        s.add(
+            Command(
+                id="cmd-1",
+                device_id=seed_light,
+                op="set",
+                target={"power": "on"},
+                status="executed",
+            )
+        )
+        await s.commit()
+
+    r = await client.delete(f"/api/devices/{seed_light}")
+    assert r.status_code == 204
+
+    r = await client.get(f"/api/devices/{seed_light}")
+    assert r.status_code == 404
+
+    from sqlalchemy import select
+    async with db_session_factory() as s:
+        states = (await s.execute(select(DeviceState).where(DeviceState.device_id == seed_light))).scalars().all()
+        events = (await s.execute(select(Event).where(Event.device_id == seed_light))).scalars().all()
+        commands = (await s.execute(select(Command).where(Command.device_id == seed_light))).scalars().all()
+        assert states == []
+        assert events == []
+        assert commands == []
+
+
+@pytest.mark.asyncio
+async def test_delete_device_404_when_missing(client):
+    r = await client.delete("/api/devices/nope")
+    assert r.status_code == 404

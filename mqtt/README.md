@@ -75,3 +75,15 @@ Phân quyền chi tiết nằm trong `config/acl.conf`.
 | --- | --- |
 | `1883` | MQTT |
 | `9001` | MQTT over WebSocket |
+
+## Production transport
+
+Production uses a separate Mosquitto profile so local development remains unchanged:
+
+| File | Purpose |
+| --- | --- |
+| `config/mosquitto.prod.conf` | TLS/mTLS listener on `8883`; no `1883` or `9001` listener |
+| `config/acl.prod.conf` | Narrow production ACL for `cloud`, `gateway`, and `monitor` |
+| `certs/` | Operator-provisioned CA, server, and client certificates; ignored by git |
+
+The secure production compose file mounts these files and exposes only internal broker port `8883`.

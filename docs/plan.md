@@ -99,6 +99,7 @@ sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/request
 sb/v1/{tenant}/{site}/{gateway}/commands/{command_id}/reply
 sb/v1/{tenant}/{site}/{gateway}/ota/campaigns/{campaign_id}/manifest
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/desired
+sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/cancel
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/progress
 sb/v1/{tenant}/{site}/{gateway}/ota/devices/{device_id}/event
 ```
@@ -125,11 +126,18 @@ Toàn bộ lifecycle do Z3Gateway C quản lý và publish trực tiếp.
 
 ### OTA behavior cố định
 
-- Cloud chỉ publish `manifest` và `ota desired`
+- OTA hiện là contract/prerequisite, không phải capability đã hoàn tất end-to-end
+  trong repo hiện tại.
+- Cloud chỉ điều phối metadata: campaign manifest, target desired, cancel intent.
 - Z3Gateway C tải `.ota` từ `artifact.url`, verify `sha256`/`size_bytes`, lưu vào `SB_OTA_DIR`
 - Z3Gateway C offer OTA file qua native Zigbee OTA
 - Z3Gateway C không publish binary qua MQTT
-- Progress/event MQTT chỉ phản ánh workflow staging/offer/result
+- Progress/event MQTT chỉ phản ánh workflow staging/offer/result/cancel/rollback
+- Các tên `ota.start`, `ota.cancel`, `ota.progress`, `ota.complete` là operation
+  vocabulary trong API/log/test; MQTT vẫn route bằng topic `manifest`, `desired`,
+  `cancel`, `progress`, `event`.
+- Gateway phải có runtime OTA manager trước khi Cloud campaign được xem là OTA
+  thật; nếu chưa có, Cloud chỉ tạo được campaign metadata.
 
 ## Internal Data Flow
 

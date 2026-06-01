@@ -13,12 +13,12 @@ filter:
   value: [Zigbee]
 package: Zigbee
 quality: production
-readme:
-- {path: readme.html}
-- {path: readme.html}
 source:
 - {path: main.c}
 - {path: app.c}
+- {path: app/display_qr.c}
+- {path: app/provisioning_qr.c}
+- {path: app/qrcodegen.c}
 tag: [prebuilt_demo]
 sdk: {id: gecko_sdk, version: 4.5.0}
 toolchain_settings: []
@@ -69,10 +69,16 @@ component:
 - {id: zigbee_zll_on_off_server}
 - {id: zigbee_zll_scenes_server}
 - {id: zigbee_zll_utility_server}
+# --- Provisioning QR display (P-side, SCRUM-80) ---
+- {id: glib}
+- {id: dmd_memlcd}
+- {id: memlcd_usart}
+- {id: ls013b7dh03}
 config_file:
 - {path: config/zcl/zcl_config.zap, directory: zcl}
 configuration:
 - {name: SL_BOARD_ENABLE_VCOM, value: '1'}
+- {name: SL_BOARD_ENABLE_DISPLAY, value: '1'}
 - condition: [iostream_usart]
   name: SL_IOSTREAM_USART_VCOM_FLOW_CONTROL_TYPE
   value: usartHwFlowControlNone
@@ -101,6 +107,5 @@ configuration:
 - {name: configTIMER_TASK_PRIORITY, value: '53'}
 - {name: configMAX_TASK_NAME_LEN, value: '30'}
 ui_hints:
-  highlight:
-  - {path: readme.html}
+  highlight: []
 

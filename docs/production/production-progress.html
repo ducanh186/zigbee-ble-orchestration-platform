@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production Hardening Progress - SCRUM-90</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --text: #17202a;
+      --muted: #5f6f82;
+      --line: #d8e0ea;
+      --accent: #0f766e;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --ok: #15803d;
+      --info: #1d4ed8;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header, main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      padding-top: 32px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px;
+    }
+    p {
+      margin: 0 0 12px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .value {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    .auditing { background: #dbeafe; color: var(--info); }
+    .blocked { background: #fee2e2; color: var(--danger); }
+    .queued { background: #e5e7eb; color: #374151; }
+    .active { background: #fef3c7; color: var(--warn); }
+    .done { background: #dcfce7; color: var(--ok); }
+    .notready { background: #fee2e2; color: var(--danger); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+      font-size: 13px;
+      color: #334155;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      background: #eef3f8;
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+    ul {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+    .progress {
+      height: 12px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .bar {
+      width: 63%;
+      height: 100%;
+      background: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Production Hardening Progress</h1>
+    <p>Zigbee Smart Building Platform - SCRUM-90</p>
+    <div class="meta">
+      <div class="metric">
+        <span class="label">Overall status</span>
+        <span class="value"><span class="badge active">IMPLEMENTING</span></span>
+      </div>
+      <div class="metric">
+        <span class="label">Production readiness</span>
+        <span class="value"><span class="badge notready">NOT_READY</span></span>
+      </div>
+      <div class="metric">
+        <span class="label">Progress</span>
+        <span class="value">100%</span>
+        <div class="progress" aria-label="100 percent complete"><div class="bar" style="width:100%"></div></div>
+      </div>
+      <div class="metric">
+        <span class="label">Last updated</span>
+        <span class="value">2026-06-01 04:22:00 +07:00</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Phase Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th>Status</th>
+            <th>Goal</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>Production scope, audit, plan, acceptance checklist, dashboard, env contract.</td>
+            <td><code>docs/production/*</code>, <code>deploy/.env.prod.example</code>, artifact verification PASS</td>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>HTTPS reverse proxy and public exposure lockdown.</td>
+            <td><code>deploy/docker-compose.prod-secure.yml</code>, <code>deploy/nginx/prod.conf</code>, exposure contract test PASS</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><span class="badge done">BACKEND_DONE</span></td>
+            <td>REST API authentication and authorization.</td>
+            <td><code>docs/production/production-auth.md</code>, auth/RBAC tests PASS; <code>SCRUM-91</code> mobile slice pending.</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>MQTT TLS/mTLS and broker ACL hardening.</td>
+            <td><code>mqtt/config/mosquitto.prod.conf</code>, <code>mqtt/config/acl.prod.conf</code>, MQTT contract test PASS</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>Gateway config hardening and secret fallback removal.</td>
+            <td><code>gateway/Z3GatewayHost/app/app_mqtt.c</code>, bridge templates, gateway config contract test PASS</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>Zigbee secure commissioning.</td>
+            <td><code>docs/production/production-commissioning.md</code>, secure commissioning contract test PASS</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>Backup, restore, monitoring, and alerting.</td>
+            <td><code>docs/production/production-operations.md</code>, operations contract test PASS</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><span class="badge done">DONE</span></td>
+            <td>CI/CD, release, rollback, and final evidence.</td>
+            <td><code>docs/production/production-release.md</code>, release readiness contract test PASS</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Current Blockers</h2>
+      <ul>
+        <li>Production domain and certificate provider need operator confirmation.</li>
+        <li>Live EC2 security group state is not verified in local environment.</li>
+        <li>Mobile login-state integration remains delegated under <code>SCRUM-91</code>.</li>
+        <li>Live MQTT mTLS negative tests need operator-approved certificates/environment.</li>
+        <li>Live gateway hardware startup validation is not run in this local environment.</li>
+        <li>Live Zigbee default global key rejection evidence needs gateway hardware.</li>
+        <li>Real backup/restore dry-run evidence needs an operator-approved environment.</li>
+        <li>Current EC2 deploy is healthy but still uses legacy <code>docker-compose.prod.yml</code>.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Evidence Links / File Paths</h2>
+      <ul>
+        <li><code>docs/production/production-security-audit.md</code></li>
+        <li><code>docs/production/production-hardening-plan.md</code></li>
+        <li><code>docs/production/production-acceptance-checklist.md</code></li>
+        <li><code>docs/production/production-final-report.md</code></li>
+        <li><code>docs/production/production-auth.md</code></li>
+        <li><code>docs/production/production-mqtt.md</code></li>
+        <li><code>docs/production/production-gateway.md</code></li>
+        <li><code>docs/production/production-commissioning.md</code></li>
+        <li><code>docs/production/production-operations.md</code></li>
+        <li><code>docs/production/production-release.md</code></li>
+        <li><code>docs/production/release-notes-v0.9.0-rc.1.md</code></li>
+        <li><code>deploy/.env.prod.example</code></li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Test Results</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Phase 0 artifact existence and placeholder scan</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Required files exist; no unfinished-marker strings, known demo IP, demo credential strings, or private key markers in new artifacts.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_exposure_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>2 passed in 0.06s. Confirms secure compose public ports and Nginx HTTPS proxy contract.</td>
+          </tr>
+          <tr>
+            <td><code>docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Secure compose config parses from the <code>deploy/</code> directory using a temporary copy of <code>.env.prod.example</code>.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>23 passed in 9.54s. Confirms JWT-shaped token validation, command auth/RBAC, and admin-only permit join.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_mqtt_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>3 passed in 0.06s. Confirms production Mosquitto TLS/mTLS config, ACL scoping, and secure compose wiring.</td>
+          </tr>
+          <tr>
+            <td><code>docker compose --env-file .env.prod -f docker-compose.prod-secure.yml config</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>Secure compose parses with MQTT cert mount and internal <code>8883</code> exposure.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_gateway_production_config_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>4 passed in 0.11s. Confirms production gateway fail-fast env contract, runtime identity, TLS setup, and placeholder bridge configs.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_secure_commissioning_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>4 passed. Confirms install-code gateway prepare_join parsing, secure dispatch, bounded duration, and negative procedure documentation.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_production_operations_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>3 passed. Confirms backup/restore, monitoring, alerting runbook coverage and persistent compose state.</td>
+          </tr>
+          <tr>
+            <td><code>python -m pytest cloud/tests/test_release_readiness_contract.py -q</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td>3 passed. Confirms release runbook, rollback procedure, release notes, and final evidence status.</td>
+          </tr>
+          <tr>
+            <td><code>EC2 deploy verification</code></td>
+            <td><span class="badge done">PASS</span></td>
+            <td><code>/health</code> returned ok; <code>sb-cloud-api</code>, <code>sb-mosquitto</code>, and <code>sb-postgres</code> were healthy.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Risk Register</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Severity</th>
+            <th>Evidence</th>
+            <th>Next phase</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Legacy deploy file still exposes API/MQTT/DB host ports if used directly.</td>
+            <td>Medium</td>
+            <td><code>deploy/docker-compose.prod.yml</code> remains for existing demo path; secure path is <code>deploy/docker-compose.prod-secure.yml</code></td>
+            <td>Phase 7 release cleanup or operator migration decision</td>
+          </tr>
+          <tr>
+            <td>Mobile production auth state is not integrated with backend login yet.</td>
+            <td>Medium</td>
+            <td><code>SCRUM-91</code> delegated mobile login-state slice</td>
+            <td>Phase 2 mobile follow-up</td>
+          </tr>
+          <tr>
+            <td>Live MQTT handshake and ACL negative tests are not run locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-mqtt.md</code></td>
+            <td>Operator environment validation</td>
+          </tr>
+          <tr>
+            <td>Live gateway hardware startup is not validated locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-gateway.md</code></td>
+            <td>Operator hardware validation</td>
+          </tr>
+          <tr>
+            <td>Live default global key rejection is not validated locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-commissioning.md</code></td>
+            <td>Operator hardware validation</td>
+          </tr>
+          <tr>
+            <td>Backup/restore dry-run evidence is not captured locally.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-operations.md</code></td>
+            <td>Operator environment validation</td>
+          </tr>
+          <tr>
+            <td>Stable production release is blocked by secure compose cutover and live evidence.</td>
+            <td>Medium</td>
+            <td><code>docs/production/production-release.md</code></td>
+            <td>Post-RC operator validation</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Next Actions</h2>
+      <ol>
+        <li>Commit, push, PR, and merge Phase 7 branch <code>codex/scrum-90-phase7-release-evidence</code>.</li>
+        <li>Create GitHub pre-release <code>v0.9.0-rc.1</code>.</li>
+        <li>Review and integrate <code>SCRUM-91</code> mobile login-state output when the subagent returns.</li>
+        <li>Plan secure compose EC2 cutover after operator certificates/environment are available.</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>Change Log</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Change</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-06-01 02:12:02 +07:00</td>
+            <td>Phase 0 started in isolated worktree and production documentation scaffold created.</td>
+            <td><code>SCRUM-90</code>; <code>codex/scrum-90-production-hardening</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 02:24:00 +07:00</td>
+            <td>Phase 1 secure compose, Nginx HTTPS proxy config, networking runbook, and exposure contract test added.</td>
+            <td><code>SCRUM-93</code>; <code>codex/scrum-90-phase1-reverse-proxy</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 02:46:30 +07:00</td>
+            <td>Backend Phase 2 JWT-shaped bearer auth, command RBAC, and admin-only permit join verified.</td>
+            <td><code>SCRUM-94</code>; <code>codex/scrum-90-phase2-auth</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:05:25 +07:00</td>
+            <td>Phase 3 production Mosquitto TLS/mTLS config, strict ACL, cert mount, and compose validation added.</td>
+            <td><code>SCRUM-95</code>; <code>codex/scrum-90-phase3-mqtt-hardening</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:18:48 +07:00</td>
+            <td>Phase 4 gateway production fail-fast MQTT config, TLS env contract, runtime identity, and placeholder bridge templates added.</td>
+            <td><code>SCRUM-96</code>; <code>codex/scrum-90-phase4-gateway-config</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:34:10 +07:00</td>
+            <td>Phase 5 gateway secure commissioning command parsing, install-code dispatch, local guardrail tests, and negative procedure runbook added.</td>
+            <td><code>SCRUM-97</code>; <code>codex/scrum-90-phase5-secure-commissioning</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 03:58:00 +07:00</td>
+            <td>Phase 6 operations runbook, backup/restore/monitoring/alerting contract test, and Mosquitto log volume persistence added.</td>
+            <td><code>SCRUM-98</code>; <code>codex/scrum-90-phase6-ops-runbooks</code></td>
+          </tr>
+          <tr>
+            <td>2026-06-01 04:22:00 +07:00</td>
+            <td>Phase 7 release runbook, rollback procedure, final evidence, release notes, and EC2 deploy evidence added.</td>
+            <td><code>SCRUM-99</code>; <code>codex/scrum-90-phase7-release-evidence</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

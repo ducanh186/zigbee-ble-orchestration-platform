@@ -14,7 +14,21 @@ from cloud.app.models import Command, Device, DeviceState, Event, Home, Room, Us
 
 # Placeholder device IDs that were seeded before real MQTT registration existed.
 # These have no EUI64 and clutter the dashboard alongside real devices.
-_LEGACY_PLACEHOLDER_IDS = {"light-01", "light-02", "pir-01", "switch-01"}
+#
+# Also includes synthetic IDs from cloud/scripts/smoke_test.py and
+# cloud/scripts/test_phase3_phase4.py — these scripts insert rows into the
+# same Postgres as the live dashboard when run without SB_TEST_DATABASE_URL,
+# and the rows persist until something deletes them. Seed sweeps them out so
+# the dashboard always boots with only real MQTT-registered devices.
+_LEGACY_PLACEHOLDER_IDS = {
+    "light-01", "light-02", "pir-01", "switch-01",
+    # smoke_test.py / test_phase3_phase4.py synthetic devices
+    "light-00124b0001aa22bb",
+    "switch-00124b0002cc33dd",
+    "light-00124b0003ee44ff",
+    # Manual curl probes left from ACL / contract testing
+    "0xPROBE", "0xTEST", "0xPROBE2",
+}
 
 
 async def _upsert(session, model, pk: str, **kwargs):

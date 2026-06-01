@@ -65,6 +65,7 @@ tar -czf "$TEMP_TAR" -C "$PROJECT_DIR" \
     --exclude='.env' \
     --exclude='.env.deploy' \
     --exclude='cloud.db' \
+    --exclude='releases' \
     --exclude='ota-files' \
     --exclude='node_modules' \
     --exclude='.claude' \
@@ -103,12 +104,9 @@ echo "--- [3/6] Preparing remote directories ---"
 ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 set -e
 cd $REMOTE_DIR
-mkdir -p deploy/mosquitto/config
 mkdir -p deploy/mosquitto/passwords
 mkdir -p deploy/cloud
-cp -f mqtt/config/acl.conf deploy/mosquitto/config/
-# Copy mosquitto.conf but remove include_dir (EC2 broker has no conf.d/ bridge config)
-sed '/^include_dir/d' mqtt/config/mosquitto.conf > deploy/mosquitto/config/mosquitto.conf
+mkdir -p mqtt/certs/clients
 echo 'Directories prepared.'
 REMOTE_EOF
 
@@ -120,6 +118,7 @@ echo "--- [4/6] Generating MQTT passwords ---"
 
 GW_PASS="${config[MQTT_GATEWAY_PASS]:-gateway123}"
 CLI_PASS="${config[MQTT_CLIENT_PASS]:-client123}"
+CLOUD_PASS="${config[MQTT_CLOUD_PASS]:-${config[MQTT_CLIENT_PASS]:-cloud123}}"
 MON_PASS="${config[MQTT_MONITOR_PASS]:-monitor123}"
 BRIDGE_PASS="${config[MQTT_BRIDGE_PASS]:-bridge123}"
 
@@ -130,59 +129,99 @@ PASSDIR=\$(pwd)/deploy/mosquitto/passwords
 docker run --rm -v "\$PASSDIR:/passwords" eclipse-mosquitto:2.0 sh -c "
   touch /passwords/passwd
   mosquitto_passwd -b /passwords/passwd gateway '$GW_PASS'
+  mosquitto_passwd -b /passwords/passwd cloud   '$CLOUD_PASS'
   mosquitto_passwd -b /passwords/passwd client  '$CLI_PASS'
   mosquitto_passwd -b /passwords/passwd monitor '$MON_PASS'
   mosquitto_passwd -b /passwords/passwd bridge  '$BRIDGE_PASS'
 "
-echo 'MQTT passwords generated (4 users: gateway, client, monitor, bridge).'
+echo 'MQTT passwords generated (5 users: gateway, cloud, client, monitor, bridge).'
 REMOTE_EOF
 
 # ----------------------------------------------------------
-# Step 5: Write cloud .env
+# Step 5: Prepare MQTT mTLS certificates
 # ----------------------------------------------------------
 echo ""
-echo "--- [5/6] Writing cloud .env on EC2 ---"
+echo "--- [5/8] Preparing MQTT mTLS certificates ---"
+
+ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+set -e
+cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-mqtt-mtls.sh
+bash deploy/setup-mqtt-mtls.sh '$REMOTE_DIR' '$EC2_HOST'
+REMOTE_EOF
+
+# ----------------------------------------------------------
+# Step 6: Write cloud .env
+# ----------------------------------------------------------
+echo ""
+echo "--- [6/8] Writing cloud .env on EC2 ---"
 
 PG_USER="${config[POSTGRES_USER]:-sb_user}"
 PG_PASS="${config[POSTGRES_PASSWORD]:-sb_pass}"
 PG_DB="${config[POSTGRES_DB]:-sb_cloud}"
 SB_DB_URL="${config[SB_DATABASE_URL]:-postgresql+asyncpg://$PG_USER:$PG_PASS@postgres:5432/$PG_DB}"
-  SB_MQTT_HOST="${config[SB_MQTT_HOST]:-mosquitto}"
-  SB_MQTT_USER="${config[SB_MQTT_USERNAME]:-client}"
-  SB_MQTT_PASS="${config[SB_MQTT_PASSWORD]:-client123}"
-  SB_API_AUTH_TOKEN="${config[SB_API_AUTH_TOKEN]:-}"
-  SB_TENANT="${config[SB_TENANT_ID]:-hust}"
-  SB_SITE="${config[SB_SITE_ID]:-lab01}"
-  SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
+SB_MQTT_HOST="${config[SB_MQTT_HOST]:-mosquitto}"
+SB_MQTT_USER="cloud"
+SB_MQTT_PASS="$CLOUD_PASS"
+SB_TENANT="${config[SB_TENANT_ID]:-hust}"
+SB_SITE="${config[SB_SITE_ID]:-lab01}"
+SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
+SB_AUTH_SECRET="${config[SB_AUTH_TOKEN_SECRET]:-}"
 
-  if [[ -z "$SB_API_AUTH_TOKEN" ]]; then
-    echo "ERROR: SB_API_AUTH_TOKEN is not set in deploy/.env.deploy"
-    echo "Generate a 32-byte token and put it in deploy/.env.deploy before deploy."
-    exit 1
+ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+set -e
+AUTH_SECRET='$SB_AUTH_SECRET'
+if [ -z "\$AUTH_SECRET" ]; then
+  AUTH_SECRET=\$(grep -s '^SB_AUTH_TOKEN_SECRET=' "$REMOTE_DIR/deploy/cloud/.env" | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "\$AUTH_SECRET" ] || [ "\$AUTH_SECRET" = "dev-only-change-me" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    AUTH_SECRET=\$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+  else
+    AUTH_SECRET=\$(openssl rand -hex 48)
   fi
-
-  ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$SB_DB_URL
 SB_MQTT_HOST=$SB_MQTT_HOST
-SB_MQTT_PORT=1883
+SB_MQTT_PORT=8883
 SB_MQTT_USERNAME=$SB_MQTT_USER
 SB_MQTT_PASSWORD=$SB_MQTT_PASS
-SB_API_AUTH_TOKEN=$SB_API_AUTH_TOKEN
+SB_MQTT_TLS_ENABLED=true
+SB_MQTT_MTLS_ENABLED=true
+SB_MQTT_CA_CERT_PATH=/mosquitto/certs/ca.crt
+SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud.crt
+SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud.key
 SB_TENANT_ID=$SB_TENANT
 SB_SITE_ID=$SB_SITE
 SB_GATEWAY_ID=$SB_GW
 SB_API_HOST=0.0.0.0
 SB_API_PORT=8000
 ENVEOF
+printf 'SB_AUTH_TOKEN_SECRET=%s\n' "\$AUTH_SECRET" >> $REMOTE_DIR/deploy/cloud/.env
 echo 'cloud/.env written.'
 REMOTE_EOF
 
 # ----------------------------------------------------------
-# Step 6: Docker compose up
+# Step 7: Prepare HTTPS certificate
 # ----------------------------------------------------------
 echo ""
-echo "--- [6/6] Building and starting containers ---"
+echo "--- [7/8] Preparing HTTPS certificate ---"
+
+HTTPS_HOST="${config[HTTPS_HOST]:-$EC2_HOST}"
+
+ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+set -e
+cd $REMOTE_DIR
+sed -i 's/\r$//' deploy/setup-https.sh
+bash deploy/setup-https.sh '$HTTPS_HOST' '$REMOTE_DIR'
+REMOTE_EOF
+
+# ----------------------------------------------------------
+# Step 8: Docker compose up
+# ----------------------------------------------------------
+echo ""
+echo "--- [8/8] Building and starting containers ---"
 
 ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 set -e
@@ -201,6 +240,8 @@ cp    ../cloud/__main__.py cloud/
 export POSTGRES_USER='$PG_USER'
 export POSTGRES_PASSWORD='$PG_PASS'
 export POSTGRES_DB='$PG_DB'
+export MQTT_MONITOR_PASSWORD='$MON_PASS'
+export MQTT_CERT_DIR='../mqtt/certs'
 
 # Detect compose command (plugin vs standalone)
 if docker compose version &>/dev/null; then
@@ -240,6 +281,7 @@ REMOTE_EOF
 echo ""
 echo "========================================="
 echo "  Deploy complete!"
+echo "  API HTTPS: https://$HTTPS_HOST"
 echo "  API Swagger: http://$EC2_HOST:8000/docs"
-echo "  MQTT Broker: $EC2_HOST:1883"
+echo "  MQTT Broker: $EC2_HOST:8883 (TLS/mTLS)"
 echo "========================================="
