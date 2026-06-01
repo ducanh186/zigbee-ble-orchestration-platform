@@ -259,7 +259,7 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Device, Event
+            from cloud.app.models import Device, DeviceState, Event
             from sqlalchemy import select
 
             async with self._db_session_factory() as session:
@@ -294,6 +294,21 @@ class MQTTService:
                     occurred_at=last_seen,
                 )
                 session.add(event)
+                if (
+                    device_type == "motion"
+                    and validated.get("event") == "occupancy_changed"
+                    and validated.get("occupancy") in {"occupied", "unoccupied"}
+                ):
+                    session.add(
+                        DeviceState(
+                            device_id=device_id,
+                            state={
+                                "occupancy": validated["occupancy"],
+                                "reachable": True,
+                            },
+                            reported_at=last_seen,
+                        )
+                    )
                 await session.commit()
                 logger.info("Saved event for %s (type=%s, event=%s)",
                             device_id, device_type, event.event_type)
@@ -660,6 +675,7 @@ class MQTTService:
                 return
             from cloud.app.models import (
                 Automation,
+                AutomationEvent,
                 Device,
                 Event,
                 ProvisioningSession,
@@ -670,6 +686,7 @@ class MQTTService:
             payload["gateway_id"] = envelope.get("gateway_id")
             payload["source"] = envelope.get("source")
             rule_id = payload.get("rule_id") or payload.get("automation_id")
+            occurred_at = _ts_ms_to_naive_utc(envelope.get("ts"))
 
             async with self._db_session_factory() as session:
                 session.add(
@@ -677,7 +694,7 @@ class MQTTService:
                         device_id=None,
                         event_type=event,
                         payload=payload,
-                        occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                        occurred_at=occurred_at,
                     )
                 )
 
@@ -747,6 +764,37 @@ class MQTTService:
                             else:
                                 rule.last_run_status = "failed"
                                 rule.last_error = payload.get("reason")
+
+                        if event in (
+                            "automation_synced",
+                            "automation_sync_failed",
+                            "automation_executed",
+                        ):
+                            status_value: str | None = None
+                            reason = payload.get("reason")
+                            if event == "automation_synced":
+                                status_value = "synced"
+                            elif event == "automation_sync_failed":
+                                status_value = "failed"
+                            elif event == "automation_executed":
+                                result = payload.get("result")
+                                if result == "ok":
+                                    status_value = "executed"
+                                elif result == "timeout":
+                                    status_value = "timeout"
+                                else:
+                                    status_value = "failed"
+
+                            session.add(
+                                AutomationEvent(
+                                    automation_id=rule_id if rule is not None else None,
+                                    event_type=event,
+                                    status=status_value,
+                                    reason=reason,
+                                    payload=payload,
+                                    occurred_at=occurred_at,
+                                )
+                            )
 
                 await session.commit()
 
