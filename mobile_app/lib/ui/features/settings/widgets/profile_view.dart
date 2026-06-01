@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../app_runtime_config.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/expandable_content.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../auth/view_models/auth_view_model.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({required this.onBack, this.onLogout, super.key});
@@ -18,13 +21,17 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
-  bool _sessionExpanded = true;
   bool _actionsExpanded = true;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
+    final runtimeConfig = context.watch<AppRuntimeConfig>();
+    final session = context.watch<AuthViewModel>().session;
+    final username = _displayValue(session?.username ?? session?.userId);
+    final subtitle = _displayValue(session?.userId ?? session?.role);
+    final role = _displayValue(session?.role);
 
     return CustomScrollView(
       slivers: [
@@ -61,7 +68,7 @@ class _ProfileViewState extends State<ProfileView> {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
-                        'NT',
+                        _initials(username),
                         style: TextStyle(
                           color: palette.primaryOn,
                           fontSize: 20,
@@ -74,8 +81,8 @@ class _ProfileViewState extends State<ProfileView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Nguyen Tri',
+                          Text(
+                            username,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -83,7 +90,7 @@ class _ProfileViewState extends State<ProfileView> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'tech.operator',
+                            subtitle,
                             style: TextStyle(
                               color: palette.textSecondary,
                               fontFamily: 'JetBrains Mono',
@@ -91,10 +98,7 @@ class _ProfileViewState extends State<ProfileView> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          StatusBadge(
-                            label: l10n.profileRoleTech,
-                            tone: BadgeTone.primary,
-                          ),
+                          StatusBadge(label: role, tone: BadgeTone.primary),
                         ],
                       ),
                     ),
@@ -102,53 +106,52 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ),
               const SizedBox(height: 18),
-              SectionTitle(
-                title: l10n.profileSession,
-                action: CollapseIconButton(
-                  key: const Key('profile-session-toggle'),
-                  expanded: _sessionExpanded,
-                  onPressed: () {
-                    setState(() => _sessionExpanded = !_sessionExpanded);
-                  },
-                ),
-              ),
-              ExpandableBody(
-                expanded: _sessionExpanded,
+              SectionTitle(title: l10n.profileSession),
+              const SizedBox(height: 8),
+              AppCard(
+                padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    const SizedBox(height: 8),
-                    AppCard(
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        children: [
-                          _ProfileRow(
-                            icon: Icons.business_outlined,
-                            label: l10n.profileOrganization,
-                            value: 'HUST - IoT Lab',
-                          ),
-                          Divider(color: palette.border, height: 1),
-                          _ProfileRow(
-                            icon: Icons.access_time,
-                            label: l10n.profileSignedIn,
-                            value: '07:01 05/16/2026',
-                            mono: true,
-                          ),
-                          Divider(color: palette.border, height: 1),
-                          _ProfileRow(
-                            icon: Icons.public,
-                            label: l10n.profileApiEndpoint,
-                            value: 'http://98.83.4.87:8000',
-                            mono: true,
-                          ),
-                          Divider(color: palette.border, height: 1),
-                          _ProfileRow(
-                            icon: Icons.router_outlined,
-                            label: l10n.profileGateway,
-                            value: 'z3gw-01 - online',
-                            mono: true,
-                          ),
-                        ],
-                      ),
+                    _ProfileRow(
+                      icon: Icons.person_outline,
+                      label: 'Username',
+                      value: _displayValue(session?.username),
+                      mono: true,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _ProfileRow(
+                      icon: Icons.badge_outlined,
+                      label: 'User ID',
+                      value: _displayValue(session?.userId),
+                      mono: true,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _ProfileRow(
+                      icon: Icons.verified_user_outlined,
+                      label: 'Role',
+                      value: role,
+                      mono: true,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _ProfileRow(
+                      icon: Icons.home_work_outlined,
+                      label: 'Home ID',
+                      value: _displayValue(session?.homeId),
+                      mono: true,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _ProfileRow(
+                      icon: Icons.access_time,
+                      label: 'Expires at',
+                      value: _formatUtc(session?.expiresAt),
+                      mono: true,
+                    ),
+                    Divider(color: palette.border, height: 1),
+                    _ProfileRow(
+                      icon: Icons.public,
+                      label: l10n.profileApiEndpoint,
+                      value: runtimeConfig.apiBaseUrl,
+                      mono: true,
                     ),
                   ],
                 ),
@@ -217,6 +220,33 @@ class _ProfileViewState extends State<ProfileView> {
       ],
     );
   }
+}
+
+String _displayValue(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return 'Not provided';
+  }
+  return trimmed;
+}
+
+String _formatUtc(DateTime? value) {
+  if (value == null) {
+    return 'Not provided';
+  }
+  return value.toUtc().toIso8601String();
+}
+
+String _initials(String value) {
+  final words = value
+      .trim()
+      .split(RegExp(r'[\s._-]+'))
+      .where((word) => word.isNotEmpty)
+      .toList();
+  if (words.isEmpty) {
+    return '--';
+  }
+  return words.take(2).map((word) => word[0].toUpperCase()).join();
 }
 
 class _ProfileRow extends StatelessWidget {

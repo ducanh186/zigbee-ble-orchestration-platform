@@ -46,6 +46,28 @@ class FailingAuthRepository implements AuthRepository {
   Future<AuthSession?> restoreSession() async => null;
 }
 
+class RestoreFailingAuthRepository implements AuthRepository {
+  @override
+  Future<AuthSession> login({
+    required String username,
+    required String password,
+  }) async {
+    throw StateError('login is not part of this test');
+  }
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  Future<AuthSession?> restoreSession() async {
+    throw const ApiException(
+      statusCode: 0,
+      kind: ApiErrorKind.unknown,
+      message: 'secure storage read failed',
+    );
+  }
+}
+
 void main() {
   test('login stores an authenticated session', () async {
     final viewModel = AuthViewModel(repository: FakeAuthRepository());
@@ -72,6 +94,21 @@ void main() {
     expect(viewModel.session?.accessToken, 'stored-token');
     expect(viewModel.errorMessage, isNull);
   });
+
+  test(
+    'bootstrap falls back to login without surfacing restore errors',
+    () async {
+      final viewModel = AuthViewModel(
+        repository: RestoreFailingAuthRepository(),
+      );
+
+      await viewModel.bootstrap();
+
+      expect(viewModel.isAuthenticated, isFalse);
+      expect(viewModel.session, isNull);
+      expect(viewModel.errorMessage, isNull);
+    },
+  );
 
   test('login surfaces error message when repository throws', () async {
     final viewModel = AuthViewModel(repository: FailingAuthRepository());

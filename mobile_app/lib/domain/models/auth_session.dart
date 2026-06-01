@@ -1,6 +1,7 @@
 class AuthSession {
   const AuthSession({
     required this.accessToken,
+    this.username,
     this.userId,
     this.role,
     this.homeId,
@@ -8,6 +9,7 @@ class AuthSession {
   });
 
   final String accessToken;
+  final String? username;
   final String? userId;
   final String? role;
   final String? homeId;

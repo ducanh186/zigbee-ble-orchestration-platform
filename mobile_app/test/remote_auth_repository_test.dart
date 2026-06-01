@@ -29,7 +29,7 @@ class FakeTokenStorage implements TokenStorage {
 
 void main() {
   test(
-    'login parses access_token, user_id, role, home_id, expires_at',
+    'login parses access_token, username, user_id, role, home_id, expires_at',
     () async {
       final tokenStorage = FakeTokenStorage();
       final repository = RemoteAuthRepository(
@@ -45,6 +45,7 @@ void main() {
             return http.Response(
               jsonEncode({
                 'access_token': 'token-abc',
+                'username': 'operator',
                 'user_id': 'operator-1',
                 'role': 'user',
                 'home_id': 'home-1',
@@ -63,10 +64,12 @@ void main() {
       );
 
       expect(session.accessToken, 'token-abc');
+      expect(session.username, 'operator');
       expect(session.userId, 'operator-1');
       expect(session.role, 'user');
       expect(session.homeId, 'home-1');
       expect(session.expiresAt, DateTime.utc(2026, 5, 16, 12));
+      expect(tokenStorage.session?.username, 'operator');
       expect(tokenStorage.session?.accessToken, 'token-abc');
     },
   );

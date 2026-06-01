@@ -86,6 +86,7 @@ async def test_login_returns_role_and_rejects_bad_password(client, db_session_fa
     body = ok.json()
     assert body["access_token"]
     assert body["user_id"] == "admin-1"
+    assert body["username"] == "admin"
     assert body["role"] == "admin"
     assert body["home_id"] is None
     assert body["expires_at"]

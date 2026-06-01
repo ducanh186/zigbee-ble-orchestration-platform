@@ -27,6 +27,7 @@ async def login(body: AuthLogin, db: AsyncSession = Depends(get_db)):
 
     return AuthSessionOut(
         access_token=create_access_token(user),
+        username=user.username,
         user_id=user.id,
         role=user.role,
         home_id=user.home_id,
