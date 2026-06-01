@@ -50,10 +50,7 @@ class AuthViewModel extends ChangeNotifier {
     } catch (error) {
       _session = null;
       _status = AuthStatus.unauthenticated;
-      _errorMessage = friendlyErrorMessage(
-        error,
-        context: 'Khoi phuc phien dang nhap that bai',
-      );
+      _errorMessage = null;
     } finally {
       notifyListeners();
     }

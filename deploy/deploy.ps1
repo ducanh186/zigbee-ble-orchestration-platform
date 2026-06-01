@@ -104,7 +104,10 @@ tar -czf "$TempZip" `
     --exclude='./.env' `
     --exclude='./.env.deploy' `
     --exclude='./cloud.db' `
+    --exclude='./releases' `
     --exclude='./ota-files' `
+    --exclude='./mqtt/passwords' `
+    --exclude='./mqtt/data' `
     --exclude='./node_modules' `
     --exclude='./.claude' `
     --exclude='./gecko_sdk' `
@@ -120,7 +123,7 @@ if ($tarExit -ne 0 -or -not (Test-Path $TempZip)) {
     # which sidesteps any Unix-tool path parsing.
     Write-Host "tar direct write failed (exit=$tarExit); retrying via stdout pipe..." -ForegroundColor Yellow
     Push-Location $ProjectDir
-    & cmd /c "tar -czf - --exclude=./.git --exclude=./__pycache__ --exclude=*.pyc --exclude=./.env --exclude=./.env.deploy --exclude=./cloud.db --exclude=./ota-files --exclude=./node_modules --exclude=./.claude --exclude=./gecko_sdk --exclude=./build --exclude=./autogen --exclude=./artifact . > `"$TempZip`""
+    & cmd /c "tar -czf - --exclude=./.git --exclude=./__pycache__ --exclude=*.pyc --exclude=./.env --exclude=./.env.deploy --exclude=./cloud.db --exclude=./releases --exclude=./ota-files --exclude=./mqtt/passwords --exclude=./mqtt/data --exclude=./node_modules --exclude=./.claude --exclude=./gecko_sdk --exclude=./build --exclude=./autogen --exclude=./artifact . > `"$TempZip`""
     Pop-Location
 }
 
@@ -141,6 +144,7 @@ ssh @SSH_OPTS $REMOTE "mkdir -p $REMOTE_DIR"
 scp @SSH_OPTS $TempZip "${REMOTE}:${REMOTE_DIR}/deploy-payload.tar.gz"
 
 Invoke-EC2 @"
+set -e
 cd $REMOTE_DIR
 tar -xzf deploy-payload.tar.gz
 rm -f deploy-payload.tar.gz
@@ -208,8 +212,21 @@ $sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } e
 $sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { "hust" }
 $sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
 $sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
+$sbAuthSecret = if ($config["SB_AUTH_TOKEN_SECRET"]) { $config["SB_AUTH_TOKEN_SECRET"] } else { "" }
 
 Invoke-EC2 @"
+set -e
+AUTH_SECRET='$sbAuthSecret'
+if [ -z "`$AUTH_SECRET" ]; then
+  AUTH_SECRET=`$(grep -s '^SB_AUTH_TOKEN_SECRET=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$AUTH_SECRET" ] || [ "`$AUTH_SECRET" = "dev-only-change-me" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    AUTH_SECRET=`$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+  else
+    AUTH_SECRET=`$(openssl rand -hex 48)
+  fi
+fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$sbDbUrl
 SB_MQTT_HOST=$sbMqttHost
@@ -222,6 +239,7 @@ SB_GATEWAY_ID=$sbGw
 SB_API_HOST=0.0.0.0
 SB_API_PORT=8000
 ENVEOF
+printf 'SB_AUTH_TOKEN_SECRET=%s\n' "`$AUTH_SECRET" >> $REMOTE_DIR/deploy/cloud/.env
 echo 'cloud/.env written.'
 "@
 

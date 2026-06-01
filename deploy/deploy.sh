@@ -65,6 +65,7 @@ tar -czf "$TEMP_TAR" -C "$PROJECT_DIR" \
     --exclude='.env' \
     --exclude='.env.deploy' \
     --exclude='cloud.db' \
+    --exclude='releases' \
     --exclude='ota-files' \
     --exclude='node_modules' \
     --exclude='.claude' \
@@ -153,8 +154,21 @@ SB_MQTT_PASS="${config[SB_MQTT_PASSWORD]:-client123}"
 SB_TENANT="${config[SB_TENANT_ID]:-hust}"
 SB_SITE="${config[SB_SITE_ID]:-lab01}"
 SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
+SB_AUTH_SECRET="${config[SB_AUTH_TOKEN_SECRET]:-}"
 
 ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+set -e
+AUTH_SECRET='$SB_AUTH_SECRET'
+if [ -z "\$AUTH_SECRET" ]; then
+  AUTH_SECRET=\$(grep -s '^SB_AUTH_TOKEN_SECRET=' "$REMOTE_DIR/deploy/cloud/.env" | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "\$AUTH_SECRET" ] || [ "\$AUTH_SECRET" = "dev-only-change-me" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    AUTH_SECRET=\$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+  else
+    AUTH_SECRET=\$(openssl rand -hex 48)
+  fi
+fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$SB_DB_URL
 SB_MQTT_HOST=$SB_MQTT_HOST
@@ -167,6 +181,7 @@ SB_GATEWAY_ID=$SB_GW
 SB_API_HOST=0.0.0.0
 SB_API_PORT=8000
 ENVEOF
+printf 'SB_AUTH_TOKEN_SECRET=%s\n' "\$AUTH_SECRET" >> $REMOTE_DIR/deploy/cloud/.env
 echo 'cloud/.env written.'
 REMOTE_EOF
 

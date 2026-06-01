@@ -232,6 +232,7 @@ class AuthLogin(BaseModel):
 
 class AuthSessionOut(BaseModel):
     access_token: str
+    username: str
     user_id: str
     role: Literal["admin", "operator", "viewer", "user"]
     home_id: str | None = None

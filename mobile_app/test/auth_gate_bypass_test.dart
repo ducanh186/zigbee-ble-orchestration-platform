@@ -24,6 +24,27 @@ class _NeverAuthenticatedRepository implements AuthRepository {
   Future<void> logout() async {}
 }
 
+class _StoredSessionRepository implements AuthRepository {
+  int restoreCalls = 0;
+
+  @override
+  Future<AuthSession?> restoreSession() async {
+    restoreCalls++;
+    return const AuthSession(accessToken: 'stored-token');
+  }
+
+  @override
+  Future<AuthSession> login({
+    required String username,
+    required String password,
+  }) async {
+    throw StateError('login should not be called when restoring a session');
+  }
+
+  @override
+  Future<void> logout() async {}
+}
+
 void main() {
   testWidgets(
     'hideLogin=true skips LoginView and renders SmartBuildingShell directly',
@@ -70,5 +91,28 @@ void main() {
 
     expect(find.byType(LoginView), findsOneWidget);
     expect(find.byType(SmartBuildingShell), findsNothing);
+  });
+
+  testWidgets('restores a stored session before showing LoginView', (
+    tester,
+  ) async {
+    final repository = _StoredSessionRepository();
+    final authViewModel = AuthViewModel(repository: repository);
+
+    await tester.pumpWidget(
+      ZigbeeSmartBuildingApp(
+        repository: MockDeviceRepository(),
+        automationRepository: MockAutomationRepository(),
+        apiBaseUrl: 'mock',
+        useMockApi: true,
+        authViewModelOverride: authViewModel,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.restoreCalls, 1);
+    expect(authViewModel.isAuthenticated, isTrue);
+    expect(find.byType(LoginView), findsNothing);
+    expect(find.byType(SmartBuildingShell), findsOneWidget);
   });
 }

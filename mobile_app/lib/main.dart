@@ -51,7 +51,6 @@ void main() {
       tokenStorage: const SecureTokenStorage(),
     ),
   );
-  unawaited(authViewModel.bootstrap());
 
   runApp(
     ZigbeeSmartBuildingApp(
@@ -146,27 +145,46 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
   AuthViewModel _fallbackAuthViewModel() {
     // Tests that omit [authViewModelOverride] still need a working auth view
     // model. Production always supplies one via [main].
-    final viewModel = AuthViewModel(
+    return AuthViewModel(
       repository: RemoteAuthRepository(
         apiClient: ApiClient(baseUrl: apiBaseUrl),
         tokenStorage: const SecureTokenStorage(),
       ),
     );
-    unawaited(viewModel.bootstrap());
-    return viewModel;
   }
 }
 
 /// Swaps between [LoginView] and [SmartBuildingShell] based on the current
 /// [AuthViewModel] session.
-class _AuthGate extends StatelessWidget {
+class _AuthGate extends StatefulWidget {
   const _AuthGate({this.hideLogin = false});
 
   final bool hideLogin;
 
   @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.hideLogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final auth = context.read<AuthViewModel>();
+        if (!auth.isAuthenticated) {
+          unawaited(auth.bootstrap());
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (hideLogin) {
+    if (widget.hideLogin) {
       return const SmartBuildingShell();
     }
     final auth = context.watch<AuthViewModel>();

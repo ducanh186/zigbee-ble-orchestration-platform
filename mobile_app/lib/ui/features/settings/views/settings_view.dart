@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/expandable_content.dart';
 import '../../../core/widgets/section_title.dart';
+import '../../auth/view_models/auth_view_model.dart';
 import '../../devices/views/devices_view.dart';
 import '../../logs/views/logs_view.dart';
 import '../widgets/profile_view.dart';
@@ -87,7 +88,6 @@ class _SettingsOverview extends StatefulWidget {
 }
 
 class _SettingsOverviewState extends State<_SettingsOverview> {
-  bool _operatorExpanded = false;
   bool _appearanceExpanded = false;
   bool _themeExpanded = false;
   bool _languageExpanded = false;
@@ -102,6 +102,12 @@ class _SettingsOverviewState extends State<_SettingsOverview> {
     final localeController = context.watch<LocaleController>();
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
+    final session = context.watch<AuthViewModel>().session;
+    final accountSubtitle = _accountSubtitle(
+      username: session?.username,
+      userId: session?.userId,
+      homeId: session?.homeId,
+    );
 
     return CustomScrollView(
       slivers: [
@@ -110,32 +116,20 @@ class _SettingsOverviewState extends State<_SettingsOverview> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           sliver: SliverList.list(
             children: [
-              SectionTitle(
-                title: l10n.settingsOperator,
-                action: CollapseIconButton(
-                  key: const Key('settings-operator-toggle'),
-                  expanded: _operatorExpanded,
-                  onPressed: () {
-                    setState(() => _operatorExpanded = !_operatorExpanded);
-                  },
-                ),
-              ),
-              ExpandableBody(
-                expanded: _operatorExpanded,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    AppCard(
-                      padding: EdgeInsets.zero,
-                      child: _SettingsRow(
-                        icon: Icons.account_circle_outlined,
-                        title: l10n.settingsAccount,
-                        subtitle: 'operator@hust/lab01',
-                        onTap: widget.onOpenProfile,
-                      ),
+              SectionTitle(title: l10n.settingsOperator),
+              Column(
+                children: [
+                  const SizedBox(height: 8),
+                  AppCard(
+                    padding: EdgeInsets.zero,
+                    child: _SettingsRow(
+                      icon: Icons.account_circle_outlined,
+                      title: l10n.settingsAccount,
+                      subtitle: accountSubtitle,
+                      onTap: widget.onOpenProfile,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               SectionTitle(
@@ -491,6 +485,29 @@ class _SettingsInfoRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _accountSubtitle({
+  required String? username,
+  required String? userId,
+  required String? homeId,
+}) {
+  final parts = <String>[];
+  final cleanUsername = username?.trim();
+  final cleanUserId = userId?.trim();
+  final cleanHomeId = homeId?.trim();
+  if (cleanUsername != null && cleanUsername.isNotEmpty) {
+    parts.add(cleanUsername);
+  }
+  if (cleanUserId != null &&
+      cleanUserId.isNotEmpty &&
+      cleanUserId != cleanUsername) {
+    parts.add(cleanUserId);
+  }
+  if (cleanHomeId != null && cleanHomeId.isNotEmpty) {
+    parts.add(cleanHomeId);
+  }
+  return parts.isEmpty ? 'Not signed in' : parts.join(' / ');
 }
 
 class _SettingsRow extends StatelessWidget {

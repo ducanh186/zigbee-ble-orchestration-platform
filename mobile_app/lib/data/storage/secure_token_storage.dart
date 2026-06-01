@@ -37,6 +37,7 @@ class SecureTokenStorage implements TokenStorage {
       final expiresAtRaw = decoded['expiresAt'];
       return AuthSession(
         accessToken: accessToken,
+        username: decoded['username'] as String?,
         userId: decoded['userId'] as String?,
         role: decoded['role'] as String?,
         homeId: decoded['homeId'] as String?,
@@ -56,6 +57,7 @@ class SecureTokenStorage implements TokenStorage {
       key: _sessionKey,
       value: jsonEncode(<String, Object?>{
         'accessToken': session.accessToken,
+        'username': session.username,
         'userId': session.userId,
         'role': session.role,
         'homeId': session.homeId,

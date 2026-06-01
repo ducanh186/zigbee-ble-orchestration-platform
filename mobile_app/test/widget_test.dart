@@ -23,14 +23,27 @@ import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_ca
 
 class _PreAuthedRepository implements AuthRepository {
   @override
-  Future<AuthSession?> restoreSession() async =>
-      const AuthSession(accessToken: 'test-token');
+  Future<AuthSession?> restoreSession() async => AuthSession(
+    accessToken: 'test-token',
+    username: 'operator',
+    userId: 'operator-1',
+    role: 'operator',
+    homeId: 'home-01',
+    expiresAt: DateTime.utc(2026, 6, 1, 12),
+  );
 
   @override
   Future<AuthSession> login({
     required String username,
     required String password,
-  }) async => const AuthSession(accessToken: 'test-token');
+  }) async => AuthSession(
+    accessToken: 'test-token',
+    username: username,
+    userId: 'operator-1',
+    role: 'operator',
+    homeId: 'home-01',
+    expiresAt: DateTime.utc(2026, 6, 1, 12),
+  );
 
   @override
   Future<void> logout() async {}
@@ -412,21 +425,21 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.text('Account'), findsNothing);
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
+    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
     expect(find.text('APPEARANCE'), findsOneWidget);
     expect(find.text('Language'), findsNothing);
     expect(find.textContaining('Run remote mode'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('settings-operator-toggle')));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Account'));
     await tester.pumpAndSettle();
 
     expect(find.text('Profile'), findsOneWidget);
-    expect(find.text('Nguyen Tri'), findsOneWidget);
-    expect(find.text('Field technician'), findsOneWidget);
-    expect(find.text('ORGANIZATION'), findsOneWidget);
-    expect(find.text('SIGNED IN SINCE'), findsOneWidget);
+    expect(find.text('operator'), findsWidgets);
+    expect(find.text('operator-1'), findsWidgets);
+    expect(find.text('home-01'), findsOneWidget);
+    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
@@ -528,16 +541,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cài đặt'), findsWidgets);
-    expect(find.text('Tài khoản'), findsNothing);
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
+    expect(find.text('Tài khoản'), findsOneWidget);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
     expect(find.text('Ngôn ngữ'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('settings-operator-toggle')));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Tài khoản'));
     await tester.pumpAndSettle();
 
     expect(find.text('Hồ sơ'), findsOneWidget);
-    expect(find.text('Kỹ thuật hiện trường'), findsOneWidget);
+    expect(find.text('operator'), findsWidgets);
     await tester.drag(
       find.byType(CustomScrollView).last,
       const Offset(0, -350),
@@ -597,20 +610,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Theme'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('settings-operator-toggle')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
+    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
     await tester.tap(find.text('Account'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ORGANIZATION'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('profile-session-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('ORGANIZATION'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('profile-session-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('ORGANIZATION'), findsOneWidget);
+    expect(find.byKey(const Key('profile-session-toggle')), findsNothing);
+    expect(find.text('operator-1'), findsWidgets);
+    expect(find.text('operator'), findsWidgets);
+    expect(find.text('home-01'), findsOneWidget);
+    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
+    expect(find.text('HUST - IoT Lab'), findsNothing);
+    expect(find.text('07:01 05/16/2026'), findsNothing);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
