@@ -220,7 +220,7 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Device, Event
+            from cloud.app.models import Device, DeviceState, Event
             from sqlalchemy import select
 
             async with self._db_session_factory() as session:
@@ -250,6 +250,21 @@ class MQTTService:
                     occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
                 )
                 session.add(event)
+                if (
+                    device_type == "motion"
+                    and validated.get("event") == "occupancy_changed"
+                    and validated.get("occupancy") in {"occupied", "unoccupied"}
+                ):
+                    session.add(
+                        DeviceState(
+                            device_id=device_id,
+                            state={
+                                "occupancy": validated["occupancy"],
+                                "reachable": True,
+                            },
+                            reported_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                        )
+                    )
                 await session.commit()
                 logger.info("Saved event for %s (type=%s, event=%s)",
                             device_id, device_type, event.event_type)
@@ -487,6 +502,7 @@ class MQTTService:
                 return
             from cloud.app.models import (
                 Automation,
+                AutomationEvent,
                 Device,
                 Event,
                 ProvisioningSession,
@@ -497,6 +513,7 @@ class MQTTService:
             payload["gateway_id"] = envelope.get("gateway_id")
             payload["source"] = envelope.get("source")
             rule_id = payload.get("rule_id") or payload.get("automation_id")
+            occurred_at = _ts_ms_to_naive_utc(envelope.get("ts"))
 
             async with self._db_session_factory() as session:
                 session.add(
@@ -504,7 +521,7 @@ class MQTTService:
                         device_id=None,
                         event_type=event,
                         payload=payload,
-                        occurred_at=_ts_ms_to_naive_utc(envelope.get("ts")),
+                        occurred_at=occurred_at,
                     )
                 )
 
@@ -554,26 +571,52 @@ class MQTTService:
                                 prov.status = "failed"
                                 prov.reason = payload.get("reason") or "failed"
 
-                if isinstance(rule_id, str) and rule_id:
+                if isinstance(rule_id, str) and rule_id and event in (
+                    "automation_synced",
+                    "automation_sync_failed",
+                    "automation_executed",
+                ):
                     rule = await session.get(Automation, rule_id)
-                    if rule is not None:
-                        if event == "automation_synced":
+                    status: str | None = None
+                    reason: str | None = payload.get("reason")
+                    if event == "automation_synced":
+                        status = "synced"
+                        if rule is not None:
                             rule.sync_status = "synced"
                             rule.last_error = None
-                        elif event == "automation_sync_failed":
+                    elif event == "automation_sync_failed":
+                        status = "failed"
+                        if rule is not None:
                             rule.sync_status = "failed"
-                            rule.last_error = payload.get("reason")
-                        elif event == "automation_executed":
-                            result = payload.get("result")
-                            if result == "ok":
+                            rule.last_error = reason
+                    elif event == "automation_executed":
+                        result = payload.get("result")
+                        if result == "ok":
+                            status = "executed"
+                            if rule is not None:
                                 rule.last_run_status = "executed"
                                 rule.last_error = None
-                            elif result == "timeout":
+                        elif result == "timeout":
+                            status = "timeout"
+                            if rule is not None:
                                 rule.last_run_status = "timeout"
-                                rule.last_error = payload.get("reason")
-                            else:
+                                rule.last_error = reason
+                        else:
+                            status = "failed"
+                            if rule is not None:
                                 rule.last_run_status = "failed"
-                                rule.last_error = payload.get("reason")
+                                rule.last_error = reason
+
+                    session.add(
+                        AutomationEvent(
+                            automation_id=rule_id if rule is not None else None,
+                            event_type=event,
+                            status=status,
+                            reason=reason,
+                            payload=payload,
+                            occurred_at=occurred_at,
+                        )
+                    )
 
                 await session.commit()
 

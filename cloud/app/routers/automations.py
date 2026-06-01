@@ -48,6 +48,16 @@ def _require_string(payload: dict[str, Any], field: str) -> str:
     return value
 
 
+def _canonical_trigger(trigger: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(trigger)
+    if (
+        normalized.get("device_type") == "switch"
+        and normalized.get("event") == "toggle"
+    ):
+        normalized["event"] = "switch_toggle"
+    return normalized
+
+
 async def _require_device(
     db: AsyncSession,
     device_id: str,
@@ -136,6 +146,7 @@ async def create_automation(
     db: AsyncSession = Depends(get_db),
 ):
     await _validate_rule_template(db, body.trigger, body.actions)
+    trigger = _canonical_trigger(body.trigger)
     rule = Automation(
         id=uuid4().hex,
         name=body.name,
@@ -144,7 +155,7 @@ async def create_automation(
         site_id=settings.site_id,
         gateway_id=settings.gateway_id,
         version=1,
-        trigger=body.trigger,
+        trigger=trigger,
         actions=body.actions,
         sync_status="pending",
         last_run_status="never_run",
@@ -171,10 +182,11 @@ async def update_automation(
         raise HTTPException(status_code=409, detail="Automation version conflict")
 
     await _validate_rule_template(db, body.trigger, body.actions)
+    trigger = _canonical_trigger(body.trigger)
     rule.name = body.name
     rule.enabled = body.enabled
     rule.version += 1
-    rule.trigger = body.trigger
+    rule.trigger = trigger
     rule.actions = body.actions
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
     mark_sync_pending(rule, "automation.upsert")

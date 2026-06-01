@@ -159,6 +159,7 @@ class Automation(Base):
         ),
     )
 
+
 class ProvisioningSession(Base):
     """Secure install-code join session tracked by the cloud API."""
 
@@ -184,5 +185,35 @@ class ProvisioningSession(Base):
             "ix_provisioning_sessions_gateway_created",
             "gateway_id",
             "created_at",
+        ),
+    )
+
+
+class AutomationEvent(Base):
+    """Audit row for each automation lifecycle / execution event from the gateway.
+
+    Persisted by the MQTT subscriber when the gateway publishes
+    ``automation_synced``, ``automation_sync_failed``, or ``automation_executed``
+    envelopes on ``gateway/event``.  Drives the mobile rule card's last-run badge.
+    """
+
+    __tablename__ = "automation_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    automation_id = Column(
+        String, ForeignKey("automations.id"), nullable=True
+    )
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=True)
+    reason = Column(String, nullable=True)
+    payload = Column(JSON, nullable=False)
+    occurred_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_automation_events_rule_occurred",
+            "automation_id",
+            "occurred_at",
         ),
     )

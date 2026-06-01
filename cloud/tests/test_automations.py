@@ -216,6 +216,36 @@ async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_fact
 
 
 @pytest.mark.asyncio
+async def test_switch_toggle_alias_is_stored_as_canonical_event(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json={
+            "name": "Switch toggles lights",
+            "enabled": True,
+            "trigger": {
+                "device_id": "switch-01",
+                "device_type": "switch",
+                "event": "toggle",
+            },
+            "actions": [
+                {"device_id": "light-01", "device_type": "light", "command": "toggle"}
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["trigger"]["event"] == "switch_toggle"
+    assert (
+        fake_mqtt.published[-1]["payload"]["payload"]["trigger"]["event"]
+        == "switch_toggle"
+    )
+
+
+@pytest.mark.asyncio
 async def test_accepts_manual_motion_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
     body = _motion_on_rule()

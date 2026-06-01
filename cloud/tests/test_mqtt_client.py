@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 @pytest.mark.asyncio
 async def test_handle_motion_event_auto_registers_and_persists():
     from cloud.app.database import Base
-    from cloud.app.models import Device, Event
+    from cloud.app.models import Device, DeviceState, Event
     from cloud.app.mqtt_client import MQTTService
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
@@ -58,13 +58,19 @@ async def test_handle_motion_event_auto_registers_and_persists():
     deadline = asyncio.get_running_loop().time() + 1.0
     event = None
     device = None
+    state = None
     while asyncio.get_running_loop().time() < deadline:
         async with db_session_factory() as session:
             event = (
                 await session.execute(select(Event).where(Event.device_id == device_id))
             ).scalar_one_or_none()
             device = await session.get(Device, device_id)
-        if event and device:
+            state = (
+                await session.execute(
+                    select(DeviceState).where(DeviceState.device_id == device_id)
+                )
+            ).scalar_one_or_none()
+        if event and device and state:
             break
         await asyncio.sleep(0.01)
 
@@ -73,6 +79,9 @@ async def test_handle_motion_event_auto_registers_and_persists():
     assert event is not None
     assert event.event_type == "occupancy_changed"
     assert event.payload["occupancy"] == "occupied"
+    assert state is not None
+    assert state.state["occupancy"] == "occupied"
+    assert state.state["reachable"] is True
 
     await engine.dispose()
 

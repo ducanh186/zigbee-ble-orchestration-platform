@@ -300,6 +300,32 @@ class AutomationOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Gateway commissioning (open / close permit-join)
+# ---------------------------------------------------------------------------
+
+
+class AutomationEventOut(BaseModel):
+    """Public schema for `GET /api/automation-events`.
+
+    Each row mirrors a gateway lifecycle / execution event for one rule.
+    """
+
+    id: int
+    automation_id: str | None
+    event_type: str
+    status: str | None
+    reason: str | None
+    payload: dict[str, Any]
+    occurred_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("occurred_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
+
+# ---------------------------------------------------------------------------
 # Provisioning sessions (secure install-code join)
 # ---------------------------------------------------------------------------
 
@@ -376,11 +402,6 @@ class ProvisioningSessionOut(BaseModel):
     @field_serializer("expires_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
-
-
-# ---------------------------------------------------------------------------
-# Gateway commissioning (open / close permit-join)
-# ---------------------------------------------------------------------------
 
 
 class CommissioningOpenBody(BaseModel):

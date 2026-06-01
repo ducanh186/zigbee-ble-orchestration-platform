@@ -11,6 +11,7 @@ from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.routers import (
+    automation_events,
     automations,
     commands,
     devices,
@@ -67,6 +68,7 @@ app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(commands.router)
 app.include_router(automations.router)
+app.include_router(automation_events.router)
 app.include_router(gateways.router)
 app.include_router(gateways.devices_router)
 app.include_router(provisioning.router)
