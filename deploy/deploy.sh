@@ -147,20 +147,28 @@ PG_USER="${config[POSTGRES_USER]:-sb_user}"
 PG_PASS="${config[POSTGRES_PASSWORD]:-sb_pass}"
 PG_DB="${config[POSTGRES_DB]:-sb_cloud}"
 SB_DB_URL="${config[SB_DATABASE_URL]:-postgresql+asyncpg://$PG_USER:$PG_PASS@postgres:5432/$PG_DB}"
-SB_MQTT_HOST="${config[SB_MQTT_HOST]:-mosquitto}"
-SB_MQTT_USER="${config[SB_MQTT_USERNAME]:-client}"
-SB_MQTT_PASS="${config[SB_MQTT_PASSWORD]:-client123}"
-SB_TENANT="${config[SB_TENANT_ID]:-hust}"
-SB_SITE="${config[SB_SITE_ID]:-lab01}"
-SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
+  SB_MQTT_HOST="${config[SB_MQTT_HOST]:-mosquitto}"
+  SB_MQTT_USER="${config[SB_MQTT_USERNAME]:-client}"
+  SB_MQTT_PASS="${config[SB_MQTT_PASSWORD]:-client123}"
+  SB_API_AUTH_TOKEN="${config[SB_API_AUTH_TOKEN]:-}"
+  SB_TENANT="${config[SB_TENANT_ID]:-hust}"
+  SB_SITE="${config[SB_SITE_ID]:-lab01}"
+  SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
 
-ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
+  if [[ -z "$SB_API_AUTH_TOKEN" ]]; then
+    echo "ERROR: SB_API_AUTH_TOKEN is not set in deploy/.env.deploy"
+    echo "Generate a 32-byte token and put it in deploy/.env.deploy before deploy."
+    exit 1
+  fi
+
+  ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$SB_DB_URL
 SB_MQTT_HOST=$SB_MQTT_HOST
 SB_MQTT_PORT=1883
 SB_MQTT_USERNAME=$SB_MQTT_USER
 SB_MQTT_PASSWORD=$SB_MQTT_PASS
+SB_API_AUTH_TOKEN=$SB_API_AUTH_TOKEN
 SB_TENANT_ID=$SB_TENANT
 SB_SITE_ID=$SB_SITE
 SB_GATEWAY_ID=$SB_GW

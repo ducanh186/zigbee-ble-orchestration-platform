@@ -9,6 +9,7 @@ import os
 
 # Force sqlite before cloud modules import and instantiate the engine.
 os.environ.setdefault("SB_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("SB_API_AUTH_TOKEN", "test-api-token")
 
 import asyncio  # noqa: E402
 from typing import Any  # noqa: E402
@@ -125,8 +126,21 @@ async def client(db_session_factory, fake_mqtt):
     from cloud.app.main import app
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": "Bearer test-api-token"},
+    ) as c:
         # Lifespan started by ASGI transport; ensure device seed is easy via DB.
+        yield c
+
+
+@pytest_asyncio.fixture
+async def unauthenticated_client(db_session_factory, fake_mqtt):
+    from cloud.app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 

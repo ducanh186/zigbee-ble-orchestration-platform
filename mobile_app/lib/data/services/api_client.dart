@@ -3,25 +3,35 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  ApiClient({required String baseUrl, http.Client? httpClient})
+  ApiClient({required String baseUrl, String? accessToken, http.Client? httpClient})
     : baseUrl = baseUrl.replaceFirst(RegExp(r'/$'), ''),
+      accessToken = accessToken?.trim(),
       _httpClient = httpClient ?? http.Client();
 
   final String baseUrl;
+  final String? accessToken;
   final http.Client _httpClient;
 
   Future<Object?> getJson(String path) async {
-    final response = await _httpClient.get(_uri(path));
+    final response = await _httpClient.get(_uri(path), headers: _headers());
     return _decode(response);
   }
 
   Future<Object?> postJson(String path, Map<String, Object?> body) async {
     final response = await _httpClient.post(
       _uri(path),
-      headers: const {'Content-Type': 'application/json'},
+      headers: _headers(json: true),
       body: jsonEncode(body),
     );
     return _decode(response);
+  }
+
+  Map<String, String> _headers({bool json = false}) {
+    return {
+      if (json) 'Content-Type': 'application/json',
+      if (accessToken != null && accessToken!.isNotEmpty)
+        'Authorization': 'Bearer $accessToken',
+    };
   }
 
   Uri _uri(String path) {

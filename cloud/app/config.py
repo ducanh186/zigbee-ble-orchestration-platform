@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+
+_CLOUD_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
@@ -16,8 +21,9 @@ class Settings(BaseSettings):
     gateway_id: str = "gw-ubuntu-01"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_auth_token: str | None = None
 
-    model_config = {"env_prefix": "SB_", "env_file": ".env", "extra": "ignore"}
+    model_config = {"env_prefix": "SB_", "env_file": _CLOUD_ENV_FILE, "extra": "ignore"}
 
 
 settings = Settings()

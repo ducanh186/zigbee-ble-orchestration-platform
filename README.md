@@ -60,6 +60,13 @@ docker compose up -d
 
 Run the Cloud API:
 
+```powershell
+Copy-Item cloud\.env.example cloud\.env
+# Edit cloud\.env and set SB_API_AUTH_TOKEN to a private token.
+$token = (Get-Content cloud\.env | Where-Object { $_ -match '^SB_API_AUTH_TOKEN=' }) -replace '^SB_API_AUTH_TOKEN=', ''
+[Environment]::SetEnvironmentVariable('SB_API_AUTH_TOKEN', $token, 'User')
+```
+
 ```bash
 pip install -r cloud/requirements.txt
 python -m cloud.app.seed
@@ -74,13 +81,26 @@ pytest cloud/tests -q
 
 Run the Flutter app:
 
-```bash
+```powershell
 cd mobile_app
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000
+$token = [Environment]::GetEnvironmentVariable('SB_API_AUTH_TOKEN', 'User')
+flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000 --dart-define=ALLOW_INSECURE_API=true --dart-define=API_AUTH_TOKEN=$token
 ```
 
 For an Android emulator talking to a host machine API, use `10.0.2.2` instead
 of `localhost`.
+
+For a shared or deployed Cloud API, use HTTPS and the same private token:
+
+```powershell
+flutter build apk `
+  --dart-define=API_BASE_URL=https://your-api-domain.example.com `
+  --dart-define=API_AUTH_TOKEN=$token
+```
+
+Keep real tokens only in local files such as `cloud\.env` or
+`deploy\.env.deploy`, and share them with teammates through a password manager
+or another private channel. Commit only the example templates.
 
 ## Deploy
 
@@ -88,6 +108,7 @@ Copy and fill the deployment environment file:
 
 ```powershell
 Copy-Item deploy\.env.deploy.example deploy\.env.deploy
+# Edit deploy\.env.deploy and set SB_API_AUTH_TOKEN to the same private token.
 ```
 
 Deploy to EC2:

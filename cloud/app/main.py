@@ -3,10 +3,11 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from cloud.app.auth import require_api_token
 from cloud.app.command_timeout import run_timeout_worker
 from cloud.app.database import async_session, init_db
 from cloud.app.mqtt_client import mqtt_service
@@ -55,12 +56,13 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
-app.include_router(devices.router)
-app.include_router(events.router)
-app.include_router(commands.router)
-app.include_router(automations.router)
-app.include_router(gateways.router)
-app.include_router(gateways.devices_router)
+protected_api = [Depends(require_api_token)]
+app.include_router(devices.router, dependencies=protected_api)
+app.include_router(events.router, dependencies=protected_api)
+app.include_router(commands.router, dependencies=protected_api)
+app.include_router(automations.router, dependencies=protected_api)
+app.include_router(gateways.router, dependencies=protected_api)
+app.include_router(gateways.devices_router, dependencies=protected_api)
 
 # -- Serve web dashboard --
 _webdev_dir = Path(__file__).resolve().parent.parent / "webdev"

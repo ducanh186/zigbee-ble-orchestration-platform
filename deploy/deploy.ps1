@@ -205,9 +205,17 @@ $sbDbUrl = if ($config["SB_DATABASE_URL"]) { $config["SB_DATABASE_URL"] }  else 
 $sbMqttHost = if ($config["SB_MQTT_HOST"]) { $config["SB_MQTT_HOST"] }     else { "mosquitto" }
 $sbMqttUser = if ($config["SB_MQTT_USERNAME"]) { $config["SB_MQTT_USERNAME"] } else { "client" }
 $sbMqttPass = if ($config["SB_MQTT_PASSWORD"]) { $config["SB_MQTT_PASSWORD"] } else { "client123" }
+$sbApiAuthToken = if ($config["SB_API_AUTH_TOKEN"]) { $config["SB_API_AUTH_TOKEN"] } else { "" }
 $sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { "hust" }
 $sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
 $sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
+
+if ([string]::IsNullOrWhiteSpace($sbApiAuthToken)) {
+    Write-Host "ERROR: SB_API_AUTH_TOKEN is not set in deploy\.env.deploy" -ForegroundColor Red
+    Write-Host "  Generate one with:"
+    Write-Host "  [System.Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))"
+    exit 1
+}
 
 Invoke-EC2 @"
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
@@ -216,6 +224,7 @@ SB_MQTT_HOST=$sbMqttHost
 SB_MQTT_PORT=1883
 SB_MQTT_USERNAME=$sbMqttUser
 SB_MQTT_PASSWORD=$sbMqttPass
+SB_API_AUTH_TOKEN=$sbApiAuthToken
 SB_TENANT_ID=$sbTenant
 SB_SITE_ID=$sbSite
 SB_GATEWAY_ID=$sbGw

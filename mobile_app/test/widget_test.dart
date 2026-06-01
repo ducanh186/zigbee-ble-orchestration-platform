@@ -38,6 +38,23 @@ void main() {
     expect(find.text('Lab Light 01'), findsOneWidget);
   });
 
+  testWidgets('blocks remote HTTP startup without auth token', (tester) async {
+    await tester.pumpWidget(
+      ZigbeeSmartBuildingApp(
+        repository: MockDeviceRepository(),
+        automationRepository: MockAutomationRepository(),
+        apiBaseUrl: 'http://98.83.4.87:8000',
+        useMockApi: false,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remote API configuration blocked'), findsOneWidget);
+    expect(find.textContaining('API_AUTH_TOKEN'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+  });
+
   testWidgets('automation tab shows rule list and opens create sheet', (
     tester,
   ) async {
