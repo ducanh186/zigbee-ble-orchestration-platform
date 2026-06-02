@@ -23,9 +23,8 @@ from cloud.app.access_control import (
 from cloud.app.auth import get_current_user, require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command, ProvisioningSession, Room, User
+from cloud.app.models import Command, FactoryDevice, ProvisioningSession, Room, User
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.provisioning_install_code import generate_install_code
 from cloud.app.schemas import (
     ProvisioningErrorCode,
     ProvisioningLabelCreate,
@@ -66,11 +65,8 @@ async def create_provisioning_label(
     payload = {
         "version": 1,
         "eui64": body.eui64,
-        "install_code": body.install_code or generate_install_code(),
         "device_type": body.device_type,
     }
-    if body.model:
-        payload["model"] = body.model
     payload_json = json.dumps(payload, separators=(",", ":"))
     return {
         "payload": payload,
@@ -146,11 +142,25 @@ async def create_provisioning_session(
             f"active session already exists for eui64 '{body.device.eui64}'",
         )
 
+    factory_device = await db.get(FactoryDevice, body.device.eui64)
+    if factory_device is None or not factory_device.is_active:
+        _raise_contract_error(
+            404,
+            ProvisioningErrorCode.DEVICE_NOT_FACTORY_REGISTERED,
+            f"device eui64 '{body.device.eui64}' is not factory registered",
+        )
+    if factory_device.device_type != body.device.device_type:
+        _raise_contract_error(
+            422,
+            ProvisioningErrorCode.INVALID_QR_PAYLOAD,
+            "device_type does not match factory registry",
+        )
+
     now = datetime.now(UTC).replace(tzinfo=None)
     command_id = uuid4().hex
     target = {
         "eui64": body.device.eui64,
-        "install_code": body.device.install_code,
+        "install_code": factory_device.install_code,
         "duration_sec": DEFAULT_PROVISIONING_DURATION_SEC,
     }
     command = Command(
@@ -168,9 +178,9 @@ async def create_provisioning_session(
         gateway_id=body.gateway_id,
         room_id=body.room_id,
         eui64=body.device.eui64,
-        install_code=body.device.install_code,
-        device_type=body.device.device_type,
-        model=body.device.model,
+        install_code=factory_device.install_code,
+        device_type=factory_device.device_type,
+        model=factory_device.model,
         status="pending",
         command_id=command_id,
         expires_at=now + timedelta(seconds=DEFAULT_PROVISIONING_DURATION_SEC),

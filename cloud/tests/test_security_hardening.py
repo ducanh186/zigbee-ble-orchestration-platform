@@ -300,8 +300,20 @@ async def test_provisioning_session_requires_parent_and_same_home_room(
     db_session_factory,
 ):
     from cloud.app.config import settings
+    from cloud.app.models import FactoryDevice
 
     await _seed_two_home_devices(db_session_factory)
+    async with db_session_factory() as session:
+        session.add(
+            FactoryDevice(
+                eui64="A8D417FEFF570B00",
+                install_code="83FED3407A939723A5C639B26916D505C3B5",
+                device_type="light",
+                model="EFR32MG12_LIGHT_KIT",
+                is_active=True,
+            )
+        )
+        await session.commit()
     await _create_user(
         db_session_factory,
         user_id="parent-1",
@@ -316,9 +328,7 @@ async def test_provisioning_session_requires_parent_and_same_home_room(
         "room_id": "room-1",
         "device": {
             "eui64": "A8D417FEFF570B00",
-            "install_code": "83FED3407A939723A5C639B26916D505C3B5",
             "device_type": "light",
-            "model": "EFR32MG12_LIGHT_KIT",
         },
     }
 
