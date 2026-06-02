@@ -15,6 +15,7 @@
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
 #include "network-creator-security.h"
 #endif
+#include "app/framework/security/af-security.h"  // sli_zigbee_af_install_code_to_key
 
 #include <string.h>
 #include <stdio.h>
@@ -287,17 +288,29 @@ EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
     return EMBER_BAD_ARGUMENT;
   }
 
-  // With BDB_JOIN_USES_INSTALL_CODE_KEY=1 the network-creator-security
-  // plugin's plain OpenNetwork() returns INVALID_CALL by design. We bypass
-  // the plugin and just permit-join the radio directly; the joining device
-  // will trigger emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback,
-  // which returns the staged IC -> stack derives the TC link key via
-  // AES-MMO on the NCP side. No host-side hash needed.
-  if (durationSec > 254) durationSec = 254;
-  EmberStatus st = emberPermitJoining((uint8_t)durationSec);
+  // SDK 4.5.0 does NOT invoke emberAfPluginNetworkCreatorSecurityGetInstallCodeCallback
+  // on a plain emberPermitJoining (verified: the callback has no caller anywhere in the
+  // SDK/autogen), so the TC never gets a transient link key for the joining EUI and the
+  // install-code join is denied as "unsecured". Instead derive the APS link key from the
+  // install code (AES-MMO host helper) and open the network with that EUI+key pair, which
+  // imports the transient key on the NCP. Only this EUI may then join, using the IC key.
+  EmberKeyData key;
+  EmberStatus dk = sli_zigbee_af_install_code_to_key((uint8_t *)ic_bytes, ic_len, &key);
+  if (dk != EMBER_SUCCESS) {
+    secMgrForget(eui_le);
+    appLogLog("NET", "open_secure_fail",
+              "\"reason\":\"derive\",\"zstatus\":\"0x%02X\"", (unsigned)dk);
+    return dk;
+  }
+
+  // Opens permit-join for the plugin's NETWORK_OPEN_TIME_S and imports the transient
+  // key via sl_zb_sec_man_import_transient_key. durationSec drives our own bookkeeping
+  // / staging TTL only.
+  EmberStatus st = emberAfPluginNetworkCreatorSecurityOpenNetworkWithKeyPair((uint8_t *)eui_le, key);
+  memset(&key, 0, sizeof(key));   // never leave the derived link key on the stack
   if (st == EMBER_SUCCESS) {
-    g_networkOpen   = true;
-    g_openTick      = msTick();
+    g_networkOpen    = true;
+    g_openTick       = msTick();
     g_openDurationMs = (uint32_t)durationSec * 1000u;
 
     char extra[64];
@@ -305,6 +318,8 @@ EmberStatus netMgrOpenForJoinSecure(const EmberEUI64 eui_le,
              "\"duration_sec\":%u,\"trigger\":\"pjoin-secure\"",
              (unsigned)durationSec);
     appMqttPublishGatewayEvent("permit_join_opened", extra);
+  } else {
+    secMgrForget(eui_le);   // could not open -> drop the staged secret
   }
   appLogLog("NET", "open_secure_cmd",
             "\"zstatus\":\"0x%02X\",\"duration_s\":%u",
