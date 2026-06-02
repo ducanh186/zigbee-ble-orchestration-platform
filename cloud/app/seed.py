@@ -12,7 +12,16 @@ from sqlalchemy import delete, select, update
 
 from cloud.app.auth import hash_password
 from cloud.app.database import async_session, init_db
-from cloud.app.models import Command, Device, DeviceState, Event, Home, Room, User
+from cloud.app.models import (
+    Command,
+    Device,
+    DeviceState,
+    Event,
+    FactoryDevice,
+    Home,
+    Room,
+    User,
+)
 
 # Placeholder device IDs that were seeded before real MQTT registration existed.
 # These have no EUI64 and clutter the dashboard alongside real devices.
@@ -56,6 +65,27 @@ _SEEDED_USERS = [
         "viewer",
         "SB_VIEWER_INITIAL_PASSWORD",
         "SB_VIEWER_PASSWORD",
+    ),
+]
+
+_PLACEHOLDER_FACTORY_DEVICES = [
+    (
+        "0000000000000053",
+        "00112233445566778899AABBCCDDEEFF528F",
+        "motion",
+        "EFR32MG12_MOTION_KIT",
+    ),
+    (
+        "0000000000000054",
+        "102132435465768798A9BACBDCEDFE0F2D18",
+        "light",
+        "EFR32MG12_LIGHT_KIT",
+    ),
+    (
+        "0000000000000055",
+        "FFEEDDCCBBAA99887766554433221100520D",
+        "light",
+        "EFR32MG12_LIGHT_KIT",
     ),
 ]
 
@@ -130,6 +160,27 @@ async def _seed_missing_user(
     )
 
 
+async def _seed_missing_factory_device(
+    session,
+    eui64: str,
+    install_code: str,
+    device_type: str,
+    model: str,
+) -> None:
+    existing = await session.get(FactoryDevice, eui64)
+    if existing is not None:
+        return
+    session.add(
+        FactoryDevice(
+            eui64=eui64,
+            install_code=install_code,
+            device_type=device_type,
+            model=model,
+            is_active=True,
+        )
+    )
+
+
 async def seed() -> None:
     await init_db()
 
@@ -165,6 +216,15 @@ async def seed() -> None:
                 .where(Device.room_id.is_(None))
                 .values(room_id="room-01")
             )
+
+            for eui64, install_code, device_type, model in _PLACEHOLDER_FACTORY_DEVICES:
+                await _seed_missing_factory_device(
+                    session,
+                    eui64,
+                    install_code,
+                    device_type,
+                    model,
+                )
 
             for (
                 user_id,

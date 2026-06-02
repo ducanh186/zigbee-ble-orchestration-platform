@@ -181,7 +181,7 @@ Runbook: docs/production/production-operations.md
 - [x] Release steps are documented.
 - [x] Rollback procedure is documented.
 - [x] Final report links all evidence.
-- [x] All checklist items are complete or explicitly accepted as deferred by live validation items.
+- [x] All checklist items are complete or explicitly accepted as deferred by live validation items, including operator validation items.
 
 Status: Release candidate evidence verified locally. The platform remains not production ready until the deferred live validation items are completed.
 

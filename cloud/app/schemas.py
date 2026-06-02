@@ -14,8 +14,6 @@ from pydantic import (
     model_validator,
 )
 
-from cloud.app.provisioning_install_code import normalize_install_code
-
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
 
 
@@ -382,6 +380,7 @@ class ProvisioningErrorCode(str, Enum):
     INVALID_EUI64 = "INVALID_EUI64"
     INVALID_INSTALL_CODE = "INVALID_INSTALL_CODE"
     UNSUPPORTED_DEVICE_TYPE = "UNSUPPORTED_DEVICE_TYPE"
+    DEVICE_NOT_FACTORY_REGISTERED = "DEVICE_NOT_FACTORY_REGISTERED"
     GATEWAY_NOT_FOUND = "GATEWAY_NOT_FOUND"
     ROOM_NOT_FOUND = "ROOM_NOT_FOUND"
     SESSION_ALREADY_ACTIVE = "SESSION_ALREADY_ACTIVE"
@@ -389,33 +388,19 @@ class ProvisioningErrorCode(str, Enum):
 
 class ProvisioningDevicePayload(BaseModel):
     eui64: str
-    install_code: str
     device_type: Literal["light", "switch", "motion"]
-    model: str | None = None
 
     @field_validator("eui64")
     @classmethod
     def _validate_eui64(cls, value: str) -> str:
         if not _EUI64_RE.fullmatch(value):
             raise ValueError("eui64 must be 16 hex characters")
-        return value.upper()
-
-    @field_validator("install_code")
-    @classmethod
-    def _validate_install_code(cls, value: str) -> str:
-        if (
-            not _HEX_RE.fullmatch(value)
-            or len(value) not in _INSTALL_CODE_HEX_LENGTHS
-        ):
-            raise ValueError("install_code must be valid hex with CRC length")
         return value.upper()
 
 
 class ProvisioningLabelCreate(BaseModel):
     eui64: str
-    install_code: str | None = None
     device_type: Literal["light", "switch", "motion"]
-    model: str | None = None
 
     @field_validator("eui64")
     @classmethod
@@ -423,16 +408,6 @@ class ProvisioningLabelCreate(BaseModel):
         if not _EUI64_RE.fullmatch(value):
             raise ValueError("eui64 must be 16 hex characters")
         return value.upper()
-
-    @field_validator("install_code")
-    @classmethod
-    def _validate_install_code(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        try:
-            return normalize_install_code(value)
-        except ValueError as exc:
-            raise ValueError("install_code must be valid hex with CRC length") from exc
 
 
 class ProvisioningLabelOut(BaseModel):

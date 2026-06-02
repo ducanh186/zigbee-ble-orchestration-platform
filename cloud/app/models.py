@@ -204,6 +204,25 @@ class AutomationEvent(Base):
     )
 
 
+class FactoryDevice(Base):
+    """Factory-provisioned device secret indexed by public EUI64."""
+
+    __tablename__ = "factory_devices"
+
+    eui64 = Column(String, primary_key=True)
+    install_code = Column(String, nullable=False)
+    device_type = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    claimed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_factory_devices_type_active", "device_type", "is_active"),
+    )
+
+
 class ProvisioningSession(Base):
     """Secure install-code join session tracked by the cloud API."""
 
