@@ -52,7 +52,7 @@ class CloudStatus {
   const CloudStatus.mock()
     : this(
         state: CloudConnectionState.mock,
-        detail: 'Mock gateway log',
+        detail: 'Mock home hub log',
         gatewayId: 'gw-demo-01',
         eventType: 'gateway_online',
         occurredAt: '07:16 05/07/2026',

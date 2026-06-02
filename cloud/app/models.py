@@ -48,10 +48,16 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     username = Column(String, unique=True, nullable=False)
-    role = Column(String, nullable=False, default="user", server_default="user")
+    display_name = Column(String, nullable=True)
+    role = Column(String, nullable=False, default="viewer", server_default="viewer")
     password_hash = Column(String, nullable=True)
+    must_change_password = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    last_login_at = Column(DateTime, nullable=True)
+    password_changed_at = Column(DateTime, nullable=True)
     home_id = Column(String, ForeignKey("homes.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     home = relationship("Home", back_populates="users")
 

@@ -203,7 +203,11 @@ class _DeviceHeroCard extends StatelessWidget {
     final palette = context.palette;
     final isOn = device.power == DevicePower.on;
     final canCommand =
-        device.isLight && device.isReachable && !viewModel.hasPendingCommand;
+        device.isLight &&
+        device.power.canCommand &&
+        !viewModel.hasPendingCommand;
+    final canTurnOn = canCommand && device.power != DevicePower.on;
+    final canTurnOff = canCommand && device.power != DevicePower.off;
 
     return AppCard(
       padding: const EdgeInsets.all(20),
@@ -267,7 +271,7 @@ class _DeviceHeroCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: canCommand
+                    onPressed: canTurnOn
                         ? () => viewModel.setLightPower(device, DevicePower.on)
                         : null,
                     icon: viewModel.hasPendingCommand
@@ -283,7 +287,7 @@ class _DeviceHeroCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: canCommand
+                    onPressed: canTurnOff
                         ? () => viewModel.setLightPower(device, DevicePower.off)
                         : null,
                     icon: const Icon(Icons.power_settings_new),
@@ -484,9 +488,9 @@ class _LastCommandCard extends StatelessWidget {
     final status = command?.status ?? CommandStatus.idle;
     final message = switch (status) {
       CommandStatus.accepted => 'Sent to Cloud API',
-      CommandStatus.queued => 'Queued by gateway',
+      CommandStatus.queued => 'Queued by home hub',
       CommandStatus.sent => 'Waiting for device reply',
-      CommandStatus.executed => 'Acknowledged by gateway',
+      CommandStatus.executed => 'Acknowledged by home hub',
       CommandStatus.failed => command?.reason ?? 'Command failed',
       CommandStatus.timeout => 'No reply within polling window',
       CommandStatus.idle => 'No active command',
@@ -657,7 +661,7 @@ class _EventRow extends StatelessWidget {
       return 'Device registry updated';
     }
     if (event.eventType == 'gateway_health') {
-      return 'Gateway health updated';
+      return 'Home hub health updated';
     }
     if (event.message.length > 80) {
       return _humanize(event.eventType);

@@ -9,16 +9,16 @@ import pytest
 from cloud.tests.auth_helpers import create_auth_user, login_headers
 
 
-async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
     await create_auth_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
         home_id="home-1",
     )
-    return await login_headers(client, "operator", "operator-pass")
+    return await login_headers(client, "parent", "parent-pass")
 
 
 async def _admin_headers(client, db_session_factory) -> dict[str, str]:
@@ -229,7 +229,7 @@ async def test_get_automation_events_filters_by_rule(client, db_session_factory)
         )
         await session.commit()
 
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     resp = await client.get(
         "/api/automation-events?automation_id=rule-evt-01",

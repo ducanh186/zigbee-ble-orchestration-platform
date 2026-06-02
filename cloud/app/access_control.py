@@ -5,13 +5,15 @@ from sqlalchemy import false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.models import Automation, Device, ProvisioningSession, Room, User
-
-
-OPERATOR_ROLES = {"admin", "operator", "user"}
+from cloud.app.roles import is_admin_role, is_parent_or_admin_role
 
 
 def is_admin(user: User) -> bool:
-    return user.role == "admin"
+    return is_admin_role(user.role)
+
+
+def is_parent_or_admin(user: User) -> bool:
+    return is_parent_or_admin_role(user.role)
 
 
 def visible_device_clause(user: User):
@@ -48,6 +50,35 @@ async def get_visible_device_or_404(
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
     await ensure_device_visible(db, device, user)
+    return device
+
+
+async def ensure_device_manageable(
+    db: AsyncSession,
+    device: Device,
+    user: User,
+) -> None:
+    if is_admin(user):
+        return
+    if not is_parent_or_admin(user) or user.home_id is None:
+        raise HTTPException(status_code=403, detail="Device outside user home")
+    if device.room_id is None:
+        raise HTTPException(status_code=403, detail="Device outside user home")
+
+    room = await db.get(Room, device.room_id)
+    if room is None or room.home_id != user.home_id:
+        raise HTTPException(status_code=403, detail="Device outside user home")
+
+
+async def get_manageable_device_or_404(
+    db: AsyncSession,
+    device_id: str,
+    user: User,
+) -> Device:
+    device = await db.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    await ensure_device_manageable(db, device, user)
     return device
 
 

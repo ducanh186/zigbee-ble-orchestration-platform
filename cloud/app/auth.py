@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import User
+from cloud.app.roles import canonical_role, is_admin_role, is_parent_or_admin_role
 
 _HASH_ITERATIONS = 210_000
 
@@ -68,8 +69,9 @@ def create_access_token(user: User) -> str:
     header = {"alg": "HS256", "typ": "JWT"}
     payload = {
         "sub": user.id,
-        "role": user.role,
+        "role": canonical_role(user.role),
         "home_id": user.home_id,
+        "iat": int(time.time()),
         "exp": int(time.time()) + settings.auth_token_ttl_seconds,
     }
     header_json = json.dumps(header, separators=(",", ":"), sort_keys=True)
@@ -150,11 +152,25 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unknown bearer token user",
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+        )
     return user
 
 
+def require_password_changed(current_user: User) -> None:
+    if current_user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="password_change_required",
+        )
+
+
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
+    require_password_changed(current_user)
+    if not is_admin_role(current_user.role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin role required",
@@ -162,10 +178,22 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-async def require_operator(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {"admin", "operator", "user"}:
+async def require_parent_or_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    require_password_changed(current_user)
+    if not is_parent_or_admin_role(current_user.role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operator role required",
+            detail="Parent role required",
+        )
+    if canonical_role(current_user.role) == "parent" and current_user.home_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Parent home scope required",
         )
     return current_user
+
+
+async def require_operator(current_user: User = Depends(get_current_user)) -> User:
+    return await require_parent_or_admin(current_user)

@@ -30,7 +30,7 @@ class RemoteDeviceRepository implements DeviceRepository {
         }
       }
       return const CloudStatus.unknown(
-        detail: 'No gateway status log found in cloud events',
+        detail: 'No home hub status log found in cloud events',
       );
     } catch (error) {
       return CloudStatus.unknown(
@@ -73,7 +73,7 @@ class RemoteDeviceRepository implements DeviceRepository {
     }
     if (value == 'offline') {
       return CloudStatus.offline(
-        detail: 'Gateway reported offline',
+        detail: 'Home hub reported offline',
         gatewayId: gatewayId,
         eventType: resolvedEventType,
         occurredAt: occurredAt,
@@ -81,7 +81,7 @@ class RemoteDeviceRepository implements DeviceRepository {
     }
 
     return CloudStatus.unknown(
-      detail: value ?? 'Gateway log has no status value',
+      detail: value ?? 'Home hub log has no status value',
       gatewayId: gatewayId,
       eventType: resolvedEventType,
       occurredAt: occurredAt,
@@ -90,7 +90,7 @@ class RemoteDeviceRepository implements DeviceRepository {
 
   @override
   Future<List<SmartDevice>> fetchDevices() async {
-    final json = await _apiClient.getJson('/api/devices');
+    final json = await _apiClient.getJson('/api/devices/');
     final devices = (json as List)
         .whereType<Map>()
         .map((item) => DeviceApiModel.fromJson(Map<String, Object?>.from(item)))

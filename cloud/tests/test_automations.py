@@ -5,16 +5,16 @@ import pytest
 from cloud.tests.auth_helpers import create_auth_user, login_headers
 
 
-async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
     await create_auth_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
         home_id="home-1",
     )
-    return await login_headers(client, "operator", "operator-pass")
+    return await login_headers(client, "parent", "parent-pass")
 
 
 async def _seed_automation_devices(db_session_factory) -> None:
@@ -80,7 +80,7 @@ async def test_create_automation_persists_pending_rule(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations", json=_motion_on_rule(), headers=headers
@@ -109,7 +109,7 @@ async def test_create_automation_persists_pending_rule(
 @pytest.mark.asyncio
 async def test_list_and_detail_automations(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations", json=_motion_on_rule(), headers=headers
@@ -132,7 +132,7 @@ async def test_enable_disable_automation_marks_sync_pending(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
     created = (
         await client.post("/api/automations", json=body, headers=headers)
@@ -163,7 +163,7 @@ async def test_update_automation_bumps_version_and_rejects_stale_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations", json=_motion_on_rule(), headers=headers
@@ -211,7 +211,7 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations", json=_motion_on_rule(), headers=headers
@@ -239,7 +239,7 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
 @pytest.mark.asyncio
 async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
@@ -278,7 +278,7 @@ async def test_create_switch_rule_normalizes_legacy_toggle_event(
     the rule does not get rejected with `unsupported_trigger`.
     """
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
@@ -310,7 +310,7 @@ async def test_create_switch_rule_normalizes_legacy_toggle_event(
 @pytest.mark.asyncio
 async def test_create_switch_rule_rejects_unknown_event(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
@@ -338,7 +338,7 @@ async def test_update_normalizes_legacy_toggle_event(
 ):
     """PUT update path must also normalize `toggle` → `switch_toggle`."""
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations",
@@ -383,7 +383,7 @@ async def test_update_normalizes_legacy_toggle_event(
 @pytest.mark.asyncio
 async def test_accepts_manual_motion_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
         {"device_id": "light-01", "device_type": "light", "command": "off"}
@@ -398,7 +398,7 @@ async def test_accepts_manual_motion_action_choice(client, db_session_factory):
 @pytest.mark.asyncio
 async def test_accepts_manual_switch_light_action_choice(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations",
@@ -424,7 +424,7 @@ async def test_accepts_manual_switch_light_action_choice(client, db_session_fact
 @pytest.mark.asyncio
 async def test_rejects_non_light_action_device(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     body = _motion_on_rule()
     body["actions"] = [
         {"device_id": "switch-01", "device_type": "switch", "command": "toggle"}
@@ -438,7 +438,7 @@ async def test_rejects_non_light_action_device(client, db_session_factory):
 
 @pytest.mark.asyncio
 async def test_get_unknown_automation_404(client, db_session_factory):
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.get("/api/automations/missing", headers=headers)
 
@@ -454,7 +454,7 @@ async def test_create_publishes_retained_desired_upsert(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     response = await client.post(
         "/api/automations", json=_motion_on_rule(), headers=headers
@@ -480,7 +480,7 @@ async def test_enable_disable_publish_desired_with_bumped_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     body = _motion_on_rule() | {"enabled": False}
     created = (
         await client.post("/api/automations", json=body, headers=headers)
@@ -505,7 +505,7 @@ async def test_put_update_publishes_desired_with_bumped_version(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations", json=_motion_on_rule(), headers=headers
@@ -535,7 +535,7 @@ async def test_delete_publishes_retained_tombstone(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_automation_devices(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/automations", json=_motion_on_rule(), headers=headers

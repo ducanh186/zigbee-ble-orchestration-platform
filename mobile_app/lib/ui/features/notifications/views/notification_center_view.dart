@@ -71,7 +71,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Important cloud and gateway events',
+                        'Important cloud and home hub events',
                         style: TextStyle(color: context.palette.textSecondary),
                       ),
                     ),
@@ -208,7 +208,7 @@ enum _NotificationCategory {
   all('All', Icons.all_inbox_outlined),
   command('Command', Icons.bolt_outlined),
   automation('Automation', Icons.rule_outlined),
-  gateway('Gateway', Icons.router_outlined),
+  gateway('Home hub', Icons.router_outlined),
   ota('OTA', Icons.system_update_alt_outlined),
   other('Other', Icons.notifications_outlined);
 

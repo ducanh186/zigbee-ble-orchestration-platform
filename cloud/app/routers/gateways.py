@@ -13,7 +13,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cloud.app.auth import require_admin
+from cloud.app.access_control import get_manageable_device_or_404
+from cloud.app.auth import require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import Command, User
@@ -72,7 +73,7 @@ async def commissioning_open(
     gateway_id: str,
     body: CommissioningOpenBody,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_admin),
 ):
     """Open the Zigbee network for joining (broadcast permit join).
 
@@ -106,7 +107,7 @@ async def commissioning_close(
     gateway_id: str,
     body: CommissioningCloseBody,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(require_admin),
 ):
     """Close the Zigbee network (broadcast permit-join with duration=0)."""
     _verify_gateway_id(gateway_id)
@@ -150,7 +151,7 @@ devices_router = APIRouter(prefix="/api/devices", tags=["gateways"])
 async def device_rediscover(
     device_id: str,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     """Trigger ZDO Simple Descriptor classification for `device_id`.
 
@@ -160,6 +161,8 @@ async def device_rediscover(
     network) returns ``status=failed reason=device_not_on_network`` on the
     command reply.
     """
+    await get_manageable_device_or_404(db, device_id, current_user)
+
     timeout_ms = 5000
     command_id = uuid4().hex
     expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(

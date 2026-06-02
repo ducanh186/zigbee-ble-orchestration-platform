@@ -22,6 +22,12 @@ class _NeverAuthenticatedRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }
 
 class _StoredSessionRepository implements AuthRepository {
@@ -43,6 +49,12 @@ class _StoredSessionRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }
 
 void main() {

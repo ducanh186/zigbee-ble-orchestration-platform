@@ -4,22 +4,23 @@
 # Usage:
 #   bash deploy/setup-https.sh <https-host-or-ip> <remote-project-dir>
 #
-# For a public IP address, this uses Let's Encrypt IP address certificates:
-#   certbot certonly --standalone --preferred-profile shortlived --ip-address <ip>
-#
-# Certbot currently obtains IP certificates but does not install them into nginx,
-# so this script renders deploy/nginx/prod.conf and mounts /etc/letsencrypt into
-# the nginx container via docker-compose.prod.yml.
+# HTTPS_CERT_MODE=letsencrypt keeps the previous Certbot flow.
+# HTTPS_CERT_MODE=cloudflare-origin expects a Cloudflare Origin CA cert/key in
+# deploy/nginx/certs and disables the obsolete Let's Encrypt renewal timer.
 set -euo pipefail
 
 HTTPS_HOST="${1:?https host or IP is required}"
 REMOTE_DIR="${2:?remote project directory is required}"
+HTTPS_CERT_MODE="${HTTPS_CERT_MODE:-letsencrypt}"
 DEPLOY_DIR="$REMOTE_DIR/deploy"
 LE_DIR="$DEPLOY_DIR/nginx/letsencrypt"
+ORIGIN_CERT_DIR="$DEPLOY_DIR/nginx/certs"
+ORIGIN_CERT_PATH="$ORIGIN_CERT_DIR/cloudflare-origin.pem"
+ORIGIN_KEY_PATH="$ORIGIN_CERT_DIR/cloudflare-origin.key"
 NGINX_CONF="$DEPLOY_DIR/nginx/prod.conf"
 
 cd "$DEPLOY_DIR"
-mkdir -p "$LE_DIR"
+mkdir -p "$LE_DIR" "$ORIGIN_CERT_DIR"
 
 is_ip_address() {
   local value="$1"
@@ -27,10 +28,14 @@ is_ip_address() {
 }
 
 render_nginx_config() {
-  if grep -q '<HTTPS_HOST>' "$NGINX_CONF"; then
-    sed "s|<HTTPS_HOST>|$HTTPS_HOST|g" "$NGINX_CONF" > "$NGINX_CONF.rendered"
-    mv "$NGINX_CONF.rendered" "$NGINX_CONF"
-  fi
+  local cert_path="$1"
+  local key_path="$2"
+  sed \
+    -e "s|<HTTPS_HOST>|$HTTPS_HOST|g" \
+    -e "s|<SSL_CERTIFICATE_PATH>|$cert_path|g" \
+    -e "s|<SSL_CERTIFICATE_KEY_PATH>|$key_path|g" \
+    "$NGINX_CONF" > "$NGINX_CONF.rendered"
+  mv "$NGINX_CONF.rendered" "$NGINX_CONF"
 }
 
 request_certificate() {
@@ -166,8 +171,46 @@ EOF
   sudo systemctl enable --now iot-platform-renew-ip-cert.timer >/dev/null
 }
 
-prepare_certificate
-render_nginx_config
-install_renew_timer
+remove_renew_timer() {
+  sudo systemctl disable --now iot-platform-renew-ip-cert.timer >/dev/null 2>&1 || true
+  sudo rm -f \
+    /etc/systemd/system/iot-platform-renew-ip-cert.timer \
+    /etc/systemd/system/iot-platform-renew-ip-cert.service \
+    /usr/local/bin/iot-platform-renew-ip-cert.sh
+  sudo systemctl daemon-reload
+}
 
-echo "HTTPS prepared for $HTTPS_HOST."
+prepare_cloudflare_origin_certificate() {
+  if [[ ! -s "$ORIGIN_CERT_PATH" || ! -s "$ORIGIN_KEY_PATH" ]]; then
+    echo "ERROR: Cloudflare Origin CA cert/key are required for HTTPS_CERT_MODE=cloudflare-origin." >&2
+    echo "Expected:" >&2
+    echo "  $ORIGIN_CERT_PATH" >&2
+    echo "  $ORIGIN_KEY_PATH" >&2
+    exit 1
+  fi
+  chmod 0644 "$ORIGIN_CERT_PATH"
+  chmod 0600 "$ORIGIN_KEY_PATH"
+  remove_renew_timer
+}
+
+case "$HTTPS_CERT_MODE" in
+  letsencrypt)
+    prepare_certificate
+    render_nginx_config \
+      "/etc/letsencrypt/live/$HTTPS_HOST/fullchain.pem" \
+      "/etc/letsencrypt/live/$HTTPS_HOST/privkey.pem"
+    install_renew_timer
+    ;;
+  cloudflare-origin)
+    prepare_cloudflare_origin_certificate
+    render_nginx_config \
+      "/etc/nginx/certs/cloudflare-origin.pem" \
+      "/etc/nginx/certs/cloudflare-origin.key"
+    ;;
+  *)
+    echo "ERROR: Unsupported HTTPS_CERT_MODE: $HTTPS_CERT_MODE" >&2
+    exit 1
+    ;;
+esac
+
+echo "HTTPS prepared for $HTTPS_HOST using $HTTPS_CERT_MODE."

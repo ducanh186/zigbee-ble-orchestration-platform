@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cloud.app.access_control import ensure_automation_visible
+from cloud.app.access_control import ensure_automation_visible, is_admin
 from cloud.app.auth import get_current_user
 from cloud.app.database import get_db
 from cloud.app.models import Automation, AutomationEvent, User
@@ -31,7 +31,7 @@ async def list_automation_events(
     result = await db.execute(stmt)
     events = result.scalars().all()
 
-    if current_user.role == "admin":
+    if is_admin(current_user):
         return events[offset : offset + limit]
 
     visible = []

@@ -163,7 +163,7 @@ void main() {
           repository: _UnauthorizedAuthRepository(),
         );
 
-        await viewModel.login(username: 'operator', password: 'wrong');
+        await viewModel.login(username: 'parent', password: 'wrong');
 
         expect(viewModel.isAuthenticated, isFalse);
         expect(viewModel.errorMessage, isNotNull);
@@ -195,4 +195,10 @@ class _UnauthorizedAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }

@@ -173,7 +173,7 @@ Lỗi hay gặp và fix nhanh:
 | `SB_MQTT_PASSWORD` | `client` | MQTT password |
 | `SB_TENANT_ID` | `hust` | Tenant ID |
 | `SB_SITE_ID` | `lab01` | Site ID |
-| `SB_GATEWAY_ID` | `gw-ubuntu-01` | Gateway ID |
+| `SB_GATEWAY_ID` | `gw-ubuntu-01` | Home hub identifier |
 | `SB_API_HOST` | `0.0.0.0` | API bind host |
 | `SB_API_PORT` | `8000` | API bind port |
 

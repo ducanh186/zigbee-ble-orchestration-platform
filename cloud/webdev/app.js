@@ -7,7 +7,6 @@ const DEFAULT_TARGET = {
 
 const state = {
   apiBase: loadSetting("apiBase", defaultApiBase()),
-  gatewayId: loadSetting("gatewayId", DEFAULT_GATEWAY_ID),
   devices: [],
   deviceStates: new Map(),
   selectedDeviceId: null,
@@ -61,7 +60,6 @@ const AUTOMATION_TEMPLATES = {
 
 const els = {
   apiBaseInput: byId("apiBaseInput"),
-  gatewayIdInput: byId("gatewayIdInput"),
   joinDurationInput: byId("joinDurationInput"),
   saveSettingsBtn: byId("saveSettingsBtn"),
   refreshBtn: byId("refreshBtn"),
@@ -85,7 +83,6 @@ const els = {
   sendLevelBtn: byId("sendLevelBtn"),
   sendRawBtn: byId("sendRawBtn"),
   deleteDeviceBtn: byId("deleteDeviceBtn"),
-  gatewayMeta: byId("gatewayMeta"),
   openJoinBtn: byId("openJoinBtn"),
   closeJoinBtn: byId("closeJoinBtn"),
   labelEui64Input: byId("labelEui64Input"),
@@ -119,9 +116,7 @@ init();
 
 function init() {
   els.apiBaseInput.value = state.apiBase;
-  els.gatewayIdInput.value = state.gatewayId;
   els.rawTargetInput.value = JSON.stringify(DEFAULT_TARGET, null, 2);
-  els.gatewayMeta.textContent = state.gatewayId;
   bindEvents();
   refreshAll();
   scheduleRefresh();
@@ -168,11 +163,8 @@ function bindEvents() {
 
 function saveSettings() {
   state.apiBase = normalizeApiBase(els.apiBaseInput.value);
-  state.gatewayId = els.gatewayIdInput.value.trim() || DEFAULT_GATEWAY_ID;
   localStorage.setItem("cloudOps.apiBase", state.apiBase);
-  localStorage.setItem("cloudOps.gatewayId", state.gatewayId);
   els.apiBaseInput.value = state.apiBase;
-  els.gatewayMeta.textContent = state.gatewayId;
   toast("Settings saved");
   refreshAll();
 }
@@ -704,13 +696,13 @@ async function closeJoin() {
 
 async function createGatewayCommand(action, body) {
   try {
-    const gatewayId = encodeURIComponent(state.gatewayId);
+    const gatewayId = encodeURIComponent(DEFAULT_GATEWAY_ID);
     const command = await fetchJson(`/api/gateways/${gatewayId}/commissioning/${action}`, {
       method: "POST",
       body: JSON.stringify(body),
     });
     await trackCommand(command);
-    toast(`Gateway command ${command.status}: ${command.id}`);
+    toast(`Device join request ${command.status}: ${command.id}`);
   } catch (error) {
     toast(cleanError(error));
   }

@@ -29,6 +29,7 @@ class RuleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final opacity = rule.enabled ? 1.0 : 0.72;
+    final showMutationControls = onDelete != null || onEnabledChanged != null;
 
     return Opacity(
       opacity: opacity,
@@ -93,23 +94,27 @@ class RuleCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Delete rule',
-                      icon: const Icon(Icons.delete_outline, size: 19),
-                      color: palette.error,
-                      onPressed: onDelete,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Switch(
-                      value: rule.enabled,
-                      onChanged: onEnabledChanged,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ],
-                ),
+                if (showMutationControls)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onDelete != null)
+                        IconButton(
+                          tooltip: 'Delete rule',
+                          icon: const Icon(Icons.delete_outline, size: 19),
+                          color: palette.error,
+                          onPressed: onDelete,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (onEnabledChanged != null)
+                        Switch(
+                          value: rule.enabled,
+                          onChanged: onEnabledChanged,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 10),

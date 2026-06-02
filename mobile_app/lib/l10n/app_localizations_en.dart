@@ -54,9 +54,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileApiEndpoint => 'API endpoint';
 
   @override
-  String get profileGateway => 'Gateway';
-
-  @override
   String get profileActions => 'Actions';
 
   @override
@@ -69,10 +66,126 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileSignOut => 'Sign out';
 
   @override
-  String get settingsOperator => 'Operator';
+  String get settingsAccountCenter => 'Settings';
 
   @override
   String get settingsAccount => 'Account';
+
+  @override
+  String get settingsAccountDetails => 'Account details';
+
+  @override
+  String get settingsRole => 'Role';
+
+  @override
+  String get settingsHomeScope => 'Home scope';
+
+  @override
+  String get settingsHomeSummary => 'Home summary';
+
+  @override
+  String get settingsRolePermissions => 'Role permissions';
+
+  @override
+  String get settingsMember => 'Member';
+
+  @override
+  String get settingsMemberHint =>
+      'Read-only: devices, state, motion, and event log';
+
+  @override
+  String get settingsParentHomeOwner => 'Parent · Home Owner';
+
+  @override
+  String get settingsParentHomeOwnerHint => 'Full control inside own home';
+
+  @override
+  String get settingsSystemAdmin => 'System Admin';
+
+  @override
+  String get settingsSystemAdminHint =>
+      'Technical and production system access';
+
+  @override
+  String get settingsHomeManagement => 'Home management';
+
+  @override
+  String get settingsDevices => 'Devices';
+
+  @override
+  String get settingsAddNewDevice => 'Add new device';
+
+  @override
+  String get settingsAutomationRules => 'Automation rules';
+
+  @override
+  String get settingsActivityHistory => 'Activity history';
+
+  @override
+  String get settingsDeviceControl => 'Device control';
+
+  @override
+  String get settingsDeviceControlHint =>
+      'Turn lights on or off inside this home';
+
+  @override
+  String get settingsAutomationCrud => 'Automation CRUD';
+
+  @override
+  String get settingsAutomationCrudHint =>
+      'Create, edit, enable, disable, and delete rules';
+
+  @override
+  String get settingsProvisioningDevice => 'Provisioning device';
+
+  @override
+  String get settingsProvisioningDeviceHint => 'Add a new device to this home';
+
+  @override
+  String get settingsDeleteDevice => 'Delete device';
+
+  @override
+  String get settingsDeleteDeviceHint =>
+      'Remove only devices that belong to this home';
+
+  @override
+  String get settingsRediscoverDevice => 'Rediscover device';
+
+  @override
+  String get settingsRediscoverDeviceHint =>
+      'Ask the home hub to classify a home device again';
+
+  @override
+  String get settingsSystemOnly => 'System only';
+
+  @override
+  String get settingsProductionConfig => 'Production config';
+
+  @override
+  String get settingsProductionConfigHint =>
+      'Admin-only tenant, site, and system identity settings';
+
+  @override
+  String get settingsMqttTlsSecurity => 'MQTT/TLS security';
+
+  @override
+  String get settingsMqttTlsSecurityHint =>
+      'Admin-only broker, certificate, and security config';
+
+  @override
+  String get settingsCloudConnection => 'Cloud connection';
+
+  @override
+  String get settingsHttpsStatus => 'HTTPS status';
+
+  @override
+  String get settingsAdvanced => 'Advanced';
+
+  @override
+  String get settingsConnectionSettings => 'Connection settings';
+
+  @override
+  String get settingsPreferences => 'Preferences';
 
   @override
   String get settingsAppearance => 'Appearance';
@@ -130,10 +243,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDiagnostics => 'Open diagnostics';
 
   @override
+  String get settingsSession => 'Session';
+
+  @override
   String get settingsLogout => 'Logout';
 
   @override
-  String get settingsLogoutHint => 'End this operator session';
+  String get settingsLogoutHint => 'End this account session';
+
+  @override
+  String get settingsLogoutConfirmTitle => 'Log out?';
+
+  @override
+  String get settingsLogoutConfirmBody =>
+      'End this account session on this device.';
+
+  @override
+  String get settingsLogoutConfirmCancel => 'Cancel';
+
+  @override
+  String get settingsLogoutConfirmAction => 'Log out';
 
   @override
   String get logsNoEvents => 'No event log yet.';

@@ -185,16 +185,16 @@ async def _seed_room(db_session_factory, room_id: str = "room-1"):
         await s.commit()
 
 
-async def _operator_headers(client, db_session_factory) -> dict[str, str]:
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
     await create_auth_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
         home_id="home-1",
     )
-    return await login_headers(client, "operator", "operator-pass")
+    return await login_headers(client, "parent", "parent-pass")
 
 
 def _create_body(**overrides):
@@ -221,7 +221,7 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
     from cloud.app.models import Command, ProvisioningSession
 
     await _seed_room(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     r = await client.post(
         "/api/provisioning/sessions", json=_create_body(), headers=headers
@@ -271,7 +271,7 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
 @pytest.mark.asyncio
 async def test_get_provisioning_session_api(client, db_session_factory):
     await _seed_room(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/provisioning/sessions", json=_create_body(), headers=headers
@@ -294,7 +294,7 @@ async def test_get_provisioning_session_api(client, db_session_factory):
 async def test_create_provisioning_session_unknown_gateway_404(
     client, db_session_factory, fake_mqtt
 ):
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     r = await client.post(
         "/api/provisioning/sessions",
@@ -311,7 +311,7 @@ async def test_create_provisioning_session_unknown_gateway_404(
 async def test_create_provisioning_session_unknown_room_404(
     client, db_session_factory, fake_mqtt
 ):
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     r = await client.post(
         "/api/provisioning/sessions", json=_create_body(), headers=headers
@@ -327,7 +327,7 @@ async def test_create_provisioning_session_duplicate_active_409(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     first = await client.post(
         "/api/provisioning/sessions", json=_create_body(), headers=headers
     )
@@ -350,7 +350,7 @@ async def test_delete_provisioning_session_cancels_non_terminal(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
         await client.post(
             "/api/provisioning/sessions", json=_create_body(), headers=headers
@@ -389,7 +389,7 @@ async def test_delete_provisioning_session_rejects_terminal(
         )
         await s.commit()
 
-    headers = await _operator_headers(client, db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
     r = await client.delete(
         "/api/provisioning/sessions/prov-joined", headers=headers

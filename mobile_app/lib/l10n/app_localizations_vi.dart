@@ -54,9 +54,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get profileApiEndpoint => 'Cloud endpoint';
 
   @override
-  String get profileGateway => 'Gateway';
-
-  @override
   String get profileActions => 'Tác vụ';
 
   @override
@@ -69,10 +66,122 @@ class AppLocalizationsVi extends AppLocalizations {
   String get profileSignOut => 'Đăng xuất';
 
   @override
-  String get settingsOperator => 'Người vận hành';
+  String get settingsAccountCenter => 'Cài đặt';
 
   @override
   String get settingsAccount => 'Tài khoản';
+
+  @override
+  String get settingsAccountDetails => 'Chi tiết tài khoản';
+
+  @override
+  String get settingsRole => 'Vai trò';
+
+  @override
+  String get settingsHomeScope => 'Phạm vi home';
+
+  @override
+  String get settingsHomeSummary => 'Tóm tắt home';
+
+  @override
+  String get settingsRolePermissions => 'Quyền vai trò';
+
+  @override
+  String get settingsMember => 'Thành viên';
+
+  @override
+  String get settingsMemberHint =>
+      'Chỉ xem: thiết bị, state, motion và event log';
+
+  @override
+  String get settingsParentHomeOwner => 'Chủ nhà';
+
+  @override
+  String get settingsParentHomeOwnerHint => 'Toàn quyền trong home của mình';
+
+  @override
+  String get settingsSystemAdmin => 'Quản trị hệ thống';
+
+  @override
+  String get settingsSystemAdminHint => 'Quyền kỹ thuật và production system';
+
+  @override
+  String get settingsHomeManagement => 'Quản lý home';
+
+  @override
+  String get settingsDevices => 'Thiết bị';
+
+  @override
+  String get settingsAddNewDevice => 'Thêm thiết bị mới';
+
+  @override
+  String get settingsAutomationRules => 'Luật tự động hóa';
+
+  @override
+  String get settingsActivityHistory => 'Lịch sử hoạt động';
+
+  @override
+  String get settingsDeviceControl => 'Điều khiển thiết bị';
+
+  @override
+  String get settingsDeviceControlHint => 'Bật hoặc tắt light trong home này';
+
+  @override
+  String get settingsAutomationCrud => 'Automation CRUD';
+
+  @override
+  String get settingsAutomationCrudHint => 'Tạo, sửa, bật, tắt và xóa rule';
+
+  @override
+  String get settingsProvisioningDevice => 'Provisioning thiết bị';
+
+  @override
+  String get settingsProvisioningDeviceHint => 'Thêm thiết bị mới vào home này';
+
+  @override
+  String get settingsDeleteDevice => 'Xóa device';
+
+  @override
+  String get settingsDeleteDeviceHint => 'Chỉ xóa device thuộc home này';
+
+  @override
+  String get settingsRediscoverDevice => 'Rediscover device';
+
+  @override
+  String get settingsRediscoverDeviceHint =>
+      'Yêu cầu home hub phân loại lại device trong home';
+
+  @override
+  String get settingsSystemOnly => 'Chỉ hệ thống';
+
+  @override
+  String get settingsProductionConfig => 'Cấu hình production';
+
+  @override
+  String get settingsProductionConfigHint =>
+      'Chỉ admin được đổi tenant, site và định danh hệ thống';
+
+  @override
+  String get settingsMqttTlsSecurity => 'Bảo mật MQTT/TLS';
+
+  @override
+  String get settingsMqttTlsSecurityHint =>
+      'Chỉ admin được đổi broker, certificate và security config';
+
+  @override
+  String get settingsCloudConnection => 'Kết nối cloud';
+
+  @override
+  String get settingsHttpsStatus => 'Trạng thái HTTPS';
+
+  @override
+  String get settingsAdvanced => 'Nâng cao';
+
+  @override
+  String get settingsConnectionSettings => 'Cài đặt kết nối';
+
+  @override
+  String get settingsPreferences => 'Tùy chọn';
 
   @override
   String get settingsAppearance => 'Giao diện';
@@ -130,10 +239,26 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsDiagnostics => 'Mở chẩn đoán';
 
   @override
+  String get settingsSession => 'Phiên';
+
+  @override
   String get settingsLogout => 'Đăng xuất';
 
   @override
-  String get settingsLogoutHint => 'Kết thúc phiên vận hành';
+  String get settingsLogoutHint => 'Kết thúc phiên tài khoản';
+
+  @override
+  String get settingsLogoutConfirmTitle => 'Đăng xuất?';
+
+  @override
+  String get settingsLogoutConfirmBody =>
+      'Kết thúc phiên tài khoản trên thiết bị này.';
+
+  @override
+  String get settingsLogoutConfirmCancel => 'Hủy';
+
+  @override
+  String get settingsLogoutConfirmAction => 'Đăng xuất';
 
   @override
   String get logsNoEvents => 'Chưa có nhật ký sự kiện.';

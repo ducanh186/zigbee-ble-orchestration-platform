@@ -7,7 +7,7 @@ import '../../../core/theme/app_theme.dart';
 class EmptyRules extends StatelessWidget {
   const EmptyRules({required this.onCreate, super.key});
 
-  final VoidCallback onCreate;
+  final VoidCallback? onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,7 @@ class EmptyRules extends StatelessWidget {
             width: 240,
             child: Text(
               'Create a rule to react when a motion sensor or switch fires. '
-              'Cloud will save it and sync to the gateway.',
+              'Cloud will save it and sync to your home hub.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -56,21 +56,23 @@ class EmptyRules extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onCreate,
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('New rule'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          if (onCreate != null) ...[
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onCreate,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New rule'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

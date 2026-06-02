@@ -23,6 +23,7 @@ import 'security/runtime_config_guard.dart';
 import 'ui/core/localization/locale_controller.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/features/auth/view_models/auth_view_model.dart';
+import 'ui/features/auth/views/change_password_view.dart';
 import 'ui/features/auth/views/login_view.dart';
 import 'ui/features/automation/view_models/automation_view_model.dart';
 import 'ui/features/devices/view_models/device_dashboard_view_model.dart';
@@ -109,12 +110,10 @@ class ZigbeeSmartBuildingApp extends StatelessWidget {
               AppRuntimeConfig(apiBaseUrl: apiBaseUrl, useMockApi: useMockApi),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              DeviceDashboardViewModel(repository: repository)..load(),
+          create: (_) => DeviceDashboardViewModel(repository: repository),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              AutomationViewModel(repository: automationRepository)..load(),
+          create: (_) => AutomationViewModel(repository: automationRepository),
         ),
         Provider<ProvisioningRepository>(
           create: (_) =>
@@ -201,6 +200,9 @@ class _AuthGateState extends State<_AuthGate> {
     }
     if (!auth.isAuthenticated) {
       return const LoginView();
+    }
+    if (auth.session?.mustChangePassword ?? false) {
+      return const ChangePasswordView();
     }
     return const SmartBuildingShell();
   }
