@@ -13,7 +13,7 @@ from cloud.app.access_control import (
     ensure_device_visible,
     filter_visible_automations,
 )
-from cloud.app.auth import get_current_user, require_operator
+from cloud.app.auth import get_current_user, require_parent_or_admin
 from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
@@ -201,7 +201,7 @@ async def get_automation(
 async def create_automation(
     body: AutomationCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     await _validate_rule_template(db, body.trigger, body.actions, current_user)
     # MVP cap: contract §11.
@@ -266,7 +266,7 @@ async def _set_enabled(
 async def enable_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     return await _set_enabled(automation_id, True, db, current_user)
 
@@ -275,7 +275,7 @@ async def enable_automation(
 async def disable_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     return await _set_enabled(automation_id, False, db, current_user)
 
@@ -285,7 +285,7 @@ async def update_automation(
     automation_id: str,
     body: AutomationUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     rule = await db.get(Automation, automation_id)
     if rule is None:
@@ -324,7 +324,7 @@ async def update_automation(
 async def delete_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     """Publish retained tombstone; keep row in DB until gateway acks.
 

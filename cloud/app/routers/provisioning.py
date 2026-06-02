@@ -20,7 +20,7 @@ from cloud.app.access_control import (
     ensure_provisioning_session_visible,
     ensure_room_visible,
 )
-from cloud.app.auth import get_current_user, require_admin, require_operator
+from cloud.app.auth import get_current_user, require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.models import Command, ProvisioningSession, Room, User
@@ -111,7 +111,7 @@ async def _get_session_or_404(
 async def create_provisioning_session(
     body: ProvisioningSessionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     if body.gateway_id != settings.gateway_id:
         _raise_contract_error(
@@ -204,7 +204,7 @@ async def get_provisioning_session(
 async def cancel_provisioning_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     session = await _get_session_or_404(db, session_id)
     await ensure_provisioning_session_visible(db, session, current_user)

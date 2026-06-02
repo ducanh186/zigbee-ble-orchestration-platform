@@ -41,6 +41,12 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> logout() async {
     logoutCalls++;
   }
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }
 
 Future<void> _pumpApp(
@@ -80,7 +86,7 @@ void main() {
 
     await _pumpApp(tester, authViewModel: viewModel);
 
-    await tester.enterText(find.byKey(const Key('login-username')), 'operator');
+    await tester.enterText(find.byKey(const Key('login-username')), 'parent');
     await tester.enterText(find.byKey(const Key('login-password')), 'password');
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
@@ -103,7 +109,7 @@ void main() {
 
     await _pumpApp(tester, authViewModel: viewModel);
 
-    await tester.enterText(find.byKey(const Key('login-username')), 'operator');
+    await tester.enterText(find.byKey(const Key('login-username')), 'parent');
     await tester.enterText(find.byKey(const Key('login-password')), 'wrong');
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
@@ -125,7 +131,7 @@ void main() {
     await _pumpApp(tester, authViewModel: viewModel);
 
     // Sign in.
-    await tester.enterText(find.byKey(const Key('login-username')), 'operator');
+    await tester.enterText(find.byKey(const Key('login-username')), 'parent');
     await tester.enterText(find.byKey(const Key('login-password')), 'password');
     await tester.tap(find.byKey(const Key('login-submit')));
     await tester.pumpAndSettle();
@@ -136,15 +142,19 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    // Scroll to the Logout row at the bottom of the settings sheet.
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -800),
+    // Scroll to the Logout row at the bottom of Settings.
+    await tester.scrollUntilVisible(
+      find.text('Logout'),
+      400,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Logout'), findsOneWidget);
     await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+    expect(find.text('Log out?'), findsOneWidget);
+    await tester.tap(find.text('Log out'));
     await tester.pumpAndSettle();
 
     expect(repo.logoutCalls, 1);

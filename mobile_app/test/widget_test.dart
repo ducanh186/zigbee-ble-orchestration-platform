@@ -22,12 +22,16 @@ import 'package:zigbee_smart_building/ui/features/devices/view_models/device_das
 import 'package:zigbee_smart_building/ui/features/home/widgets/gateway_status_card.dart';
 
 class _PreAuthedRepository implements AuthRepository {
+  _PreAuthedRepository({this.role = 'parent'});
+
+  final String role;
+
   @override
   Future<AuthSession?> restoreSession() async => AuthSession(
     accessToken: 'test-token',
-    username: 'operator',
-    userId: 'operator-1',
-    role: 'operator',
+    username: role,
+    userId: '$role-1',
+    role: role,
     homeId: 'home-01',
     expiresAt: DateTime.utc(2026, 6, 1, 12),
   );
@@ -39,14 +43,20 @@ class _PreAuthedRepository implements AuthRepository {
   }) async => AuthSession(
     accessToken: 'test-token',
     username: username,
-    userId: 'operator-1',
-    role: 'operator',
+    userId: '$role-1',
+    role: role,
     homeId: 'home-01',
     expiresAt: DateTime.utc(2026, 6, 1, 12),
   );
 
   @override
   Future<void> logout() async {}
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }
 
 class _GatewayHealthRepository extends MockDeviceRepository {
@@ -139,12 +149,15 @@ void main() {
     required bool useMockApi,
     DeviceRepository? repository,
     AutomationRepository? automationRepository,
+    String role = 'parent',
   }) async {
     SharedPreferences.setMockInitialValues({});
     // SCRUM-29 wraps the app in an auth gate. Pre-authenticate the dashboard
     // tests so they continue to render the shell on first frame.
-    final authViewModel = AuthViewModel(repository: _PreAuthedRepository());
-    await authViewModel.login(username: 'operator', password: 'password');
+    final authViewModel = AuthViewModel(
+      repository: _PreAuthedRepository(role: role),
+    );
+    await authViewModel.login(username: role, password: 'password');
 
     await tester.pumpWidget(
       ZigbeeSmartBuildingApp(
@@ -327,16 +340,13 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -350),
+    await tester.scrollUntilVisible(
+      find.text('Devices'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Device inventory'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Device inventory'));
+    await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Lab Motion'));
@@ -417,67 +427,92 @@ void main() {
     expect(find.textContaining('light-01'), findsOneWidget);
   });
 
-  testWidgets('settings owns devices logs account logout and runtime toggle', (
-    tester,
-  ) async {
+  testWidgets('settings shows compact parent-facing sections', (tester) async {
     await pumpDashboard(tester, useMockApi: true);
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
-    expect(find.text('Account'), findsOneWidget);
-    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
-    expect(find.text('APPEARANCE'), findsOneWidget);
-    expect(find.text('Language'), findsNothing);
-    expect(find.textContaining('Run remote mode'), findsNothing);
-
-    await tester.tap(find.text('Account'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Profile'), findsOneWidget);
-    expect(find.text('operator'), findsWidgets);
-    expect(find.text('operator-1'), findsWidgets);
-    expect(find.text('home-01'), findsOneWidget);
-    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -250),
+    expect(find.text('Settings'), findsWidgets);
+    expect(find.text('Account Center'), findsNothing);
+    expect(find.text('HOME SUMMARY'), findsOneWidget);
+    expect(find.text('Parent · Home Owner'), findsOneWidget);
+    expect(find.text('Home: home-01'), findsOneWidget);
+    expect(find.text('Role permissions'), findsNothing);
+    expect(find.text('Member'), findsNothing);
+    expect(find.text('System Admin'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('HOME MANAGEMENT'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
+    expect(find.text('HOME MANAGEMENT'), findsOneWidget);
+    expect(find.text('Devices'), findsOneWidget);
+    expect(find.text('Add new device'), findsOneWidget);
+    expect(find.text('Automation rules'), findsOneWidget);
+    expect(find.text('Activity history'), findsOneWidget);
+    expect(find.text('Device control'), findsNothing);
+    expect(find.text('Automation CRUD'), findsNothing);
+    expect(find.text('Provisioning device'), findsNothing);
+    expect(find.text('Delete device'), findsNothing);
+    expect(find.text('Rediscover device'), findsNothing);
+    expect(find.text('SYSTEM ONLY'), findsNothing);
+    expect(find.text('Production config'), findsNothing);
+    expect(find.text('MQTT/TLS security'), findsNothing);
+    expect(find.text('API base URL'), findsNothing);
+    expect(find.text('HTTPS status'), findsNothing);
+    expect(find.text('Poll interval'), findsNothing);
+    expect(find.text('Command timeout'), findsNothing);
+    expect(find.text('Build'), findsNothing);
+    expect(find.text('Diagnostics'), findsNothing);
 
-    expect(find.text('CLOUD'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('settings-cloud-toggle')));
+    await tester.scrollUntilVisible(
+      find.text('Theme'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.byType(SegmentedButton<AppThemeMode>), findsNothing);
+    expect(find.byType(SegmentedButton<String>), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('ADVANCED'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Connection settings'), findsOneWidget);
+    expect(find.text('API base URL'), findsNothing);
+    expect(find.text('HTTPS status'), findsNothing);
+    await tester.tap(find.text('Connection settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('API base URL'), findsOneWidget);
+    expect(find.text('HTTPS status'), findsOneWidget);
     expect(find.text('Poll interval'), findsOneWidget);
     expect(find.text('Command timeout'), findsOneWidget);
 
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -350),
+    expect(find.textContaining('operator'), findsNothing);
+    expect(find.textContaining('Operator'), findsNothing);
+    expect(find.text('Gateway ID'), findsNothing);
+    expect(find.text('API Gateway'), findsNothing);
+    expect(find.byKey(const Key('settings-appearance-toggle')), findsNothing);
+    expect(find.byKey(const Key('settings-cloud-toggle')), findsNothing);
+    expect(find.byKey(const Key('settings-workspace-toggle')), findsNothing);
+    expect(find.byKey(const Key('settings-about-toggle')), findsNothing);
+    expect(find.textContaining('Run remote mode'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Devices'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Device inventory'), findsOneWidget);
-    expect(find.text('Cloud logs'), findsOneWidget);
-
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -500),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('ABOUT'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('settings-about-toggle')));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.text('Device inventory'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Device inventory'));
+    await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
 
     expect(find.text('Devices'), findsWidgets);
@@ -496,20 +531,13 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
 
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -350),
+    await tester.scrollUntilVisible(
+      find.text('Activity history'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('settings-workspace-toggle')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Cloud logs'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cloud logs'));
+    await tester.tap(find.text('Activity history'));
     await tester.pumpAndSettle();
 
     expect(find.text('Logs'), findsWidgets);
@@ -524,6 +552,30 @@ void main() {
     expect(find.text('Event payload'), findsNothing);
   });
 
+  testWidgets('settings logout requires confirmation', (tester) async {
+    await pumpDashboard(tester, useMockApi: true);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Logout'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Log out?'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Log out'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Settings'), findsWidgets);
+  });
+
   testWidgets('settings language switch updates localized copy', (
     tester,
   ) async {
@@ -532,51 +584,61 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-language-toggle')));
+    await tester.scrollUntilVisible(
+      find.text('Language'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('Vi'));
+    await tester.tap(find.text('Language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tiếng Việt'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, 1600),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Cài đặt'), findsWidgets);
-    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
-    expect(find.text('Tài khoản'), findsOneWidget);
-    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
+    expect(find.byKey(const Key('settings-appearance-toggle')), findsNothing);
+    expect(find.text('Tóm tắt home'), findsOneWidget);
+    expect(find.text('Chủ nhà'), findsWidgets);
+    expect(find.text('Home: home-01'), findsOneWidget);
+    expect(find.textContaining('operator'), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Ngôn ngữ'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Ngôn ngữ'), findsOneWidget);
 
-    await tester.tap(find.text('Tài khoản'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Hồ sơ'), findsOneWidget);
-    expect(find.text('operator'), findsWidgets);
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -350),
+    await tester.scrollUntilVisible(
+      find.text('Lịch sử hoạt động'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Đổi mật khẩu'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -350),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(
-      find.byKey(const Key('settings-workspace-toggle')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Nhật ký cloud'), findsOneWidget);
+    expect(find.text('Lịch sử hoạt động'), findsOneWidget);
   });
 
-  testWidgets('settings profile and logs sections collapse and expand', (
+  testWidgets('viewer shell hides mutation entry points', (tester) async {
+    await pumpDashboard(tester, useMockApi: true, role: 'viewer');
+
+    expect(find.text('Provisioning'), findsNothing);
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Automation Rules'), findsWidgets);
+    expect(find.text('New rule'), findsNothing);
+    expect(find.text('Delete'), findsNothing);
+  });
+
+  testWidgets('settings compact rows stay stable during navigation', (
     tester,
   ) async {
     await pumpDashboard(tester, useMockApi: true);
@@ -584,61 +646,26 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.text('Theme'), findsNothing);
-    expect(find.text('Language'), findsNothing);
-    expect(find.textContaining('Affects all'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Theme'), findsOneWidget);
-    expect(find.text('Grey'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('settings-theme-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Grey'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('settings-theme-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Grey'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Theme'), findsNothing);
-
-    await tester.tap(find.byKey(const Key('settings-appearance-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.text('Theme'), findsOneWidget);
-
-    expect(find.byKey(const Key('settings-operator-toggle')), findsNothing);
-    expect(find.text('operator / operator-1 / home-01'), findsOneWidget);
-    await tester.tap(find.text('Account'));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('profile-session-toggle')), findsNothing);
-    expect(find.text('operator-1'), findsWidgets);
-    expect(find.text('operator'), findsWidgets);
-    expect(find.text('home-01'), findsOneWidget);
-    expect(find.text('2026-06-01T12:00:00.000Z'), findsOneWidget);
-    expect(find.text('HUST - IoT Lab'), findsNothing);
-    expect(find.text('07:01 05/16/2026'), findsNothing);
-
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -500),
+    expect(find.text('Parent · Home Owner'), findsOneWidget);
+    expect(find.text('Home: home-01'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Theme'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('settings-workspace-toggle')),
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
+    expect(find.byKey(const Key('settings-theme-toggle')), findsNothing);
+    expect(find.byKey(const Key('settings-language-toggle')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Activity history'),
+      500,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Cloud logs'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cloud logs'));
+    await tester.tap(find.text('Activity history'));
     await tester.pumpAndSettle();
 
     expect(find.text('State reported: on'), findsNothing);
@@ -649,7 +676,7 @@ void main() {
     expect(find.text('State reported: on'), findsOneWidget);
   });
 
-  testWidgets('gateway health logs use a compact consistent summary', (
+  testWidgets('home hub health logs use a compact consistent summary', (
     tester,
   ) async {
     await pumpDashboard(
@@ -665,15 +692,17 @@ void main() {
       const Offset(0, -500),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings-workspace-toggle')));
+    await tester.scrollUntilVisible(
+      find.text('Activity history'),
+      500,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Cloud logs'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cloud logs'));
+    await tester.tap(find.text('Activity history'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Success - gateway - Health reported - connected, 1444096ms'),
+      find.text('Success - home hub - Health reported - connected, 1444096ms'),
       findsOneWidget,
     );
     expect(
@@ -705,13 +734,13 @@ void main() {
     expect(ThemeController().mode, AppThemeMode.dark);
   });
 
-  testWidgets('does not present mock data as a real gateway status', (
+  testWidgets('does not present mock data as a real home hub status', (
     tester,
   ) async {
     await pumpDashboard(tester, useMockApi: true);
 
-    expect(find.text('Mock gateway log'), findsOneWidget);
-    expect(find.text('Gateway online'), findsNothing);
+    expect(find.text('Mock home hub log'), findsOneWidget);
+    expect(find.text('Home hub online'), findsNothing);
   });
 
   testWidgets('home dashboard does not overflow on a narrow phone viewport', (
@@ -725,7 +754,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('gateway status card shows unknown instead of guessing', (
+  testWidgets('home hub status card shows unknown instead of guessing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -734,16 +763,16 @@ void main() {
         home: const Scaffold(
           body: GatewayStatusCard(
             status: CloudStatus.unknown(
-              detail: 'No gateway status log found in cloud events',
+              detail: 'No home hub status log found in cloud events',
             ),
           ),
         ),
       ),
     );
 
-    expect(find.text('Gateway status unknown'), findsOneWidget);
+    expect(find.text('Home hub status unknown'), findsOneWidget);
     expect(
-      find.text('No gateway status log found in cloud events'),
+      find.text('No home hub status log found in cloud events'),
       findsOneWidget,
     );
   });

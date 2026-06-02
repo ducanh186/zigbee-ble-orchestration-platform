@@ -29,7 +29,7 @@ class FakeTokenStorage implements TokenStorage {
 
 void main() {
   test(
-    'login parses access_token, username, user_id, role, home_id, expires_at',
+    'login parses access_token, username, user_id, role, home_id, must_change_password, expires_at',
     () async {
       final tokenStorage = FakeTokenStorage();
       final repository = RemoteAuthRepository(
@@ -40,15 +40,17 @@ void main() {
             expect(request.method, 'POST');
             expect(request.url.path, '/auth/login');
             final body = jsonDecode(request.body) as Map<String, Object?>;
-            expect(body['username'], 'operator');
+            expect(body['username'], 'parent');
             expect(body['password'], 'password');
             return http.Response(
               jsonEncode({
                 'access_token': 'token-abc',
-                'username': 'operator',
-                'user_id': 'operator-1',
-                'role': 'user',
+                'username': 'parent',
+                'user_id': 'parent-1',
+                'display_name': 'Demo Parent',
+                'role': 'parent',
                 'home_id': 'home-1',
+                'must_change_password': true,
                 'expires_at': '2026-05-16T12:00:00Z',
               }),
               200,
@@ -59,37 +61,57 @@ void main() {
       );
 
       final session = await repository.login(
-        username: 'operator',
+        username: 'parent',
         password: 'password',
       );
 
       expect(session.accessToken, 'token-abc');
-      expect(session.username, 'operator');
-      expect(session.userId, 'operator-1');
-      expect(session.role, 'user');
+      expect(session.username, 'parent');
+      expect(session.userId, 'parent-1');
+      expect(session.displayName, 'Demo Parent');
+      expect(session.role, 'parent');
       expect(session.homeId, 'home-1');
+      expect(session.mustChangePassword, isTrue);
       expect(session.expiresAt, DateTime.utc(2026, 5, 16, 12));
-      expect(tokenStorage.session?.username, 'operator');
+      expect(tokenStorage.session?.username, 'parent');
       expect(tokenStorage.session?.accessToken, 'token-abc');
     },
   );
 
   test(
-    'restoreSession returns stored unexpired token and primes ApiClient',
+    'restoreSession validates stored token with auth me and refreshes saved user info',
     () async {
       final tokenStorage = FakeTokenStorage()
         ..session = AuthSession(
           accessToken: 'stored-token',
-          userId: 'operator-1',
-          role: 'user',
+          username: 'parent',
+          userId: 'parent-1',
+          role: 'parent',
           homeId: 'home-1',
+          mustChangePassword: false,
           expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
         );
-      late Map<String, String> headers;
+      final paths = <String>[];
+      final authHeaders = <String?>[];
       final apiClient = ApiClient(
         baseUrl: 'http://98.83.4.87:8000',
         httpClient: MockClient((request) async {
-          headers = request.headers;
+          paths.add(request.url.path);
+          authHeaders.add(request.headers['Authorization']);
+          if (request.url.path == '/auth/me') {
+            return http.Response(
+              jsonEncode({
+                'username': 'parent',
+                'user_id': 'parent-1',
+                'display_name': 'Demo Parent',
+                'role': 'parent',
+                'home_id': 'home-1',
+                'must_change_password': true,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
           return http.Response(
             jsonEncode([]),
             200,
@@ -106,9 +128,40 @@ void main() {
       await apiClient.getJson('/devices');
 
       expect(session?.accessToken, 'stored-token');
-      expect(headers['Authorization'], 'Bearer stored-token');
+      expect(session?.displayName, 'Demo Parent');
+      expect(session?.mustChangePassword, isTrue);
+      expect(paths, ['/auth/me', '/devices']);
+      expect(authHeaders, ['Bearer stored-token', 'Bearer stored-token']);
+      expect(tokenStorage.session?.displayName, 'Demo Parent');
     },
   );
+
+  test('restoreSession clears stored token when auth me rejects it', () async {
+    final tokenStorage = FakeTokenStorage()
+      ..session = AuthSession(
+        accessToken: 'stored-token',
+        expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      );
+    final repository = RemoteAuthRepository(
+      tokenStorage: tokenStorage,
+      apiClient: ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/auth/me');
+          return http.Response(
+            jsonEncode({'detail': 'Unknown bearer token user'}),
+            401,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      ),
+    );
+
+    final session = await repository.restoreSession();
+
+    expect(session, isNull);
+    expect(tokenStorage.clearCalls, 1);
+  });
 
   test('restoreSession clears expired stored token', () async {
     final tokenStorage = FakeTokenStorage()
@@ -133,7 +186,7 @@ void main() {
         baseUrl: 'http://98.83.4.87:8000',
         httpClient: MockClient((request) async {
           return http.Response(
-            jsonEncode({'user_id': 'operator-1'}),
+            jsonEncode({'user_id': 'parent-1'}),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -142,7 +195,7 @@ void main() {
     );
 
     expect(
-      () => repository.login(username: 'operator', password: 'password'),
+      () => repository.login(username: 'parent', password: 'password'),
       throwsA(
         isA<ApiException>().having(
           (e) => e.message,
@@ -168,7 +221,7 @@ void main() {
     );
 
     expect(
-      () => repository.login(username: 'operator', password: 'bad'),
+      () => repository.login(username: 'parent', password: 'bad'),
       throwsA(
         isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401),
       ),
@@ -197,5 +250,36 @@ void main() {
 
     expect(calledMethod, 'POST');
     expect(calledPath, '/auth/logout');
+  });
+
+  test('changePassword POSTs and clears local session', () async {
+    final tokenStorage = FakeTokenStorage()
+      ..session = const AuthSession(accessToken: 'stored-token');
+    var calledPath = '';
+    var requestBody = <String, Object?>{};
+    final repository = RemoteAuthRepository(
+      tokenStorage: tokenStorage,
+      apiClient: ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          calledPath = request.url.path;
+          requestBody = jsonDecode(request.body) as Map<String, Object?>;
+          expect(request.headers['Authorization'], 'Bearer stored-token');
+          return http.Response('', 204);
+        }),
+      ),
+    );
+
+    await repository.changePassword(
+      oldPassword: 'old-pass',
+      newPassword: 'new-pass',
+    );
+
+    expect(calledPath, '/auth/change-password');
+    expect(requestBody, {
+      'old_password': 'old-pass',
+      'new_password': 'new-pass',
+    });
+    expect(tokenStorage.clearCalls, 1);
   });
 }

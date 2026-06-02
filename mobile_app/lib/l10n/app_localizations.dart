@@ -188,12 +188,6 @@ abstract class AppLocalizations {
   /// **'API endpoint'**
   String get profileApiEndpoint;
 
-  /// No description provided for @profileGateway.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway'**
-  String get profileGateway;
-
   /// No description provided for @profileActions.
   ///
   /// In en, this message translates to:
@@ -218,17 +212,233 @@ abstract class AppLocalizations {
   /// **'Sign out'**
   String get profileSignOut;
 
-  /// No description provided for @settingsOperator.
+  /// No description provided for @settingsAccountCenter.
   ///
   /// In en, this message translates to:
-  /// **'Operator'**
-  String get settingsOperator;
+  /// **'Settings'**
+  String get settingsAccountCenter;
 
   /// No description provided for @settingsAccount.
   ///
   /// In en, this message translates to:
   /// **'Account'**
   String get settingsAccount;
+
+  /// No description provided for @settingsAccountDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Account details'**
+  String get settingsAccountDetails;
+
+  /// No description provided for @settingsRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get settingsRole;
+
+  /// No description provided for @settingsHomeScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Home scope'**
+  String get settingsHomeScope;
+
+  /// No description provided for @settingsHomeSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Home summary'**
+  String get settingsHomeSummary;
+
+  /// No description provided for @settingsRolePermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Role permissions'**
+  String get settingsRolePermissions;
+
+  /// No description provided for @settingsMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get settingsMember;
+
+  /// No description provided for @settingsMemberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only: devices, state, motion, and event log'**
+  String get settingsMemberHint;
+
+  /// No description provided for @settingsParentHomeOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent · Home Owner'**
+  String get settingsParentHomeOwner;
+
+  /// No description provided for @settingsParentHomeOwnerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Full control inside own home'**
+  String get settingsParentHomeOwnerHint;
+
+  /// No description provided for @settingsSystemAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'System Admin'**
+  String get settingsSystemAdmin;
+
+  /// No description provided for @settingsSystemAdminHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical and production system access'**
+  String get settingsSystemAdminHint;
+
+  /// No description provided for @settingsHomeManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Home management'**
+  String get settingsHomeManagement;
+
+  /// No description provided for @settingsDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get settingsDevices;
+
+  /// No description provided for @settingsAddNewDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add new device'**
+  String get settingsAddNewDevice;
+
+  /// No description provided for @settingsAutomationRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation rules'**
+  String get settingsAutomationRules;
+
+  /// No description provided for @settingsActivityHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity history'**
+  String get settingsActivityHistory;
+
+  /// No description provided for @settingsDeviceControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Device control'**
+  String get settingsDeviceControl;
+
+  /// No description provided for @settingsDeviceControlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn lights on or off inside this home'**
+  String get settingsDeviceControlHint;
+
+  /// No description provided for @settingsAutomationCrud.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation CRUD'**
+  String get settingsAutomationCrud;
+
+  /// No description provided for @settingsAutomationCrudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create, edit, enable, disable, and delete rules'**
+  String get settingsAutomationCrudHint;
+
+  /// No description provided for @settingsProvisioningDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Provisioning device'**
+  String get settingsProvisioningDevice;
+
+  /// No description provided for @settingsProvisioningDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a new device to this home'**
+  String get settingsProvisioningDeviceHint;
+
+  /// No description provided for @settingsDeleteDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete device'**
+  String get settingsDeleteDevice;
+
+  /// No description provided for @settingsDeleteDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove only devices that belong to this home'**
+  String get settingsDeleteDeviceHint;
+
+  /// No description provided for @settingsRediscoverDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Rediscover device'**
+  String get settingsRediscoverDevice;
+
+  /// No description provided for @settingsRediscoverDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the home hub to classify a home device again'**
+  String get settingsRediscoverDeviceHint;
+
+  /// No description provided for @settingsSystemOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'System only'**
+  String get settingsSystemOnly;
+
+  /// No description provided for @settingsProductionConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Production config'**
+  String get settingsProductionConfig;
+
+  /// No description provided for @settingsProductionConfigHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin-only tenant, site, and system identity settings'**
+  String get settingsProductionConfigHint;
+
+  /// No description provided for @settingsMqttTlsSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'MQTT/TLS security'**
+  String get settingsMqttTlsSecurity;
+
+  /// No description provided for @settingsMqttTlsSecurityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin-only broker, certificate, and security config'**
+  String get settingsMqttTlsSecurityHint;
+
+  /// No description provided for @settingsCloudConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud connection'**
+  String get settingsCloudConnection;
+
+  /// No description provided for @settingsHttpsStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTPS status'**
+  String get settingsHttpsStatus;
+
+  /// No description provided for @settingsAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsAdvanced;
+
+  /// No description provided for @settingsConnectionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection settings'**
+  String get settingsConnectionSettings;
+
+  /// No description provided for @settingsPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get settingsPreferences;
 
   /// No description provided for @settingsAppearance.
   ///
@@ -338,6 +548,12 @@ abstract class AppLocalizations {
   /// **'Open diagnostics'**
   String get settingsDiagnostics;
 
+  /// No description provided for @settingsSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get settingsSession;
+
   /// No description provided for @settingsLogout.
   ///
   /// In en, this message translates to:
@@ -347,8 +563,32 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLogoutHint.
   ///
   /// In en, this message translates to:
-  /// **'End this operator session'**
+  /// **'End this account session'**
   String get settingsLogoutHint;
+
+  /// No description provided for @settingsLogoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?'**
+  String get settingsLogoutConfirmTitle;
+
+  /// No description provided for @settingsLogoutConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'End this account session on this device.'**
+  String get settingsLogoutConfirmBody;
+
+  /// No description provided for @settingsLogoutConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get settingsLogoutConfirmCancel;
+
+  /// No description provided for @settingsLogoutConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get settingsLogoutConfirmAction;
 
   /// No description provided for @logsNoEvents.
   ///

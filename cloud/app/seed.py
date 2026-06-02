@@ -6,9 +6,11 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
+from cloud.app.auth import hash_password
 from cloud.app.database import async_session, init_db
 from cloud.app.models import Command, Device, DeviceState, Event, Home, Room, User
 
@@ -30,6 +32,33 @@ _LEGACY_PLACEHOLDER_IDS = {
     "0xPROBE", "0xTEST", "0xPROBE2",
 }
 
+_SEEDED_USERS = [
+    (
+        "admin",
+        "admin",
+        "System Admin",
+        "admin",
+        "SB_ADMIN_INITIAL_PASSWORD",
+        "SB_ADMIN_PASSWORD",
+    ),
+    (
+        "parent",
+        "parent",
+        "Parent / Home Owner",
+        "parent",
+        "SB_PARENT_INITIAL_PASSWORD",
+        "SB_PARENT_PASSWORD",
+    ),
+    (
+        "viewer",
+        "viewer",
+        "Member",
+        "viewer",
+        "SB_VIEWER_INITIAL_PASSWORD",
+        "SB_VIEWER_PASSWORD",
+    ),
+]
+
 
 async def _upsert(session, model, pk: str, **kwargs):
     """Insert a row if its primary key does not already exist."""
@@ -41,6 +70,64 @@ async def _upsert(session, model, pk: str, **kwargs):
     obj = model(id=pk, **kwargs)
     session.add(obj)
     return obj
+
+
+def _initial_password(new_env: str, legacy_env: str) -> str | None:
+    password = os.getenv(new_env)
+    if password:
+        return password
+    legacy_password = os.getenv(legacy_env)
+    if legacy_password:
+        print(f"Deprecated env {legacy_env} is set. Use {new_env} instead.")
+        return legacy_password
+    return None
+
+
+def _seeded_user_kwargs(
+    username: str,
+    display_name: str,
+    role: str,
+    new_password_env: str,
+    legacy_password_env: str,
+) -> dict:
+    kwargs = {
+        "username": username,
+        "display_name": display_name,
+        "role": role,
+        "home_id": "home-01",
+        "must_change_password": True,
+        "is_active": True,
+    }
+    password = _initial_password(new_password_env, legacy_password_env)
+    if password:
+        kwargs["password_hash"] = hash_password(password)
+    return kwargs
+
+
+async def _seed_missing_user(
+    session,
+    user_id: str,
+    username: str,
+    display_name: str,
+    role: str,
+    new_password_env: str,
+    legacy_password_env: str,
+) -> None:
+    existing = await session.get(User, user_id)
+    if existing is not None:
+        return
+    session.add(
+        User(
+            id=user_id,
+            **_seeded_user_kwargs(
+                username,
+                display_name,
+                role,
+                new_password_env,
+                legacy_password_env,
+            ),
+        )
+    )
 
 
 async def seed() -> None:
@@ -73,11 +160,29 @@ async def seed() -> None:
 
             # No placeholder devices — real devices are auto-registered
             # via MQTT when the gateway discovers them (ZDO + registry).
-
-            # User
-            await _upsert(
-                session, User, "admin", username="admin", home_id="home-01"
+            await session.execute(
+                update(Device)
+                .where(Device.room_id.is_(None))
+                .values(room_id="room-01")
             )
+
+            for (
+                user_id,
+                username,
+                display_name,
+                role,
+                new_password_env,
+                legacy_password_env,
+            ) in _SEEDED_USERS:
+                await _seed_missing_user(
+                    session,
+                    user_id,
+                    username,
+                    display_name,
+                    role,
+                    new_password_env,
+                    legacy_password_env,
+                )
 
     print("Seed complete.")
 

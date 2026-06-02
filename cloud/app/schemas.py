@@ -230,12 +230,28 @@ class AuthLogin(BaseModel):
     password: str = Field(min_length=1)
 
 
+class AuthChangePassword(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+class AuthUserOut(BaseModel):
+    username: str
+    user_id: str
+    display_name: str | None = None
+    role: Literal["admin", "parent", "viewer"]
+    home_id: str | None = None
+    must_change_password: bool
+
+
 class AuthSessionOut(BaseModel):
     access_token: str
     username: str
     user_id: str
-    role: Literal["admin", "operator", "viewer", "user"]
+    display_name: str | None = None
+    role: Literal["admin", "parent", "viewer"]
     home_id: str | None = None
+    must_change_password: bool
     expires_at: datetime
 
     @field_serializer("expires_at")

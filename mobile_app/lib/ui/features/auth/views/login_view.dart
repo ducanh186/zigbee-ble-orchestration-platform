@@ -5,7 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../view_models/auth_view_model.dart';
 
-/// Operator sign-in screen.
+/// Account sign-in screen.
 ///
 /// Reads/writes the [AuthViewModel] in the surrounding Provider scope. The
 /// view itself is purely presentational: the parent widget tree decides
@@ -70,7 +70,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Operator access to the Smart Building gateway.',
+                      'Account access to your Smart Home.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: palette.textSecondary,

@@ -22,7 +22,7 @@ This handoff gives the next AI agent enough context to continue the production-h
 | Release URL | `https://github.com/ducanh186/zigbee-ble-orchestration-platform/releases/tag/v0.9.0-rc.1` |
 | Production readiness | `NOT_PRODUCTION_READY` |
 
-Do not claim stable production readiness. The repository evidence plan is complete locally, but live/operator validation remains open.
+Do not claim stable production readiness. The repository evidence plan is complete locally, but live validation remains open.
 
 ## Merged Work In This Session
 
@@ -139,7 +139,7 @@ Markdown files may be ignored by repo rules. When adding new `docs/**/*.md`, use
 
 6. Cloud-App auth hardening now has a follow-up PR in progress.
    - The follow-up covers Cloud endpoint auth/scoping gaps, Mobile release guard, and the `SB_AUTH_TOKEN_SECRET` env canonical name.
-   - Do not treat this as stable production readiness until the PR is merged and live/operator validation is captured.
+   - Do not treat this as stable production readiness until the PR is merged and live validation is captured.
 
 7. Stable production release is deferred.
    - Current release is `v0.9.0-rc.1` pre-release only.

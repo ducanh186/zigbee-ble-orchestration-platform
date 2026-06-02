@@ -70,32 +70,34 @@ class _GatewayStatusPresentation {
   });
 
   factory _GatewayStatusPresentation.from(CloudStatus status) {
-    final gatewayId = status.gatewayId ?? 'gateway';
-    final logTime = status.occurredAt == null ? '' : ' - ${status.occurredAt}';
+    final logTime = status.occurredAt == null ? '' : 'Last report: ${status.occurredAt}';
     final eventType = status.eventType == null ? '' : ' (${status.eventType})';
+    final latestReport = logTime.isEmpty && eventType.isEmpty
+        ? 'Latest cloud event received'
+        : '$logTime$eventType';
 
     return switch (status.state) {
       CloudConnectionState.online => _GatewayStatusPresentation(
-        title: 'Gateway online',
-        subtitle: '$gatewayId$logTime$eventType',
+        title: 'Home hub online',
+        subtitle: latestReport,
         badgeLabel: 'LOG',
         tone: BadgeTone.success,
       ),
       CloudConnectionState.offline => _GatewayStatusPresentation(
-        title: 'Gateway offline',
-        subtitle: status.detail ?? '$gatewayId$logTime$eventType',
+        title: 'Home hub offline',
+        subtitle: status.detail ?? latestReport,
         badgeLabel: 'OFF',
         tone: BadgeTone.error,
       ),
       CloudConnectionState.unknown => _GatewayStatusPresentation(
-        title: 'Gateway status unknown',
-        subtitle: status.detail ?? 'No gateway status log found',
+        title: 'Home hub status unknown',
+        subtitle: status.detail ?? 'No home hub status log found',
         badgeLabel: 'CHECK',
         tone: BadgeTone.warning,
       ),
       CloudConnectionState.mock => _GatewayStatusPresentation(
-        title: 'Mock gateway log',
-        subtitle: '$gatewayId$logTime$eventType',
+        title: 'Mock home hub log',
+        subtitle: latestReport,
         badgeLabel: 'MOCK',
         tone: BadgeTone.neutral,
       ),
@@ -130,7 +132,7 @@ class _GatewayStatusPresentation {
 
 @Preview(
   name: 'Online from cloud log',
-  group: 'Gateway status',
+  group: 'Home hub status',
   size: Size(390, 120),
 )
 Widget gatewayStatusOnlinePreview() {
@@ -143,11 +145,11 @@ Widget gatewayStatusOnlinePreview() {
   );
 }
 
-@Preview(name: 'No gateway log', group: 'Gateway status', size: Size(390, 120))
+@Preview(name: 'No home hub log', group: 'Home hub status', size: Size(390, 120))
 Widget gatewayStatusUnknownPreview() {
   return _GatewayStatusPreviewShell(
     status: const CloudStatus.unknown(
-      detail: 'No gateway status log found in cloud events',
+      detail: 'No home hub status log found in cloud events',
     ),
   );
 }

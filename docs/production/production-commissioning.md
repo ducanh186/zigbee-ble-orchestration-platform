@@ -23,7 +23,7 @@ The cross-team implementation checklist for Gateway and local Zigbee owners is
 | Contract | Evidence |
 |---|---|
 | Permit join duration is bounded at the API edge. | `cloud/app/schemas.py` keeps `CommissioningOpenBody.duration_sec` at `1..180`. |
-| Backend permit-join open/close is admin-only. | `cloud/app/routers/gateways.py` uses `require_admin`; `cloud/tests/test_gateways.py` covers unauthenticated, operator-forbidden, and admin-allowed cases. |
+| Backend permit-join open/close requires `parent` or `admin`. | `cloud/app/routers/gateways.py` uses `require_parent_or_admin`; `cloud/tests/test_gateways.py` covers unauthenticated/viewer-forbidden and parent/admin-allowed cases. |
 | Provisioning publishes install-code join intent. | `cloud/app/routers/provisioning.py` publishes `gateway.prepare_join` with `eui64`, `install_code`, and `duration_sec`. |
 | Gateway parses the secure join target. | `gateway/Z3GatewayHost/app/sb_command.h` and `.c` parse `eui64` and `install_code` from the command body. |
 | Gateway uses the secure join path. | `gateway/Z3GatewayHost/app/device_dispatch.c` validates `eui64`, `install_code`, and duration before calling `netMgrOpenForJoinSecure`. |

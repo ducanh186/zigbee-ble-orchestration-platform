@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
 
 from cloud.app.access_control import (
-    ensure_device_visible,
+    ensure_device_manageable,
     get_visible_device_or_404,
-    is_admin,
+    is_parent_or_admin,
 )
-from cloud.app.auth import get_current_user, require_operator
+from cloud.app.auth import get_current_user, require_parent_or_admin
 from cloud.app.database import get_db
 from cloud.app.models import Command, Device, User
 from cloud.app.mqtt_client import mqtt_service
@@ -30,14 +30,14 @@ async def create_command(
     device_id: str,
     body: CommandCreate,
     db: AsyncSession = Depends(get_db),
-    operator: User = Depends(require_operator),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     # Verify device exists and get its type for command translation
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     if device is None:
         raise HTTPException(status_code=404, detail="Device not found")
-    await ensure_device_visible(db, device, operator)
+    await ensure_device_manageable(db, device, current_user)
 
     # Translate user-friendly format to gateway wire format
     try:
@@ -88,7 +88,7 @@ async def get_command(
     if cmd is None:
         raise HTTPException(status_code=404, detail="Command not found")
     if cmd.device_id is None:
-        if not is_admin(current_user):
+        if not is_parent_or_admin(current_user):
             raise HTTPException(status_code=403, detail="Command outside user home")
     else:
         await get_visible_device_or_404(db, cmd.device_id, current_user)

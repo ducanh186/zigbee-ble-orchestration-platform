@@ -11,6 +11,9 @@ async def create_auth_user(
     role: str,
     password: str,
     home_id: str | None,
+    display_name: str | None = None,
+    must_change_password: bool = False,
+    is_active: bool = True,
 ) -> None:
     from cloud.app.auth import hash_password
     from cloud.app.models import Home, User
@@ -26,9 +29,12 @@ async def create_auth_user(
             User(
                 id=user_id,
                 username=username,
+                display_name=display_name,
                 role=role,
                 password_hash=hash_password(password),
                 home_id=home_id,
+                must_change_password=must_change_password,
+                is_active=is_active,
             )
         )
         await session.commit()

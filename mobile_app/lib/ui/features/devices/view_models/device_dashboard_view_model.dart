@@ -112,7 +112,10 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   }
 
   Future<void> setLightPower(SmartDevice device, DevicePower target) async {
-    if (!device.isLight || !device.isReachable || hasPendingCommand) {
+    if (!device.isLight ||
+        !device.power.canCommand ||
+        target == device.power ||
+        hasPendingCommand) {
       return;
     }
 

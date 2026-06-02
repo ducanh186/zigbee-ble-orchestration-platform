@@ -39,8 +39,10 @@ class SecureTokenStorage implements TokenStorage {
         accessToken: accessToken,
         username: decoded['username'] as String?,
         userId: decoded['userId'] as String?,
+        displayName: decoded['displayName'] as String?,
         role: decoded['role'] as String?,
         homeId: decoded['homeId'] as String?,
+        mustChangePassword: decoded['mustChangePassword'] == true,
         expiresAt: expiresAtRaw is String
             ? DateTime.tryParse(expiresAtRaw)
             : null,
@@ -59,8 +61,10 @@ class SecureTokenStorage implements TokenStorage {
         'accessToken': session.accessToken,
         'username': session.username,
         'userId': session.userId,
+        'displayName': session.displayName,
         'role': session.role,
         'homeId': session.homeId,
+        'mustChangePassword': session.mustChangePassword,
         'expiresAt': session.expiresAt?.toUtc().toIso8601String(),
       }),
     );

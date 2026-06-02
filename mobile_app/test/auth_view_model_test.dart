@@ -6,6 +6,7 @@ import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_mod
 
 class FakeAuthRepository implements AuthRepository {
   AuthSession? restoredSession;
+  int changePasswordCalls = 0;
 
   @override
   Future<AuthSession> login({
@@ -14,7 +15,9 @@ class FakeAuthRepository implements AuthRepository {
   }) async {
     return AuthSession(
       accessToken: 'test-token',
-      userId: 'operator-1',
+      username: 'parent',
+      userId: 'parent-1',
+      role: 'parent',
       expiresAt: DateTime.utc(2026, 5, 16, 12),
     );
   }
@@ -24,6 +27,14 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession?> restoreSession() async => restoredSession;
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    changePasswordCalls++;
+  }
 }
 
 class FailingAuthRepository implements AuthRepository {
@@ -44,6 +55,12 @@ class FailingAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession?> restoreSession() async => null;
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {}
 }
 
 class RestoreFailingAuthRepository implements AuthRepository {
@@ -66,13 +83,21 @@ class RestoreFailingAuthRepository implements AuthRepository {
       message: 'secure storage read failed',
     );
   }
+
+  @override
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    throw StateError('changePassword is not part of this test');
+  }
 }
 
 void main() {
   test('login stores an authenticated session', () async {
     final viewModel = AuthViewModel(repository: FakeAuthRepository());
 
-    await viewModel.login(username: 'operator', password: 'password');
+    await viewModel.login(username: 'parent', password: 'password');
 
     expect(viewModel.isAuthenticated, isTrue);
     expect(viewModel.session?.accessToken, 'test-token');
@@ -83,7 +108,9 @@ void main() {
     final repository = FakeAuthRepository()
       ..restoredSession = AuthSession(
         accessToken: 'stored-token',
-        userId: 'operator-1',
+        username: 'parent',
+        userId: 'parent-1',
+        role: 'parent',
         expiresAt: DateTime.utc(2026, 5, 16, 12),
       );
     final viewModel = AuthViewModel(repository: repository);
@@ -113,7 +140,7 @@ void main() {
   test('login surfaces error message when repository throws', () async {
     final viewModel = AuthViewModel(repository: FailingAuthRepository());
 
-    await viewModel.login(username: 'operator', password: 'wrong');
+    await viewModel.login(username: 'parent', password: 'wrong');
 
     expect(viewModel.isAuthenticated, isFalse);
     expect(viewModel.session, isNull);
@@ -123,4 +150,23 @@ void main() {
     expect(viewModel.errorMessage, isNot(contains('invalid credentials')));
     expect(viewModel.errorMessage, isNot(contains('API 401')));
   });
+
+  test(
+    'changePassword clears authenticated session after repository success',
+    () async {
+      final repository = FakeAuthRepository();
+      final viewModel = AuthViewModel(repository: repository);
+      await viewModel.login(username: 'parent', password: 'password');
+
+      await viewModel.changePassword(
+        oldPassword: 'old-pass',
+        newPassword: 'new-pass',
+      );
+
+      expect(repository.changePasswordCalls, 1);
+      expect(viewModel.isAuthenticated, isFalse);
+      expect(viewModel.session, isNull);
+      expect(viewModel.errorMessage, isNull);
+    },
+  );
 }

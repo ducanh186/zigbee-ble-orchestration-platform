@@ -245,7 +245,7 @@ async def test_event_read_endpoints_require_auth_and_scope_by_home(
 
 
 @pytest.mark.asyncio
-async def test_automation_writes_require_operator_and_same_home_devices(
+async def test_automation_writes_require_parent_and_same_home_devices(
     client,
     db_session_factory,
 ):
@@ -260,10 +260,10 @@ async def test_automation_writes_require_operator_and_same_home_devices(
     )
     await _create_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
         home_id="home-1",
     )
 
@@ -278,24 +278,24 @@ async def test_automation_writes_require_operator_and_same_home_devices(
     )
     assert viewer_write.status_code == 403
 
-    operator_headers = await _login(client, "operator", "operator-pass")
+    parent_headers = await _login(client, "parent", "parent-pass")
     cross_home_write = await client.post(
         "/api/automations",
         json=_automation_body("light-home-2"),
-        headers=operator_headers,
+        headers=parent_headers,
     )
     assert cross_home_write.status_code == 403
 
     allowed = await client.post(
         "/api/automations",
         json=_automation_body(),
-        headers=operator_headers,
+        headers=parent_headers,
     )
     assert allowed.status_code == 201
 
 
 @pytest.mark.asyncio
-async def test_provisioning_session_requires_operator_and_same_home_room(
+async def test_provisioning_session_requires_parent_and_same_home_room(
     client,
     db_session_factory,
 ):
@@ -304,10 +304,10 @@ async def test_provisioning_session_requires_operator_and_same_home_room(
     await _seed_two_home_devices(db_session_factory)
     await _create_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
         home_id="home-1",
     )
 
@@ -325,7 +325,7 @@ async def test_provisioning_session_requires_operator_and_same_home_room(
     no_token = await client.post("/api/provisioning/sessions", json=payload)
     assert no_token.status_code == 401
 
-    headers = await _login(client, "operator", "operator-pass")
+    headers = await _login(client, "parent", "parent-pass")
     other_room = await client.post(
         "/api/provisioning/sessions",
         json=payload | {"room_id": "room-2"},
@@ -342,17 +342,25 @@ async def test_provisioning_session_requires_operator_and_same_home_room(
 
 
 @pytest.mark.asyncio
-async def test_destructive_device_actions_are_admin_only(
+async def test_destructive_device_actions_require_parent_home_scope_or_admin(
     client,
     db_session_factory,
 ):
     await _seed_two_home_devices(db_session_factory)
     await _create_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+    await _create_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
         home_id="home-1",
     )
     await _create_user(
@@ -364,18 +372,42 @@ async def test_destructive_device_actions_are_admin_only(
         home_id=None,
     )
 
-    operator_headers = await _login(client, "operator", "operator-pass")
+    viewer_headers = await _login(client, "viewer", "viewer-pass")
     delete_forbidden = await client.delete(
         "/api/devices/light-home-1",
-        headers=operator_headers,
+        headers=viewer_headers,
     )
     rediscover_forbidden = await client.post(
         "/api/devices/light-home-1/rediscover",
-        headers=operator_headers,
+        headers=viewer_headers,
     )
 
     assert delete_forbidden.status_code == 403
     assert rediscover_forbidden.status_code == 403
+
+    parent_headers = await _login(client, "parent", "parent-pass")
+    cross_home_delete = await client.delete(
+        "/api/devices/light-home-2",
+        headers=parent_headers,
+    )
+    cross_home_rediscover = await client.post(
+        "/api/devices/light-home-2/rediscover",
+        headers=parent_headers,
+    )
+    assert cross_home_delete.status_code == 403
+    assert cross_home_rediscover.status_code == 403
+
+    rediscover_parent = await client.post(
+        "/api/devices/light-home-1/rediscover",
+        headers=parent_headers,
+    )
+    assert rediscover_parent.status_code == 201
+
+    delete_parent = await client.delete(
+        "/api/devices/motion-home-1",
+        headers=parent_headers,
+    )
+    assert delete_parent.status_code == 204
 
     admin_headers = await _login(client, "admin", "admin-pass")
     rediscover_allowed = await client.post(

@@ -8,5 +8,10 @@ abstract class AuthRepository {
     required String password,
   });
 
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  });
+
   Future<void> logout();
 }
