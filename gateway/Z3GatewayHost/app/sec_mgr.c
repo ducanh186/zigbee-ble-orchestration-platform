@@ -7,11 +7,27 @@
 #include <string.h>
 
 // EZSP policy IDs we set. Per gecko_sdk/protocol/zigbee/app/util/ezsp/ezsp-enum.h:
-//   EZSP_TC_KEY_REQUEST_POLICY     = 0x05
-//   EZSP_DENY_TC_KEY_REQUESTS      = 0x50
-// (matches Jira spec "EmberAllowTrustCenterLinkKeyRequestPolicy = DENIED_BY_DEFAULT".)
-#define EZSP_TC_KEY_REQUEST_POLICY_ID  0x05u
-#define EZSP_DENY_TC_KEY_REQUESTS_VAL  0x50u
+//   EZSP_TC_KEY_REQUEST_POLICY                      = 0x05
+//   EZSP_DENY_TC_KEY_REQUESTS                       = 0x50
+//   EZSP_ALLOW_TC_KEY_REQUESTS_AND_SEND_CURRENT_KEY = 0x51
+//   EZSP_ALLOW_TC_KEY_REQUEST_AND_GENERATE_NEW_KEY  = 0x52
+//
+// We ALLOW + GENERATE-NEW (0x52), not DENY (0x50). After an install-code join,
+// BDB-mandated Zigbee 3.0 commissioning has the node request an updated Trust
+// Center link key; if the TC denies it the node tears the network down and
+// re-steers forever (observed churn: every kit joined IC_DERIVED, then left
+// ~19 s later with "Update TC Link Key: Error 0x04" on the device console).
+//
+// 0x52 mints a *fresh unique random* APS link key per device, transported
+// encrypted under that device's install-code-derived key. This preserves the
+// per-device-unique key posture (unlike 0x51, which would hand every device
+// the global TC link key and defeat install-code-only). The initial join is
+// still gated by BDB_JOIN_USES_INSTALL_CODE_KEY=1 — 0x52 only governs the
+// post-authentication key update, so the install-code requirement is intact.
+// (Supersedes the earlier Jira "DENIED_BY_DEFAULT" hardening default, which
+// made standard install-code Z3.0 commissioning impossible.)
+#define EZSP_TC_KEY_REQUEST_POLICY_ID     0x05u
+#define EZSP_ALLOW_TC_KEY_GEN_NEW_VAL     0x52u
 
 #define SEC_MGR_MAX_SLOTS 4
 
@@ -72,10 +88,10 @@ void secMgrOnStackUp(void)
 {
   if (g_policySet) return;  // idempotent — only first NETWORK_UP per boot
   EzspStatus ezsp_status = ezspSetPolicy(EZSP_TC_KEY_REQUEST_POLICY_ID,
-                                         EZSP_DENY_TC_KEY_REQUESTS_VAL);
+                                         EZSP_ALLOW_TC_KEY_GEN_NEW_VAL);
   if (ezsp_status == EZSP_SUCCESS) {
     g_policySet = true;
-    emberAfCorePrintln("secMgr: TC policy=DENY (set on NETWORK_UP)");
+    emberAfCorePrintln("secMgr: TC policy=ALLOW+GEN_NEW (set on NETWORK_UP)");
   } else {
     emberAfCorePrintln("secMgr: WARN set TC policy failed, ezsp=0x%02X",
                        (unsigned)ezsp_status);
@@ -142,6 +158,15 @@ void secMgrForget(const EmberEUI64 eui_le)
   eui64ToStringBigEndian(eui_str, sizeof(eui_str), s->eui_le);
   wipeSlot(s);
   appLogLog("secMgr", "forget", "\"eui64\":\"%s\"", eui_str);
+}
+
+// Returns true if the EUI64 currently has a non-expired staged install code.
+// Used by the Trust Center join callback to decide whether a join event was
+// driven by SCRUM-81 prepare_join (publish provisioning_joined) or unrelated.
+bool secMgrHasStaged(const EmberEUI64 eui_le)
+{
+  if (!eui_le) return false;
+  return findSlotByEui(eui_le) != NULL;
 }
 
 // ---------- TC plugin callback ----------

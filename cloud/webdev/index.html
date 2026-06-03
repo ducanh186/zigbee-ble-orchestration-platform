@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <div class="login-overlay" id="loginOverlay" hidden>
+      <form class="login-card" id="loginForm">
+        <div class="brand-mark">SB</div>
+        <h2>Cloud Ops Console</h2>
+        <p>Sign in to continue</p>
+        <input id="loginUser" type="text" placeholder="Username" autocomplete="username" required />
+        <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required />
+        <button type="submit" class="icon-button primary">Sign in</button>
+        <p class="login-error" id="loginError"></p>
+      </form>
+    </div>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -26,6 +37,9 @@
           </button>
           <button class="icon-button primary" id="refreshBtn" type="button" title="Refresh now">
             Refresh
+          </button>
+          <button class="icon-button" id="logoutBtn" type="button" title="Log out">
+            Logout
           </button>
         </div>
       </header>

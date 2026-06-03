@@ -42,4 +42,9 @@ bool secMgrStage(const EmberEUI64 eui_le,
 // Zero-wipes the IC bytes. Safe no-op if no slot held.
 void secMgrForget(const EmberEUI64 eui_le);
 
+// Returns true if the EUI64 currently has a non-expired staged install code.
+// Used by the Trust Center join callback to decide whether a join event was
+// driven by SCRUM-81 prepare_join (publish provisioning_joined) or unrelated.
+bool secMgrHasStaged(const EmberEUI64 eui_le);
+
 #endif // SEC_MGR_H

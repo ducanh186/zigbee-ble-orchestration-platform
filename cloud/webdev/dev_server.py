@@ -4,6 +4,7 @@ import argparse
 import json
 import mimetypes
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -42,7 +43,14 @@ class WebdevHandler(BaseHTTPRequestHandler):
 
     def route(self, head_only: bool = False) -> None:
         parsed = urlsplit(self.path)
-        if parsed.path == "/health" or parsed.path.startswith("/api/"):
+        # Proxy all backend routes to API_TARGET. /auth/* (login/logout) must be
+        # included — otherwise the login POST falls through to the static handler
+        # and returns index.html (HTTP 200, not JSON) -> "Login failed (200)".
+        if (
+            parsed.path == "/health"
+            or parsed.path.startswith("/api/")
+            or parsed.path.startswith("/auth/")
+        ):
             self.proxy_api(head_only=head_only)
             return
         self.serve_static(parsed.path, head_only=head_only)
@@ -83,29 +91,39 @@ class WebdevHandler(BaseHTTPRequestHandler):
         }
         request = Request(target, data=body, headers=headers, method=self.command)
 
-        try:
-            with urlopen(request, timeout=20) as response:
-                payload = response.read()
-                self.send_response(response.status)
-                for key, value in response.headers.items():
+        # Retry transient connection/DNS failures (e.g. systemd-resolved
+        # "Temporary failure in name resolution" / EAI_AGAIN). HTTPError is a
+        # real backend response, so it is NOT retried.
+        last_error = None
+        for attempt in range(3):
+            try:
+                with urlopen(request, timeout=20) as response:
+                    payload = response.read()
+                    self.send_response(response.status)
+                    for key, value in response.headers.items():
+                        if key.lower() not in {"connection", "transfer-encoding"}:
+                            self.send_header(key, value)
+                    self.send_header("access-control-allow-origin", "*")
+                    self.end_headers()
+                    if not head_only:
+                        self.wfile.write(payload)
+                return
+            except HTTPError as error:
+                payload = error.read()
+                self.send_response(error.code)
+                for key, value in error.headers.items():
                     if key.lower() not in {"connection", "transfer-encoding"}:
                         self.send_header(key, value)
                 self.send_header("access-control-allow-origin", "*")
                 self.end_headers()
                 if not head_only:
                     self.wfile.write(payload)
-        except HTTPError as error:
-            payload = error.read()
-            self.send_response(error.code)
-            for key, value in error.headers.items():
-                if key.lower() not in {"connection", "transfer-encoding"}:
-                    self.send_header(key, value)
-            self.send_header("access-control-allow-origin", "*")
-            self.end_headers()
-            if not head_only:
-                self.wfile.write(payload)
-        except URLError as error:
-            self.send_json(502, {"detail": f"API proxy failed: {error.reason}"})
+                return
+            except URLError as error:
+                last_error = error
+                time.sleep(0.4 * (attempt + 1))
+        reason = last_error.reason if last_error else "unknown"
+        self.send_json(502, {"detail": f"API proxy failed: {reason}"})
 
     def send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")

@@ -352,6 +352,53 @@ curl -s http://localhost:8000/api/devices/ | head
 # kỳ vọng: JSON array chứa các device đã seed
 ```
 
+### Dashboard chính thức — https://dashboard.iot-building.app
+
+**Đây là site chính thức từ 2026-06-03 trở đi.** Mọi truy cập web dashboard
+dùng URL này, KHÔNG dùng IP trực tiếp (`http://98.83.4.87:8000`) nữa.
+
+Kiến trúc phục vụ:
+
+```text
+Browser ──HTTPS──▶ https://dashboard.iot-building.app
+        ──▶ Cloudflare Tunnel
+        ──▶ EC2 localhost:8000  (FastAPI, cloud.app.main:app)
+```
+
+FastAPI vừa là API **vừa** phục vụ luôn web dashboard (cùng origin):
+
+- `GET /`            → `cloud/webdev/index.html`
+- `GET /static/*`    → mount `cloud/webdev/` (app.js, styles.css)
+- `/api/*`, `/auth/*`, `/health` → cùng host → không cần proxy, không CORS.
+
+Vì cùng origin, `cloud/webdev/app.js::defaultApiBase()` trả `""` (relative).
+Không cần `dev_server.py` khi chạy trên site chính thức.
+
+**Đăng nhập:** dashboard yêu cầu login (overlay `#loginOverlay`). Dùng tài
+khoản giống app (vd `parent` / `password`). Token lưu localStorage, gắn vào
+`Authorization: Bearer` cho mọi request; 401 → tự hiện lại màn login.
+
+**Deploy bản dashboard mới lên site chính thức** (cập nhật `cloud/webdev/`
+hoặc `cloud/app/`):
+
+```bash
+# 1) (máy dev) commit + push thay đổi lên remote.
+# 2) Trên EC2:
+cd <repo-on-ec2> && git pull
+#    restart FastAPI (đúng lệnh ở "Start cloud backend", port 8000):
+#    kill tiến trình uvicorn cũ rồi chạy lại nohup uvicorn ... --port 8000
+# 3) Xác minh:
+curl -s https://dashboard.iot-building.app/health           # {"status":"ok",...}
+curl -s https://dashboard.iot-building.app/ | grep loginOverlay   # có => bản mới
+```
+
+> Site chạy trên EC2; máy dev không có SSH tới EC2 trong session này. Bước (2)
+> do người quản EC2 thực hiện sau khi `git pull`.
+
+**Local dev (tuỳ chọn, offline UI work):** chạy dashboard cục bộ và proxy API
+sang EC2 bằng `cloud/webdev/dev_server.py` (`--api-target https://dashboard.iot-building.app`).
+Đây là đường phụ cho dev, không phải đường chính thức.
+
 ### Inspect MQTT traffic
 
 Credential monitor chỉ đọc, an toàn để trace:
@@ -932,10 +979,11 @@ phía trên, đây là chỗ tra cứu nguồn gốc.
 
 ### Cloud / dashboard
 
-- Canonical local dev flow là **manual uvicorn + cloud/webdev/dev_server.py**
-  trên Linux. `cloud/webdev/start_dev.py` (Windows-flavoured one-shot
-  launcher) hạ xuống mức alternative. Chi tiết trong
-  `cloud/webdev/README.md`.
+- **CẬP NHẬT 2026-06-03:** site chính thức là **https://dashboard.iot-building.app**
+  (FastAPI trên EC2:8000 phục vụ luôn `cloud/webdev`, qua Cloudflare Tunnel —
+  xem section "Dashboard chính thức"). `dev_server.py` chỉ còn là đường dev local
+  tuỳ chọn (proxy API sang EC2), không còn là canonical. `start_dev.py`
+  (Windows one-shot) vẫn là alternative. Chi tiết trong `cloud/webdev/README.md`.
 - `cloud/app/seed.py._LEGACY_PLACEHOLDER_IDS` mở rộng cho 6 EUI test
   (`00124b0001aa22bb`, `00124b0002cc33dd`, `00124b0003ee44ff`,
   `0xPROBE`, `0xTEST`, `0xPROBE2`) — `start_dev.py` tự dọn nếu tái xuất

@@ -3,6 +3,11 @@
 
 #define SWITCH_ENDPOINT          1
 
+// PB1 sends the On/Off Toggle straight to the gateway/coordinator (cloud
+// automation rule owns switch -> light). No binding is used.
+#define GATEWAY_NODE_ID          0x0000  // Zigbee coordinator (Z3Gateway)
+#define GATEWAY_ENDPOINT         1       // gateway HA endpoint that sees On/Off
+
 // Network timing
 #define NETWORK_SEARCH_DELAY_MS  3000u    // 3 s delay after leave before searching
 #define NETWORK_RETRY_DELAY_MS   10000u   // 10 s retry if not found

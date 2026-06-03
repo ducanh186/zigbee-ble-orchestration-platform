@@ -40,6 +40,10 @@
 // <q EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_ALLOW_TC_REJOIN_WITH_WELL_KNOWN_KEY> Allow Trust Center rejoin with well known key
 // <i> Default: FALSE
 // <i> The TC will allow rejoining of a device using the well known key for the number of seconds mentioned in the timeout option below.
+// Kept 0 (install-code-only, reject well-known rejoin) per SCRUM-55 + security
+// review. A lab test flipping this to 1 did NOT reduce device churn (devices join
+// secure + classify OK, then re-steer regardless), so the relaxation gave no
+// benefit and only weakened the TC — reverted.
 #define EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_ALLOW_TC_REJOIN_WITH_WELL_KNOWN_KEY   0
 
 // <o EMBER_AF_PLUGIN_NETWORK_CREATOR_SECURITY_ALLOW_TC_REJOINS_USING_WELL_KNOWN_KEY_TIMEOUT_SEC> Allow Trust Center rejoin with well known key timeout (seconds) <0-65535>
