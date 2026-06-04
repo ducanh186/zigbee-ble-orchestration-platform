@@ -1,6 +1,6 @@
-# Zigbee BLE Orchestration Platform
+# Zigbee Orchestration Platform
 
-Zigbee BLE Orchestration Platform is a smart-building prototype that connects a FastAPI Cloud backend, a Flutter mobile app, a C gateway runtime, MQTT, PostgreSQL, and Zigbee end devices. The system lets a user view devices, send commands, provision new devices, publish OTA campaigns, and sync automation rules to the gateway.
+Zigbee Orchestration Platform is a smart-building prototype that connects a FastAPI Cloud backend, a Flutter mobile app, a C gateway runtime, MQTT, PostgreSQL, and Zigbee end devices. The system lets a user view devices, send commands, provision new devices, publish OTA campaigns, and sync automation rules to the gateway.
 
 This repository is still a demo and hardening workspace. Treat production deployment, MQTT certificates, database credentials, and device install codes as real security boundaries.
 
