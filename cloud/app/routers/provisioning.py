@@ -16,12 +16,15 @@ import qrcode.image.svg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cloud.app.auth import require_admin
+from cloud.app.access_control import (
+    ensure_provisioning_session_visible,
+    ensure_room_visible,
+)
+from cloud.app.auth import get_current_user, require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command, ProvisioningSession, Room
+from cloud.app.models import Command, FactoryDevice, ProvisioningSession, Room, User
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.provisioning_install_code import generate_install_code
 from cloud.app.schemas import (
     ProvisioningErrorCode,
     ProvisioningLabelCreate,
@@ -62,11 +65,8 @@ async def create_provisioning_label(
     payload = {
         "version": 1,
         "eui64": body.eui64,
-        "install_code": body.install_code or generate_install_code(),
         "device_type": body.device_type,
     }
-    if body.model:
-        payload["model"] = body.model
     payload_json = json.dumps(payload, separators=(",", ":"))
     return {
         "payload": payload,
@@ -107,6 +107,7 @@ async def _get_session_or_404(
 async def create_provisioning_session(
     body: ProvisioningSessionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     if body.gateway_id != settings.gateway_id:
         _raise_contract_error(
@@ -124,6 +125,7 @@ async def create_provisioning_session(
             ProvisioningErrorCode.ROOM_NOT_FOUND,
             f"room_id '{body.room_id}' not found",
         )
+    await ensure_room_visible(db, room, current_user)
 
     active = (
         await db.execute(
@@ -140,11 +142,25 @@ async def create_provisioning_session(
             f"active session already exists for eui64 '{body.device.eui64}'",
         )
 
+    factory_device = await db.get(FactoryDevice, body.device.eui64)
+    if factory_device is None or not factory_device.is_active:
+        _raise_contract_error(
+            404,
+            ProvisioningErrorCode.DEVICE_NOT_FACTORY_REGISTERED,
+            f"device eui64 '{body.device.eui64}' is not factory registered",
+        )
+    if factory_device.device_type != body.device.device_type:
+        _raise_contract_error(
+            422,
+            ProvisioningErrorCode.INVALID_QR_PAYLOAD,
+            "device_type does not match factory registry",
+        )
+
     now = datetime.now(UTC).replace(tzinfo=None)
     command_id = uuid4().hex
     target = {
         "eui64": body.device.eui64,
-        "install_code": body.device.install_code,
+        "install_code": factory_device.install_code,
         "duration_sec": DEFAULT_PROVISIONING_DURATION_SEC,
     }
     command = Command(
@@ -162,9 +178,9 @@ async def create_provisioning_session(
         gateway_id=body.gateway_id,
         room_id=body.room_id,
         eui64=body.device.eui64,
-        install_code=body.device.install_code,
-        device_type=body.device.device_type,
-        model=body.device.model,
+        install_code=factory_device.install_code,
+        device_type=factory_device.device_type,
+        model=factory_device.model,
         status="pending",
         command_id=command_id,
         expires_at=now + timedelta(seconds=DEFAULT_PROVISIONING_DURATION_SEC),
@@ -187,16 +203,21 @@ async def create_provisioning_session(
 async def get_provisioning_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return await _get_session_or_404(db, session_id)
+    session = await _get_session_or_404(db, session_id)
+    await ensure_provisioning_session_visible(db, session, current_user)
+    return session
 
 
 @router.delete("/{session_id}", response_model=ProvisioningSessionOut)
 async def cancel_provisioning_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     session = await _get_session_or_404(db, session_id)
+    await ensure_provisioning_session_visible(db, session, current_user)
     if session.status in TERMINAL_STATUSES:
         raise HTTPException(
             status_code=409,
@@ -208,4 +229,3 @@ async def cancel_provisioning_session(
     await db.commit()
     await db.refresh(session)
     return session
-from cloud.app.auth import require_admin

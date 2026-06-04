@@ -22,26 +22,57 @@ async def _admin_headers(client, db_session_factory) -> dict[str, str]:
     return await login_headers(client, "admin", "admin-pass")
 
 
-@pytest.mark.asyncio
-async def test_open_requires_admin_role(client, db_session_factory, fake_mqtt):
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
     await create_auth_user(
         db_session_factory,
-        user_id="operator-1",
-        username="operator",
-        role="operator",
-        password="operator-pass",
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "parent", "parent-pass")
+
+
+@pytest.mark.asyncio
+async def test_commissioning_requires_admin_role(
+    client, db_session_factory, fake_mqtt
+):
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
         home_id="home-1",
     )
 
     no_token = await client.post(f"/api/gateways/{GW}/commissioning/open", json={})
     assert no_token.status_code == 401
 
-    headers = await login_headers(client, "operator", "operator-pass")
-    non_admin = await client.post(
-        f"/api/gateways/{GW}/commissioning/open", json={}, headers=headers
+    viewer_headers = await login_headers(client, "viewer", "viewer-pass")
+    viewer_forbidden = await client.post(
+        f"/api/gateways/{GW}/commissioning/open", json={}, headers=viewer_headers
     )
-    assert non_admin.status_code == 403
+    assert viewer_forbidden.status_code == 403
     assert fake_mqtt.published == []
+
+    parent_headers = await _parent_headers(client, db_session_factory)
+    parent_open = await client.post(
+        f"/api/gateways/{GW}/commissioning/open", json={}, headers=parent_headers
+    )
+    assert parent_open.status_code == 403, parent_open.text
+
+    parent_close = await client.post(
+        f"/api/gateways/{GW}/commissioning/close", json={}, headers=parent_headers
+    )
+    assert parent_close.status_code == 403, parent_close.text
+
+    admin_headers = await _admin_headers(client, db_session_factory)
+    admin_open = await client.post(
+        f"/api/gateways/{GW}/commissioning/open", json={}, headers=admin_headers
+    )
+    assert admin_open.status_code == 201, admin_open.text
 
 
 @pytest.mark.asyncio
@@ -147,7 +178,7 @@ async def test_open_then_get_command(client, db_session_factory, fake_mqtt):
     assert r.status_code == 201
     cmd_id = r.json()["id"]
 
-    r2 = await client.get(f"/api/commands/{cmd_id}")
+    r2 = await client.get(f"/api/commands/{cmd_id}", headers=headers)
     assert r2.status_code == 200
     got = r2.json()
     assert got["id"] == cmd_id

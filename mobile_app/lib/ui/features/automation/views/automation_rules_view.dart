@@ -17,7 +17,9 @@ import '../widgets/rule_card.dart';
 /// a successful save, a green success banner shows and the new rule's card
 /// is outlined with the primary color until the next interaction.
 class AutomationRulesView extends StatefulWidget {
-  const AutomationRulesView({super.key});
+  const AutomationRulesView({super.key, this.canMutate = true});
+
+  final bool canMutate;
 
   @override
   State<AutomationRulesView> createState() => _AutomationRulesViewState();
@@ -60,7 +62,9 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
             if (rules.isEmpty && !automation.isLoading)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: EmptyRules(onCreate: _openCreate),
+                child: EmptyRules(
+                  onCreate: widget.canMutate ? _openCreate : null,
+                ),
               )
             else
               SliverPadding(
@@ -71,8 +75,10 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                       _SavedBanner(palette: palette),
                       const SizedBox(height: 12),
                     ],
-                    NewRuleCta(onTap: _openCreate),
-                    const SizedBox(height: 16),
+                    if (widget.canMutate) ...[
+                      NewRuleCta(onTap: _openCreate),
+                      const SizedBox(height: 16),
+                    ],
                     Row(
                       children: [
                         Expanded(
@@ -105,12 +111,15 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                           rule: rule,
                           template: _templateFor(rule),
                           highlight: rule.id == _justCreatedRuleId,
-                          onEnabledChanged: automation.isSaving
+                          onEnabledChanged:
+                              !widget.canMutate || automation.isSaving
                               ? null
                               : (value) => value
                                     ? automation.enableRule(rule.id)
                                     : automation.disableRule(rule.id),
-                          onDelete: () => _confirmDelete(automation, rule),
+                          onDelete: widget.canMutate
+                              ? () => _confirmDelete(automation, rule)
+                              : null,
                         ),
                       ),
                   ],
@@ -141,7 +150,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
         return AlertDialog(
           title: const Text('Delete rule?'),
           content: Text(
-            'This removes "${rule.name}" from the gateway sync list.',
+            'This removes "${rule.name}" from the home hub sync list.',
           ),
           actions: [
             TextButton(
@@ -213,7 +222,7 @@ class _SavedBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Rule created. Waiting for gateway sync.',
+              'Rule created. Waiting for home hub sync.',
               style: TextStyle(
                 color: palette.success,
                 fontSize: 13,

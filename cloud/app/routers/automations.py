@@ -8,11 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cloud.app.access_control import (
+    ensure_automation_visible,
+    ensure_device_visible,
+    filter_visible_automations,
+)
+from cloud.app.auth import get_current_user, require_parent_or_admin
 from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.models import Automation, Device
+from cloud.app.models import Automation, Device, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
@@ -61,6 +67,7 @@ async def _require_device(
     device_id: str,
     expected_type: str,
     role: str,
+    current_user: User,
 ) -> Device:
     device = await db.get(Device, device_id)
     if device is None:
@@ -70,6 +77,7 @@ async def _require_device(
             status_code=422,
             detail=f"{role} device must be a {expected_type} device",
         )
+    await ensure_device_visible(db, device, current_user)
     return device
 
 
@@ -103,6 +111,7 @@ async def _validate_rule_template(
     db: AsyncSession,
     trigger: dict[str, Any],
     actions: list[dict[str, Any]],
+    current_user: User,
 ) -> None:
     if len(actions) > MAX_ACTIONS_PER_AUTOMATION:
         raise HTTPException(
@@ -118,7 +127,9 @@ async def _validate_rule_template(
     if trigger_device_type not in {"switch", "motion"}:
         raise HTTPException(status_code=422, detail="Unsupported trigger device_type")
 
-    await _require_device(db, trigger_device_id, trigger_device_type, "Trigger")
+    await _require_device(
+        db, trigger_device_id, trigger_device_type, "Trigger", current_user
+    )
 
     # Normalize event in-place so the caller's `trigger` dict — which is what
     # gets persisted to DB and published on MQTT — carries the canonical value.
@@ -134,7 +145,7 @@ async def _validate_rule_template(
             raise HTTPException(status_code=422, detail="Action device_type must be light")
         if command not in {"on", "off", "toggle"}:
             raise HTTPException(status_code=422, detail="Unsupported light action command")
-        await _require_device(db, action_device_id, "light", "Action")
+        await _require_device(db, action_device_id, "light", "Action", current_user)
         action_commands.append(command)
 
     if trigger_device_type == "switch":
@@ -160,19 +171,25 @@ async def _validate_rule_template(
 
 
 @router.get("", response_model=list[AutomationOut])
-async def list_automations(db: AsyncSession = Depends(get_db)):
+async def list_automations(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(select(Automation).order_by(Automation.created_at.asc()))
-    return result.scalars().all()
+    rules = result.scalars().all()
+    return await filter_visible_automations(db, list(rules), current_user)
 
 
 @router.get("/{automation_id}", response_model=AutomationOut)
 async def get_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await ensure_automation_visible(db, rule, current_user)
     return rule
 
 
@@ -184,8 +201,9 @@ async def get_automation(
 async def create_automation(
     body: AutomationCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
-    await _validate_rule_template(db, body.trigger, body.actions)
+    await _validate_rule_template(db, body.trigger, body.actions, current_user)
     # MVP cap: contract §11.
     enabled_count = await db.execute(
         select(Automation).where(
@@ -228,10 +246,12 @@ async def _set_enabled(
     automation_id: str,
     enabled: bool,
     db: AsyncSession,
+    current_user: User,
 ) -> Automation:
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await ensure_automation_visible(db, rule, current_user)
     rule.enabled = enabled
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -246,16 +266,18 @@ async def _set_enabled(
 async def enable_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
-    return await _set_enabled(automation_id, True, db)
+    return await _set_enabled(automation_id, True, db, current_user)
 
 
 @router.post("/{automation_id}/disable", response_model=AutomationOut)
 async def disable_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
-    return await _set_enabled(automation_id, False, db)
+    return await _set_enabled(automation_id, False, db, current_user)
 
 
 @router.put("/{automation_id}", response_model=AutomationOut)
@@ -263,10 +285,12 @@ async def update_automation(
     automation_id: str,
     body: AutomationUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await ensure_automation_visible(db, rule, current_user)
     if body.version is not None and body.version != rule.version:
         raise HTTPException(status_code=409, detail="Automation version conflict")
 
@@ -276,7 +300,7 @@ async def update_automation(
     new_trigger = body.trigger if body.trigger is not None else rule.trigger
     new_actions = body.actions if body.actions is not None else rule.actions
     if body.trigger is not None or body.actions is not None:
-        await _validate_rule_template(db, new_trigger, new_actions)
+        await _validate_rule_template(db, new_trigger, new_actions, current_user)
 
     if body.name is not None:
         rule.name = body.name
@@ -300,6 +324,7 @@ async def update_automation(
 async def delete_automation(
     automation_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
 ):
     """Publish retained tombstone; keep row in DB until gateway acks.
 
@@ -314,6 +339,7 @@ async def delete_automation(
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await ensure_automation_visible(db, rule, current_user)
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)

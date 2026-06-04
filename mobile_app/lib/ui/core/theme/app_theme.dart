@@ -100,6 +100,9 @@ class AppTheme {
         height: 64,
         backgroundColor: palette.surface,
         indicatorColor: palette.primaryTint,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontSize: 11,

@@ -18,7 +18,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(_wrap(const ProvisioningView()));
 
-      expect(find.text('Gateway ID'), findsOneWidget);
+      expect(find.text('Gateway ID'), findsNothing);
       expect(find.text('Room ID'), findsOneWidget);
       expect(find.text('Device identity required'), findsOneWidget);
 

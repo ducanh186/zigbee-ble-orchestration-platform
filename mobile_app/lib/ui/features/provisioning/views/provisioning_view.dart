@@ -37,9 +37,8 @@ class ProvisioningView extends StatefulWidget {
 }
 
 class _ProvisioningViewState extends State<ProvisioningView> {
-  final TextEditingController _gatewayController = TextEditingController(
-    text: 'gw-ubuntu-01',
-  );
+  static const String _defaultJoinTargetId = 'gw-ubuntu-01';
+
   final TextEditingController _roomController = TextEditingController();
   final TextEditingController _manualQrController = TextEditingController();
   StreamSubscription<ProvisioningSession>? _polling;
@@ -57,7 +56,6 @@ class _ProvisioningViewState extends State<ProvisioningView> {
   @override
   void dispose() {
     _polling?.cancel();
-    _gatewayController.dispose();
     _roomController.dispose();
     _manualQrController.dispose();
     super.dispose();
@@ -82,29 +80,14 @@ class _ProvisioningViewState extends State<ProvisioningView> {
               _SessionStatusCard(session: session, error: _error),
               const SizedBox(height: 12),
               AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      key: const Key('provisioning-gateway-field'),
-                      controller: _gatewayController,
-                      decoration: const InputDecoration(
-                        labelText: 'Gateway ID',
-                        prefixIcon: Icon(Icons.hub_outlined),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('provisioning-room-field'),
-                      controller: _roomController,
-                      decoration: const InputDecoration(
-                        labelText: 'Room ID',
-                        prefixIcon: Icon(Icons.meeting_room_outlined),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ],
+                child: TextField(
+                  key: const Key('provisioning-room-field'),
+                  controller: _roomController,
+                  decoration: const InputDecoration(
+                    labelText: 'Room ID',
+                    prefixIcon: Icon(Icons.meeting_room_outlined),
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(height: 12),
@@ -202,7 +185,6 @@ class _ProvisioningViewState extends State<ProvisioningView> {
         (session == null ||
             (session.isTerminal &&
                 session.status != ProvisioningStatus.joined)) &&
-        _gatewayController.text.trim().isNotEmpty &&
         _roomController.text.trim().isNotEmpty;
   }
 
@@ -220,7 +202,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     try {
       final repository = context.read<ProvisioningRepository>();
       final session = await repository.createSession(
-        gatewayId: _gatewayController.text.trim(),
+        gatewayId: _defaultJoinTargetId,
         roomId: _roomController.text.trim(),
         payload: payload,
       );
@@ -456,13 +438,13 @@ class _SessionStatusCard extends StatelessWidget {
   String _statusCopy(ProvisioningStatus? status, String? reason) {
     return switch (status) {
       ProvisioningStatus.pending => 'Session created in Cloud.',
-      ProvisioningStatus.permitOpen => 'Gateway is accepting this device.',
+      ProvisioningStatus.permitOpen => 'Device join window is accepting this device.',
       ProvisioningStatus.joining => 'Device is joining the Zigbee network.',
       ProvisioningStatus.joined => 'Device joined and is ready for room use.',
       ProvisioningStatus.failed => reason ?? 'Provisioning failed.',
       ProvisioningStatus.expired => 'Provisioning session expired.',
       ProvisioningStatus.cancelled => 'Provisioning session cancelled.',
-      null => 'Enter gateway, room, and device identity.',
+      null => 'Enter room and device identity.',
     };
   }
 }

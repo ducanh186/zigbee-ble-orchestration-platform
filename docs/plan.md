@@ -185,7 +185,7 @@ Switch event / motion event
 |---|---|---|
 | `SB_TENANT_ID` | `hust` | Tenant ID |
 | `SB_SITE_ID` | `lab01` | Site ID |
-| `SB_GATEWAY_ID` | `gw-ubuntu-01` | Gateway ID |
+| `SB_GATEWAY_ID` | `gw-ubuntu-01` | Home hub identifier |
 | `SB_MQTT_HOST` | `localhost` | MQTT broker host |
 | `SB_MQTT_PORT` | `1883` | MQTT broker port |
 | `SB_OTA_DIR` | `./ota-files` | OTA artifact storage |

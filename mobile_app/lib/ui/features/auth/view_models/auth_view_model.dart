@@ -98,4 +98,36 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    if (isLoading) {
+      return;
+    }
+
+    _status = AuthStatus.refreshing;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.changePassword(
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      );
+      _session = null;
+      _status = AuthStatus.unauthenticated;
+    } catch (error) {
+      _status = _session == null
+          ? AuthStatus.unauthenticated
+          : AuthStatus.authenticated;
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Doi mat khau that bai',
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
 }

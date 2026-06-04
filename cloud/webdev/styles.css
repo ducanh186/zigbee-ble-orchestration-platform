@@ -181,7 +181,7 @@ h2 {
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(280px, 340px);
   grid-template-areas:
     "status status status"
-    "devices detail gateway"
+    "devices detail join"
     "devices activity commands";
   gap: 14px;
   padding: 14px;
@@ -257,8 +257,8 @@ h2 {
   grid-area: detail;
 }
 
-.gateway-panel {
-  grid-area: gateway;
+.join-panel {
+  grid-area: join;
 }
 
 .activity-panel {
@@ -463,19 +463,15 @@ textarea {
   line-height: 1.45;
 }
 
-.gateway-controls {
+.join-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 108px;
+  grid-template-columns: minmax(0, 1fr) 140px 140px;
   gap: 10px;
   padding: 12px;
 }
 
-.gateway-controls button {
+.join-controls button {
   grid-column: span 1;
-}
-
-.gateway-controls label:first-child {
-  grid-column: 1 / -1;
 }
 
 input,
@@ -488,7 +484,7 @@ select {
   padding: 0 10px;
 }
 
-.gateway-controls input {
+.join-controls input {
   width: 100%;
   margin-top: 5px;
 }
@@ -860,7 +856,7 @@ td {
     grid-template-areas:
       "status status"
       "devices detail"
-      "gateway commands"
+      "join commands"
       "activity activity";
   }
 
@@ -887,7 +883,7 @@ td {
       "status"
       "devices"
       "detail"
-      "gateway"
+      "join"
       "activity"
       "commands";
   }

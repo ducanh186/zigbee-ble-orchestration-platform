@@ -8,42 +8,93 @@ import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/cloud_status.dart';
 
 void main() {
-  test('renameDeviceName patches display label and preserves gateway identity',
-      () async {
-    final apiClient = ApiClient(
-      baseUrl: 'http://98.83.4.87:8000',
-      httpClient: MockClient((request) async {
-        expect(request.method, 'PATCH');
-        expect(request.url.path, '/api/devices/light-01');
-        expect(request.headers['authorization'], 'Bearer token-abc');
-        final body = jsonDecode(request.body) as Map<String, Object?>;
-        expect(body, {'name': 'Desk lamp'});
-        return http.Response(
-          jsonEncode({
-            'id': 'light-01',
-            'device_type': 'light',
-            'eui64': '00124b0001aa22bb',
-            'room_id': 'room-1',
-            'name': 'Desk lamp',
-            'is_online': true,
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }),
-    );
-    apiClient.setAccessToken('token-abc');
-    final repository = RemoteDeviceRepository(apiClient: apiClient);
+  test(
+    'fetchDevices uses the canonical list endpoint without redirect',
+    () async {
+      final requests = <Uri>[];
+      final apiClient = ApiClient(
+        baseUrl: 'https://dashboard.iot-building.app',
+        httpClient: MockClient((request) async {
+          requests.add(request.url);
+          expect(request.headers['Authorization'], 'Bearer token-abc');
+          if (request.url.path == '/api/devices/') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'light-01',
+                  'device_type': 'light',
+                  'eui64': '00124b0001aa22bb',
+                  'room_id': 'room-01',
+                  'name': 'Desk lamp',
+                  'is_online': true,
+                },
+              ]),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.url.path == '/api/devices/light-01/state') {
+            return http.Response(
+              jsonEncode({
+                'device_id': 'light-01',
+                'state': {'power': 'on', 'level': 100, 'reachable': true},
+                'reported_at': '10:11 06/02/2026',
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('unexpected path ${request.url.path}', 404);
+        }),
+      );
+      apiClient.setAccessToken('token-abc');
+      final repository = RemoteDeviceRepository(apiClient: apiClient);
 
-    final renamed = await repository.renameDeviceName(
-      deviceId: 'light-01',
-      name: 'Desk lamp',
-    );
+      final devices = await repository.fetchDevices();
 
-    expect(renamed.id, 'light-01');
-    expect(renamed.eui64, '00124b0001aa22bb');
-    expect(renamed.name, 'Desk lamp');
-  });
+      expect(devices, hasLength(1));
+      expect(requests.first.path, '/api/devices/');
+    },
+  );
+
+  test(
+    'renameDeviceName patches display label and preserves gateway identity',
+    () async {
+      final apiClient = ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'PATCH');
+          expect(request.url.path, '/api/devices/light-01');
+          expect(request.headers['authorization'], 'Bearer token-abc');
+          final body = jsonDecode(request.body) as Map<String, Object?>;
+          expect(body, {'name': 'Desk lamp'});
+          return http.Response(
+            jsonEncode({
+              'id': 'light-01',
+              'device_type': 'light',
+              'eui64': '00124b0001aa22bb',
+              'room_id': 'room-1',
+              'name': 'Desk lamp',
+              'is_online': true,
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      apiClient.setAccessToken('token-abc');
+      final repository = RemoteDeviceRepository(apiClient: apiClient);
+
+      final renamed = await repository.renameDeviceName(
+        deviceId: 'light-01',
+        name: 'Desk lamp',
+      );
+
+      expect(renamed.id, 'light-01');
+      expect(renamed.eui64, '00124b0001aa22bb');
+      expect(renamed.name, 'Desk lamp');
+    },
+  );
 
   test('fetchEvents for device reads three recent cloud event rows', () async {
     final repository = RemoteDeviceRepository(
@@ -114,7 +165,7 @@ void main() {
   });
 
   test(
-    'does not invent gateway status when cloud logs contain no gateway event',
+    'does not invent home hub status when cloud logs contain no hub event',
     () async {
       final repository = RemoteDeviceRepository(
         apiClient: ApiClient(
@@ -140,7 +191,7 @@ void main() {
       final status = await repository.fetchCloudStatus();
 
       expect(status.state, CloudConnectionState.unknown);
-      expect(status.detail, 'No gateway status log found in cloud events');
+      expect(status.detail, 'No home hub status log found in cloud events');
     },
   );
 

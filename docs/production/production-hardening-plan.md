@@ -1,6 +1,6 @@
 # Production Hardening Plan
 
-Last updated: 2026-06-01 04:22:00 +07:00
+Last updated: 2026-06-02 15:13:36 +07:00
 
 Jira: SCRUM-90
 
@@ -93,9 +93,9 @@ Do not put real secrets, private keys, JWT secrets, database passwords, or certi
 
 - `SCRUM-91` mobile login-state subagent is running separately.
 - Backend Phase 2 auth/RBAC is locally verified, but mobile login-state integration still needs `SCRUM-91` output.
-- Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with operator approval.
-- Live Zigbee default global key rejection needs operator hardware evidence before final production readiness is claimed.
-- Real backup and restore dry-run evidence needs an operator-approved environment before final production readiness is claimed.
+- Live EC2 validation is outside local phases and must be marked `not testable in this environment` unless run later with deployment approval.
+- Live Zigbee default global key rejection needs hardware evidence before final production readiness is claimed.
+- Real backup and restore dry-run evidence needs an approved production-like environment before final production readiness is claimed.
 - Current EC2 deploy uses legacy `docker-compose.prod.yml`; secure compose cutover is required before stable production release.
 
 ## Phase 0 Verification
@@ -148,13 +148,13 @@ Evidence checked:
 Command:
 
 ```text
-python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q
+python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_devices.py cloud/tests/test_gateways.py cloud/tests/test_provisioning.py cloud/tests/test_automations.py cloud/tests/test_security_hardening.py cloud/tests/test_schemas.py -q
 ```
 
 Result:
 
 ```text
-23 passed in 9.54s
+133 passed in 25.29s
 ```
 
 Evidence checked:
@@ -163,8 +163,8 @@ Evidence checked:
 - Invalid and expired bearer tokens return `401`.
 - Unauthenticated device command requests return `401`.
 - `viewer` device command requests return `403`.
-- `operator` device command requests succeed where allowed.
-- `operator` permit-join requests return `403`.
+- `parent` device command requests succeed where allowed.
+- `parent` permit-join requests succeed for the configured gateway.
 - `admin` permit-join requests succeed.
 - `docs/production/production-auth.md` records deferred refresh, `/auth/me`, and token-revocation items.
 

@@ -18,8 +18,16 @@ CREATE TABLE rooms (
 CREATE TABLE users (
     id          VARCHAR     PRIMARY KEY,
     username    VARCHAR     NOT NULL UNIQUE,
+    display_name VARCHAR,
+    role        VARCHAR     NOT NULL DEFAULT 'viewer',
+    password_hash VARCHAR,
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
+    last_login_at TIMESTAMP,
+    password_changed_at TIMESTAMP,
     home_id     VARCHAR     REFERENCES homes(id),
-    created_at  TIMESTAMP   DEFAULT now()
+    created_at  TIMESTAMP   DEFAULT now(),
+    updated_at  TIMESTAMP   DEFAULT now()
 );
 
 CREATE TABLE devices (
@@ -88,3 +96,17 @@ CREATE TABLE automations (
 
 CREATE INDEX ix_automations_gateway_created
     ON automations (tenant_id, site_id, gateway_id, created_at);
+
+CREATE TABLE factory_devices (
+    eui64        VARCHAR     PRIMARY KEY,
+    install_code VARCHAR     NOT NULL,
+    device_type  VARCHAR     NOT NULL,
+    model        VARCHAR,
+    is_active    BOOLEAN     NOT NULL DEFAULT TRUE,
+    claimed_at   TIMESTAMP,
+    created_at   TIMESTAMP   DEFAULT now(),
+    updated_at   TIMESTAMP   DEFAULT now()
+);
+
+CREATE INDEX ix_factory_devices_type_active
+    ON factory_devices (device_type, is_active);

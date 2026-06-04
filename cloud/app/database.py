@@ -93,7 +93,7 @@ async def ensure_device_last_seen_column(target_engine=None) -> None:
 
 
 async def ensure_user_auth_columns(target_engine=None) -> None:
-    """Idempotent backfill for minimal auth/RBAC columns on users."""
+    """Idempotent backfill for Phase A auth/RBAC columns on users."""
     from sqlalchemy import inspect, text
 
     eng = target_engine if target_engine is not None else engine
@@ -103,7 +103,16 @@ async def ensure_user_auth_columns(target_engine=None) -> None:
         if not insp.has_table("users"):
             return set()
         cols = {c["name"] for c in insp.get_columns("users")}
-        return {"role", "password_hash"} - cols
+        return {
+            "role",
+            "password_hash",
+            "display_name",
+            "must_change_password",
+            "is_active",
+            "last_login_at",
+            "password_changed_at",
+            "updated_at",
+        } - cols
 
     async with eng.begin() as conn:
         missing = await conn.run_sync(_missing_columns)
@@ -111,13 +120,64 @@ async def ensure_user_auth_columns(target_engine=None) -> None:
             await conn.execute(
                 text(
                     "ALTER TABLE users "
-                    "ADD COLUMN role VARCHAR NOT NULL DEFAULT 'user'"
+                    "ADD COLUMN role VARCHAR NOT NULL DEFAULT 'viewer'"
                 )
             )
         if "password_hash" in missing:
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN password_hash VARCHAR")
             )
+        if "display_name" in missing:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR"))
+        if "must_change_password" in missing:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
+        if "is_active" in missing:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true")
+            )
+        if "last_login_at" in missing:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP"))
+        if "password_changed_at" in missing:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN password_changed_at TIMESTAMP")
+            )
+        if "updated_at" in missing:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN updated_at TIMESTAMP"))
+
+
+async def normalize_user_roles(target_engine=None) -> None:
+    """Idempotently migrate legacy public roles to canonical MVP roles."""
+    from sqlalchemy import inspect, text
+
+    eng = target_engine if target_engine is not None else engine
+
+    def _has_role_column(sync_conn) -> bool:
+        insp = inspect(sync_conn)
+        if not insp.has_table("users"):
+            return False
+        cols = {c["name"] for c in insp.get_columns("users")}
+        return "role" in cols
+
+    async with eng.begin() as conn:
+        if not await conn.run_sync(_has_role_column):
+            return
+        await conn.execute(
+            text("UPDATE users SET role = 'parent' WHERE role IN ('operator', 'user')")
+        )
+        await conn.execute(
+            text("UPDATE users SET role = 'viewer' WHERE role IN ('member', '')")
+        )
+        await conn.execute(
+            text(
+                "UPDATE users SET role = 'viewer' "
+                "WHERE role IS NULL OR role NOT IN ('admin', 'parent', 'viewer')"
+            )
+        )
 
 
 async def init_db() -> None:
@@ -158,3 +218,4 @@ async def init_db() -> None:
     await ensure_automation_version_column()
     await ensure_device_last_seen_column()
     await ensure_user_auth_columns()
+    await normalize_user_roles()

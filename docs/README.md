@@ -22,6 +22,10 @@ For the operational runbook see [`instruct.md`](./instruct.md).
 
 - [`FLASHING.md`](./FLASHING.md) — how to flash every board, build matrix, artifact inventory, tracking policy.
 
+## Production security
+
+- [`production/gateway-localzigbee-security-requirements.md`](./production/gateway-localzigbee-security-requirements.md) — Gateway and local Zigbee security implementation requirements and evidence checklist.
+
 ## Runbook
 
 - [`instruct.md`](./instruct.md) — end-to-end bring-up, vận hành, debug. Session notes appended over time.

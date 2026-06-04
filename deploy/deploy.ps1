@@ -226,10 +226,16 @@ $sbTenant = if ($config["SB_TENANT_ID"]) { $config["SB_TENANT_ID"] }     else { 
 $sbSite = if ($config["SB_SITE_ID"]) { $config["SB_SITE_ID"] }       else { "lab01" }
 $sbGw = if ($config["SB_GATEWAY_ID"]) { $config["SB_GATEWAY_ID"] }    else { "gw-ubuntu-01" }
 $sbAuthSecret = if ($config["SB_AUTH_TOKEN_SECRET"]) { $config["SB_AUTH_TOKEN_SECRET"] } else { "" }
+$sbAdminPassword = if ($config["SB_ADMIN_INITIAL_PASSWORD"]) { $config["SB_ADMIN_INITIAL_PASSWORD"] } elseif ($config["SB_ADMIN_PASSWORD"]) { $config["SB_ADMIN_PASSWORD"] } else { "" }
+$sbParentPassword = if ($config["SB_PARENT_INITIAL_PASSWORD"]) { $config["SB_PARENT_INITIAL_PASSWORD"] } elseif ($config["SB_PARENT_PASSWORD"]) { $config["SB_PARENT_PASSWORD"] } else { "" }
+$sbViewerPassword = if ($config["SB_VIEWER_INITIAL_PASSWORD"]) { $config["SB_VIEWER_INITIAL_PASSWORD"] } elseif ($config["SB_VIEWER_PASSWORD"]) { $config["SB_VIEWER_PASSWORD"] } else { "" }
 
 Invoke-EC2 @"
 set -e
 AUTH_SECRET='$sbAuthSecret'
+ADMIN_PASSWORD='$sbAdminPassword'
+PARENT_PASSWORD='$sbParentPassword'
+VIEWER_PASSWORD='$sbViewerPassword'
 if [ -z "`$AUTH_SECRET" ]; then
   AUTH_SECRET=`$(grep -s '^SB_AUTH_TOKEN_SECRET=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
 fi
@@ -240,6 +246,34 @@ if [ -z "`$AUTH_SECRET" ] || [ "`$AUTH_SECRET" = "dev-only-change-me" ]; then
     AUTH_SECRET=`$(openssl rand -hex 48)
   fi
 fi
+if [ -z "`$ADMIN_PASSWORD" ]; then
+  ADMIN_PASSWORD=`$(grep -s '^SB_ADMIN_INITIAL_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$ADMIN_PASSWORD" ]; then
+  ADMIN_PASSWORD=`$(grep -s '^SB_ADMIN_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$PARENT_PASSWORD" ]; then
+  PARENT_PASSWORD=`$(grep -s '^SB_PARENT_INITIAL_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$PARENT_PASSWORD" ]; then
+  PARENT_PASSWORD=`$(grep -s '^SB_PARENT_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$VIEWER_PASSWORD" ]; then
+  VIEWER_PASSWORD=`$(grep -s '^SB_VIEWER_INITIAL_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+if [ -z "`$VIEWER_PASSWORD" ]; then
+  VIEWER_PASSWORD=`$(grep -s '^SB_VIEWER_PASSWORD=' '$REMOTE_DIR/deploy/cloud/.env' | tail -n1 | cut -d= -f2- || true)
+fi
+generate_login_password() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "import secrets; print(secrets.token_urlsafe(18))"
+  else
+    openssl rand -base64 24 | tr -d '\n'
+  fi
+}
+if [ -z "`$ADMIN_PASSWORD" ]; then ADMIN_PASSWORD=`$(generate_login_password); fi
+if [ -z "`$PARENT_PASSWORD" ]; then PARENT_PASSWORD=`$(generate_login_password); fi
+if [ -z "`$VIEWER_PASSWORD" ]; then VIEWER_PASSWORD=`$(generate_login_password); fi
 cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$sbDbUrl
 SB_MQTT_HOST=$sbMqttHost
@@ -258,6 +292,9 @@ SB_API_HOST=0.0.0.0
 SB_API_PORT=8000
 ENVEOF
 printf 'SB_AUTH_TOKEN_SECRET=%s\n' "`$AUTH_SECRET" >> $REMOTE_DIR/deploy/cloud/.env
+printf 'SB_ADMIN_INITIAL_PASSWORD=%s\n' "`$ADMIN_PASSWORD" >> $REMOTE_DIR/deploy/cloud/.env
+printf 'SB_PARENT_INITIAL_PASSWORD=%s\n' "`$PARENT_PASSWORD" >> $REMOTE_DIR/deploy/cloud/.env
+printf 'SB_VIEWER_INITIAL_PASSWORD=%s\n' "`$VIEWER_PASSWORD" >> $REMOTE_DIR/deploy/cloud/.env
 echo 'cloud/.env written.'
 "@
 
@@ -266,6 +303,7 @@ echo 'cloud/.env written.'
 # ----------------------------------------------------------
 Write-Host ""
 $httpsHost = if ($config["HTTPS_HOST"]) { $config["HTTPS_HOST"] } else { $EC2_HOST }
+$httpsCertMode = if ($config["HTTPS_CERT_MODE"]) { $config["HTTPS_CERT_MODE"] } else { "letsencrypt" }
 
 Write-Host "--- [7/8] Preparing HTTPS certificate ---" -ForegroundColor Yellow
 
@@ -273,7 +311,7 @@ Invoke-EC2 @"
 set -e
 cd $REMOTE_DIR
 sed -i 's/\r$//' deploy/setup-https.sh
-bash deploy/setup-https.sh '$httpsHost' '$REMOTE_DIR'
+HTTPS_CERT_MODE='$httpsCertMode' bash deploy/setup-https.sh '$httpsHost' '$REMOTE_DIR'
 "@
 
 # ----------------------------------------------------------

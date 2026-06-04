@@ -1,6 +1,6 @@
 # Production Acceptance Checklist
 
-Last updated: 2026-06-01 03:18:48 +07:00
+Last updated: 2026-06-02 15:13:36 +07:00
 
 Jira: SCRUM-90
 
@@ -57,22 +57,36 @@ Status: Verified locally. Live EC2 security group state is not testable in this 
 - [x] JWT access tokens are issued and validated.
 - [x] Refresh/logout/me behavior is implemented or explicitly deferred with rationale.
 - [x] Phase 2 high-risk actuator endpoints require authentication.
-- [x] Role-based access control covers `viewer`, `operator`, and `admin`.
+- [x] Cloud-App read endpoints require authentication except `/health`, `/auth/login`, and `/auth/logout`.
+- [x] Device, event, command, automation, automation-event, and provisioning session reads are scoped by `home_id` where applicable.
+- [x] Automation and provisioning writes reject `viewer` and require `parent` or `admin` with same-home referenced devices/rooms.
+- [x] Device delete and rediscover require `parent` or `admin`; parent is same-home scoped.
+- [x] Mobile release builds fail early for non-HTTPS `API_BASE_URL` or `HIDE_LOGIN=true`.
+- [x] Role-based access control covers `viewer`, `parent`, and `admin`.
 - [x] Unauthenticated command request returns `401`.
 - [x] Viewer command request returns `403`.
-- [x] Operator command request succeeds where allowed.
-- [x] Operator permit-join request returns `403`.
+- [x] Parent command request succeeds where allowed.
+- [x] Parent permit-join request succeeds for the configured gateway.
 - [x] Admin permit-join request succeeds.
 - [x] Invalid token returns `401`.
 - [x] Expired token returns `401`.
 
-Status: Backend REST API slice verified locally. Mobile login-state work remains delegated under `SCRUM-91`.
+Status: Cloud-App REST API slice and Mobile release guard verified locally. Live environment validation remains pending before production readiness.
 
 Evidence:
 
 ```text
-python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_gateways.py -q
-23 passed in 9.54s
+python -m pytest cloud/tests/test_auth_rbac.py cloud/tests/test_commands.py cloud/tests/test_devices.py cloud/tests/test_gateways.py cloud/tests/test_provisioning.py cloud/tests/test_automations.py cloud/tests/test_security_hardening.py cloud/tests/test_schemas.py -q
+133 passed
+
+flutter analyze
+No issues found
+
+flutter test
+93 passed
+
+flutter build apk --release --dart-define=API_BASE_URL=https://dashboard.iot-building.app --dart-define=USE_MOCK_API=false
+Built build\app\outputs\flutter-apk\app-release.apk
 ```
 
 Runbook: docs/production/production-auth.md
@@ -124,7 +138,7 @@ Runbook: docs/production/production-gateway.md
 
 - [x] Permit join is closed by default.
 - [x] Permit join duration is short and bounded.
-- [x] Only admin can open permit join.
+- [x] Only parent/admin sessions can open permit join.
 - [x] Install-code commissioning support is proven or documented.
 - [x] Default global Zigbee key join is rejected by gateway security config and marked for live negative evidence.
 - [x] Negative commissioning procedure exists.
@@ -167,9 +181,9 @@ Runbook: docs/production/production-operations.md
 - [x] Release steps are documented.
 - [x] Rollback procedure is documented.
 - [x] Final report links all evidence.
-- [x] All checklist items are complete or explicitly accepted as deferred by the operator validation items.
+- [x] All checklist items are complete or explicitly accepted as deferred by live validation items, including operator validation items.
 
-Status: Release candidate evidence verified locally. The platform remains not production ready until the deferred operator validation items are completed.
+Status: Release candidate evidence verified locally. The platform remains not production ready until the deferred live validation items are completed.
 
 Evidence:
 

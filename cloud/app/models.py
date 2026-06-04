@@ -48,10 +48,16 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     username = Column(String, unique=True, nullable=False)
-    role = Column(String, nullable=False, default="user", server_default="user")
+    display_name = Column(String, nullable=True)
+    role = Column(String, nullable=False, default="viewer", server_default="viewer")
     password_hash = Column(String, nullable=True)
+    must_change_password = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="1")
+    last_login_at = Column(DateTime, nullable=True)
+    password_changed_at = Column(DateTime, nullable=True)
     home_id = Column(String, ForeignKey("homes.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     home = relationship("Home", back_populates="users")
 
@@ -173,6 +179,49 @@ class Automation(Base):
             "created_at",
         ),
     )
+
+
+class AutomationEvent(Base):
+    """Audit row for automation lifecycle and execution events from gateway."""
+
+    __tablename__ = "automation_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    automation_id = Column(String, ForeignKey("automations.id"), nullable=True)
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=True)
+    reason = Column(String, nullable=True)
+    payload = Column(JSON, nullable=False)
+    occurred_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index(
+            "ix_automation_events_rule_occurred",
+            "automation_id",
+            "occurred_at",
+        ),
+    )
+
+
+class FactoryDevice(Base):
+    """Factory-provisioned device secret indexed by public EUI64."""
+
+    __tablename__ = "factory_devices"
+
+    eui64 = Column(String, primary_key=True)
+    install_code = Column(String, nullable=False)
+    device_type = Column(String, nullable=False)
+    model = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    claimed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_factory_devices_type_active", "device_type", "is_active"),
+    )
+
 
 class ProvisioningSession(Base):
     """Secure install-code join session tracked by the cloud API."""

@@ -16,6 +16,7 @@ from cloud.app.schemas import (
     ProvisioningSessionOut,
     ProvisioningStatus,
 )
+from cloud.tests.auth_helpers import create_auth_user, login_headers
 
 VALID_EUI64 = "A8D417FEFF570B00"
 VALID_INSTALL_CODE = "83FED3407A939723A5C639B26916D505C3B5"  # 36 hex = 18 bytes
@@ -42,6 +43,7 @@ def test_error_code_enum_values():
         "INVALID_EUI64",
         "INVALID_INSTALL_CODE",
         "UNSUPPORTED_DEVICE_TYPE",
+        "DEVICE_NOT_FACTORY_REGISTERED",
         "GATEWAY_NOT_FOUND",
         "ROOM_NOT_FOUND",
         "SESSION_ALREADY_ACTIVE",
@@ -53,19 +55,9 @@ def test_error_code_enum_values():
 def test_device_payload_valid():
     p = ProvisioningDevicePayload(
         eui64=VALID_EUI64,
-        install_code=VALID_INSTALL_CODE,
         device_type="light",
-        model="EFR32MG12_LIGHT_KIT",
     )
     assert p.device_type == "light"
-    assert p.model == "EFR32MG12_LIGHT_KIT"
-
-
-def test_device_payload_model_optional():
-    p = ProvisioningDevicePayload(
-        eui64=VALID_EUI64, install_code=VALID_INSTALL_CODE, device_type="motion"
-    )
-    assert p.model is None
 
 
 @pytest.mark.parametrize(
@@ -74,25 +66,13 @@ def test_device_payload_model_optional():
 )
 def test_device_payload_bad_eui64(bad):
     with pytest.raises(ValidationError):
-        ProvisioningDevicePayload(
-            eui64=bad, install_code=VALID_INSTALL_CODE, device_type="light"
-        )
-
-
-@pytest.mark.parametrize("bad", ["ZZZZ", "83FE", "abc", "12345"])
-def test_device_payload_bad_install_code(bad):
-    with pytest.raises(ValidationError):
-        ProvisioningDevicePayload(
-            eui64=VALID_EUI64, install_code=bad, device_type="light"
-        )
+        ProvisioningDevicePayload(eui64=bad, device_type="light")
 
 
 @pytest.mark.parametrize("bad", ["occupancy", "occ", "lock", "unknown", "Light"])
 def test_device_payload_bad_device_type(bad):
     with pytest.raises(ValidationError):
-        ProvisioningDevicePayload(
-            eui64=VALID_EUI64, install_code=VALID_INSTALL_CODE, device_type=bad
-        )
+        ProvisioningDevicePayload(eui64=VALID_EUI64, device_type=bad)
 
 
 # --- session create / out ---------------------------------------------------
@@ -103,9 +83,7 @@ def test_session_create_valid():
         room_id="room-1",
         device={
             "eui64": VALID_EUI64,
-            "install_code": VALID_INSTALL_CODE,
             "device_type": "light",
-            "model": "X",
         },
     )
     assert body.device.eui64 == VALID_EUI64
@@ -184,15 +162,41 @@ async def _seed_room(db_session_factory, room_id: str = "room-1"):
         await s.commit()
 
 
+async def _seed_factory_device(db_session_factory):
+    from cloud.app.models import FactoryDevice
+
+    async with db_session_factory() as s:
+        s.add(
+            FactoryDevice(
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                model="EFR32MG12_LIGHT_KIT",
+                is_active=True,
+            )
+        )
+        await s.commit()
+
+
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "parent", "parent-pass")
+
+
 def _create_body(**overrides):
     body = {
         "gateway_id": settings.gateway_id,
         "room_id": "room-1",
         "device": {
             "eui64": VALID_EUI64,
-            "install_code": VALID_INSTALL_CODE,
             "device_type": "light",
-            "model": "EFR32MG12_LIGHT_KIT",
         },
     }
     body.update(overrides)
@@ -208,8 +212,12 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
     from cloud.app.models import Command, ProvisioningSession
 
     await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
 
-    r = await client.post("/api/provisioning/sessions", json=_create_body())
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert r.status_code == 201, r.text
     data = r.json()
@@ -255,11 +263,18 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
 @pytest.mark.asyncio
 async def test_get_provisioning_session_api(client, db_session_factory):
     await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
-        await client.post("/api/provisioning/sessions", json=_create_body())
+        await client.post(
+            "/api/provisioning/sessions", json=_create_body(), headers=headers
+        )
     ).json()
 
-    r = await client.get(f"/api/provisioning/sessions/{created['session_id']}")
+    r = await client.get(
+        f"/api/provisioning/sessions/{created['session_id']}",
+        headers=headers,
+    )
 
     assert r.status_code == 200, r.text
     data = r.json()
@@ -269,10 +284,15 @@ async def test_get_provisioning_session_api(client, db_session_factory):
 
 
 @pytest.mark.asyncio
-async def test_create_provisioning_session_unknown_gateway_404(client, fake_mqtt):
+async def test_create_provisioning_session_unknown_gateway_404(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _parent_headers(client, db_session_factory)
+
     r = await client.post(
         "/api/provisioning/sessions",
         json=_create_body(gateway_id="unknown-gateway"),
+        headers=headers,
     )
 
     assert r.status_code == 404
@@ -281,8 +301,14 @@ async def test_create_provisioning_session_unknown_gateway_404(client, fake_mqtt
 
 
 @pytest.mark.asyncio
-async def test_create_provisioning_session_unknown_room_404(client, fake_mqtt):
-    r = await client.post("/api/provisioning/sessions", json=_create_body())
+async def test_create_provisioning_session_unknown_room_404(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert r.status_code == 404
     assert r.json()["detail"]["error_code"] == ProvisioningErrorCode.ROOM_NOT_FOUND
@@ -294,10 +320,16 @@ async def test_create_provisioning_session_duplicate_active_409(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
-    first = await client.post("/api/provisioning/sessions", json=_create_body())
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    first = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
     assert first.status_code == 201, first.text
 
-    second = await client.post("/api/provisioning/sessions", json=_create_body())
+    second = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
 
     assert second.status_code == 409
     assert (
@@ -308,15 +340,41 @@ async def test_create_provisioning_session_duplicate_active_409(
 
 
 @pytest.mark.asyncio
+async def test_create_provisioning_session_unknown_factory_device_404(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
+
+    assert r.status_code == 404
+    assert (
+        r.json()["detail"]["error_code"]
+        == ProvisioningErrorCode.DEVICE_NOT_FACTORY_REGISTERED
+    )
+    assert fake_mqtt.published == []
+
+
+@pytest.mark.asyncio
 async def test_delete_provisioning_session_cancels_non_terminal(
     client, db_session_factory, fake_mqtt
 ):
     await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
     created = (
-        await client.post("/api/provisioning/sessions", json=_create_body())
+        await client.post(
+            "/api/provisioning/sessions", json=_create_body(), headers=headers
+        )
     ).json()
 
-    r = await client.delete(f"/api/provisioning/sessions/{created['session_id']}")
+    r = await client.delete(
+        f"/api/provisioning/sessions/{created['session_id']}",
+        headers=headers,
+    )
 
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "cancelled"
@@ -345,7 +403,11 @@ async def test_delete_provisioning_session_rejects_terminal(
         )
         await s.commit()
 
-    r = await client.delete("/api/provisioning/sessions/prov-joined")
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.delete(
+        "/api/provisioning/sessions/prov-joined", headers=headers
+    )
 
     assert r.status_code == 409
 

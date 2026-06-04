@@ -1,7 +1,7 @@
-# Cloud Ops Console
+# Smart Home Account Center
 
-Static web UI for checking cloud events, device state, gateway commissioning,
-and command status during development.
+Static web UI for checking cloud events, device state, device join windows,
+provisioning labels, and command status during development.
 
 ## Canonical local dev flow (Linux)
 

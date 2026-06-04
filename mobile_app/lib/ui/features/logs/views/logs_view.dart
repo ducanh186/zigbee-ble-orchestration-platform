@@ -250,7 +250,7 @@ class _LogSummary {
       messageLower,
       combinedLower,
     );
-    final source = event.source == null ? 'cloud/gateway' : event.source!;
+    final source = _displaySource(event.source);
 
     return _LogSummary(
       outcome: outcome,
@@ -278,7 +278,7 @@ class _LogSummary {
 
   static String _subjectFrom(String eventType, String lower) {
     if (lower.contains('gateway')) {
-      return 'gateway';
+      return 'home hub';
     }
     final normalizedType = eventType.trim().toLowerCase();
     if (normalizedType.isEmpty || normalizedType == 'event') {
@@ -361,6 +361,13 @@ class _LogSummary {
     return eventType.toLowerCase().contains('gateway') ||
         lower.contains('gateway_health') ||
         lower.contains('gateway health');
+  }
+
+  static String _displaySource(String? source) {
+    if (source == null || source.trim().isEmpty) {
+      return 'cloud/home hub';
+    }
+    return source.replaceAll('gateway', 'home hub');
   }
 
   static Map<String, String> _mapEntries(String message) {
