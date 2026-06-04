@@ -6,12 +6,11 @@ import 'package:zigbee_smart_building/domain/models/provisioning_session.dart';
 
 void main() {
   group('ProvisioningQrPayload', () {
-    test('parses valid v1 QR JSON and normalizes secure join fields', () {
+    test('parses valid v1 QR JSON without exposing install code', () {
       final payload = ProvisioningQrPayload.parseJson(
         jsonEncode({
           'version': 1,
           'eui64': 'a8d417feff570b00',
-          'install_code': '83fed3407a939723a5c639b26916d505c3b5',
           'device_type': 'light',
           'model': 'EFR32MG12_LIGHT_KIT',
         }),
@@ -19,7 +18,6 @@ void main() {
 
       expect(payload.version, 1);
       expect(payload.eui64, 'A8D417FEFF570B00');
-      expect(payload.installCode, '83FED3407A939723A5C639B26916D505C3B5');
       expect(payload.deviceType, ProvisioningDeviceType.light);
       expect(payload.model, 'EFR32MG12_LIGHT_KIT');
     });
@@ -37,7 +35,6 @@ void main() {
           jsonEncode({
             'version': 2,
             'eui64': 'A8D417FEFF570B00',
-            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
             'device_type': 'light',
           }),
         ),
@@ -45,25 +42,12 @@ void main() {
       );
     });
 
-    test('rejects invalid EUI64 and install code values', () {
+    test('rejects invalid EUI64 values', () {
       expect(
         () => ProvisioningQrPayload.parseJson(
           jsonEncode({
             'version': 1,
             'eui64': '0xA8D417FEFF570B00',
-            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
-            'device_type': 'light',
-          }),
-        ),
-        throwsA(isA<FormatException>()),
-      );
-
-      expect(
-        () => ProvisioningQrPayload.parseJson(
-          jsonEncode({
-            'version': 1,
-            'eui64': 'A8D417FEFF570B00',
-            'install_code': 'not-hex',
             'device_type': 'light',
           }),
         ),
@@ -77,7 +61,6 @@ void main() {
           jsonEncode({
             'version': 1,
             'eui64': 'A8D417FEFF570B00',
-            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
             'device_type': 'occupancy',
           }),
         ),
@@ -95,7 +78,6 @@ void main() {
           jsonEncode({
             'version': 1,
             'eui64': 'A8D417FEFF570B00',
-            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
             'device_type': 'switch',
             'model': 'EFR32MG12_SWITCH_KIT',
           }),
@@ -107,7 +89,6 @@ void main() {
         'room_id': 'lab',
         'device': {
           'eui64': 'A8D417FEFF570B00',
-          'install_code': '83FED3407A939723A5C639B26916D505C3B5',
           'device_type': 'switch',
           'model': 'EFR32MG12_SWITCH_KIT',
         },

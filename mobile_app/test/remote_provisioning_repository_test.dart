@@ -35,7 +35,6 @@ void main() {
         jsonEncode({
           'version': 1,
           'eui64': 'a8d417feff570b00',
-          'install_code': '83fed3407a939723a5c639b26916d505c3b5',
           'device_type': 'light',
           'model': 'EFR32MG12_LIGHT_KIT',
         }),
@@ -47,7 +46,6 @@ void main() {
       'room_id': 'lab',
       'device': {
         'eui64': 'A8D417FEFF570B00',
-        'install_code': '83FED3407A939723A5C639B26916D505C3B5',
         'device_type': 'light',
         'model': 'EFR32MG12_LIGHT_KIT',
       },

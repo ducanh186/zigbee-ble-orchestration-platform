@@ -14,7 +14,6 @@ class ProvisioningSessionCreateApiModel {
   Map<String, Object?> toJson() {
     final device = <String, Object?>{
       'eui64': payload.eui64,
-      'install_code': payload.installCode,
       'device_type': payload.deviceType.wireValue,
     };
 

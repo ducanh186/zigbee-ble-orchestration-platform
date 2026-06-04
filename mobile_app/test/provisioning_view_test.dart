@@ -11,7 +11,7 @@ import 'package:zigbee_smart_building/ui/features/provisioning/views/provisionin
 
 void main() {
   const validQrJson =
-      '{"version":1,"eui64":"A8D417FEFF570B00","install_code":"83FED3407A939723A5C639B26916D505C3B5","device_type":"light","model":"EFR32MG12_LIGHT_KIT"}';
+      '{"version":1,"eui64":"A8D417FEFF570B00","device_type":"light","model":"EFR32MG12_LIGHT_KIT"}';
 
   testWidgets(
     'renders wizard shell with start disabled until device payload exists',
@@ -195,7 +195,6 @@ void main() {
       jsonEncode({
         'version': 1,
         'eui64': 'A8D417FEFF570B00',
-        'install_code': '83FED3407A939723A5C639B26916D505C3B5',
         'device_type': 'light',
         'model': 'EFR32MG12_LIGHT_KIT',
       }),
@@ -243,7 +242,6 @@ void main() {
       jsonEncode({
         'version': 1,
         'eui64': 'A8D417FEFF570B00',
-        'install_code': '83FED3407A939723A5C639B26916D505C3B5',
         'device_type': 'switch',
       }),
     );

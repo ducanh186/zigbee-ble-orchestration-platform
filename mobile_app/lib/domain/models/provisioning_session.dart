@@ -1,8 +1,6 @@
 import 'dart:convert';
 
 const _supportedQrVersion = 1;
-const _installCodeHexLengths = <int>{16, 20, 28, 36};
-final _hexPattern = RegExp(r'^[0-9a-fA-F]+$');
 final _eui64Pattern = RegExp(r'^[0-9a-fA-F]{16}$');
 
 enum ProvisioningDeviceType {
@@ -75,7 +73,6 @@ class ProvisioningQrPayload {
   const ProvisioningQrPayload({
     required this.version,
     required this.eui64,
-    required this.installCode,
     required this.deviceType,
     this.model,
   });
@@ -99,18 +96,9 @@ class ProvisioningQrPayload {
       throw const FormatException('eui64 must be 16 hex characters');
     }
 
-    final installCode = _requiredString(json, 'install_code').trim();
-    if (!_hexPattern.hasMatch(installCode) ||
-        !_installCodeHexLengths.contains(installCode.length)) {
-      throw const FormatException(
-        'install_code must be valid hex with CRC length',
-      );
-    }
-
     return ProvisioningQrPayload(
       version: version,
       eui64: eui64.toUpperCase(),
-      installCode: installCode.toUpperCase(),
       deviceType: ProvisioningDeviceType.fromJson(json['device_type']),
       model: _optionalString(json, 'model'),
     );
@@ -118,7 +106,6 @@ class ProvisioningQrPayload {
 
   final int version;
   final String eui64;
-  final String installCode;
   final ProvisioningDeviceType deviceType;
   final String? model;
 }

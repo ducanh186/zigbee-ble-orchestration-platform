@@ -17,7 +17,7 @@ SB_COMMAND_C = REPO_ROOT / "gateway" / "Z3GatewayHost" / "app" / "sb_command.c"
 DEVICE_DISPATCH_C = (
     REPO_ROOT / "gateway" / "Z3GatewayHost" / "app" / "device_dispatch.c"
 )
-COMMISSIONING_DOC = REPO_ROOT / "docs" / "production" / "production-commissioning.md"
+COMMISSIONING_DOC = REPO_ROOT / "docs" / "SECURITY.md"
 
 
 def test_cloud_and_gateway_commissioning_bounds_are_secure() -> None:

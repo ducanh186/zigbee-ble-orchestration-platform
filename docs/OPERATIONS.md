@@ -130,7 +130,8 @@ Check:
 Check:
 
 - Factory device exists and is active.
-- QR payload carries the expected EUI64 and install code.
+- QR payload carries the expected EUI64. It does not carry the install code.
+- Cloud resolves the factory install code and sends it to Gateway in `gateway.prepare_join`.
 - No active non-terminal session already exists for the same device.
 - Gateway received `gateway.prepare_join`.
 - Local Zigbee permit-join window opened.

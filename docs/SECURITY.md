@@ -29,7 +29,9 @@ These are the durable conclusions carried forward from the removed security scan
 
 ### Provisioning Install Codes Need Tight Handling
 
-`factory_devices` and `provisioning_sessions` store install-code material. That is sensitive because it can authorize a Zigbee join. Minimize retention, limit who can read or create labels, avoid logging install codes, and clear or mask stale values when the product no longer needs them.
+QR payloads do not carry install codes. Cloud resolves the factory device record, sends the install code to Gateway in `gateway.prepare_join`, and Gateway opens a short secure join window for that EUI64. `factory_devices` and `provisioning_sessions` store install-code material, which is sensitive because it can authorize a Zigbee join. Minimize retention, limit who can create labels or sessions, avoid logging install codes, and clear or mask stale values when the product no longer needs them.
+
+The expected negative evidence is that joins do not fall back to the Zigbee default global key. Gateway security config requires install-code joins and disables well-known-key rejoins.
 
 ### Local Secret Files Are Not Documentation
 
