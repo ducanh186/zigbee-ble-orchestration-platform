@@ -7,6 +7,8 @@ const DEFAULT_TARGET = {
 
 const state = {
   apiBase: loadSetting("apiBase", defaultApiBase()),
+  gatewayId: loadSetting("gatewayId", DEFAULT_GATEWAY_ID),
+  token: loadSetting("authToken", ""),
   devices: [],
   deviceStates: new Map(),
   selectedDeviceId: null,
@@ -110,6 +112,12 @@ const els = {
   autoSaveBtn: byId("autoSaveBtn"),
   automationList: byId("automationList"),
   automationSummary: byId("automationSummary"),
+  loginOverlay: byId("loginOverlay"),
+  loginForm: byId("loginForm"),
+  loginUser: byId("loginUser"),
+  loginPass: byId("loginPass"),
+  loginError: byId("loginError"),
+  logoutBtn: byId("logoutBtn"),
 };
 
 init();
@@ -118,11 +126,68 @@ function init() {
   els.apiBaseInput.value = state.apiBase;
   els.rawTargetInput.value = JSON.stringify(DEFAULT_TARGET, null, 2);
   bindEvents();
+  if (state.token) {
+    startSession();
+  } else {
+    requireLogin();
+  }
+}
+
+// Begin the authenticated dashboard session: hide login, load data, poll.
+function startSession() {
+  showApp();
   refreshAll();
   scheduleRefresh();
 }
 
+async function handleLogin(event) {
+  event.preventDefault();
+  const username = els.loginUser.value.trim();
+  const password = els.loginPass.value;
+  els.loginError.textContent = "";
+  try {
+    const response = await fetch(`${state.apiBase}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.access_token) {
+      throw new Error((data && data.detail) || `Login failed (${response.status})`);
+    }
+    state.token = data.access_token;
+    localStorage.setItem("cloudOps.authToken", state.token);
+    els.loginPass.value = "";
+    startSession();
+    toast(`Signed in as ${data.username || username}`);
+  } catch (error) {
+    els.loginError.textContent = cleanError(error);
+  }
+}
+
+function logout() {
+  state.token = "";
+  localStorage.removeItem("cloudOps.authToken");
+  requireLogin();
+}
+
+// Stop polling and show the login overlay (called on logout or any 401).
+function requireLogin() {
+  if (state.refreshTimer) {
+    clearInterval(state.refreshTimer);
+    state.refreshTimer = null;
+  }
+  if (els.loginOverlay) els.loginOverlay.hidden = false;
+  if (els.loginUser) els.loginUser.focus();
+}
+
+function showApp() {
+  if (els.loginOverlay) els.loginOverlay.hidden = true;
+}
+
 function bindEvents() {
+  if (els.loginForm) els.loginForm.addEventListener("submit", handleLogin);
+  if (els.logoutBtn) els.logoutBtn.addEventListener("click", logout);
   els.saveSettingsBtn.addEventListener("click", saveSettings);
   els.refreshBtn.addEventListener("click", refreshAll);
   els.levelSlider.addEventListener("input", () => {
@@ -767,13 +832,21 @@ function upsertCommand(command) {
 }
 
 async function fetchJson(path, options = {}) {
+  const headers = {
+    "content-type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (state.token) {
+    headers["authorization"] = `Bearer ${state.token}`;
+  }
   const response = await fetch(`${state.apiBase}${path}`, {
     ...options,
-    headers: {
-      "content-type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
   });
+  if (response.status === 401) {
+    requireLogin();
+    throw new Error("Unauthorized — please sign in again");
+  }
   const text = await response.text();
   let payload = null;
   if (text) {

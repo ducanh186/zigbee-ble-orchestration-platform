@@ -1027,3 +1027,59 @@ td {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 32, 42, 0.55);
+}
+
+.login-overlay[hidden] {
+  display: none;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  max-width: 90vw;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.login-card h2 {
+  margin: 4px 0 0;
+}
+
+.login-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-card input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.login-card button {
+  margin-top: 4px;
+}
+
+.login-error {
+  margin: 0;
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 13px;
+}
