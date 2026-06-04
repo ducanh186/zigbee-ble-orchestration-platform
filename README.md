@@ -1,156 +1,83 @@
-# Zigbee Smart Building Platform
+# Zigbee BLE Orchestration Platform
 
-This repository contains a small smart-building system for Zigbee devices. It
-connects a Flutter mobile app, a FastAPI cloud backend, a Mosquitto broker, and
-a native Silicon Labs Z3Gateway host application.
+Zigbee BLE Orchestration Platform is a smart-building prototype that connects a FastAPI Cloud backend, a Flutter mobile app, a C gateway runtime, MQTT, PostgreSQL, and Zigbee end devices. The system lets a user view devices, send commands, provision new devices, publish OTA campaigns, and sync automation rules to the gateway.
 
-The current MVP focuses on real device monitoring, light control, and simple
-automation rules such as "when motion is occupied, turn these lights on".
+This repository is still a demo and hardening workspace. Treat production deployment, MQTT certificates, database credentials, and device install codes as real security boundaries.
 
-## System Overview
+## Architecture Snapshot
 
 ```text
-Flutter app
-  -> Cloud REST API (FastAPI)
-  -> Mosquitto MQTT broker
-  -> Z3Gateway C host app
-  -> EFR32 NCP
-  -> Zigbee end devices
+Mobile App
+  -> HTTPS / FastAPI Cloud
+  -> PostgreSQL
+  -> MQTT broker
+  -> Gateway runtime
+  -> Zigbee NCP and end devices
 ```
 
-The Gateway talks to MQTT directly. The old Python MQTT-to-IPC bridge is no
-longer part of the active architecture.
+The Cloud app owns the REST API, user access checks, command rows, device state history, provisioning sessions, OTA metadata, and automation records. MQTT carries the live bridge between Cloud and Gateway under the `sb/v1/{tenant}/{site}/{gateway}` namespace. The Gateway subscribes to desired state and command topics, speaks Zigbee locally, and publishes device reports, events, command replies, health, automation status, and OTA progress back to Cloud.
 
-## Main Parts
+## Quick Start
 
-| Path | What it contains |
-| --- | --- |
-| `mobile_app/` | Flutter app for monitoring devices, controlling lights, and managing automation rules |
-| `cloud/` | FastAPI backend, MQTT client, command tracking, events, and automation API |
-| `gateway/` | Native Z3Gateway C host app for MQTT, Zigbee command dispatch, telemetry, and local rule handling |
-| `mqtt/` | Mosquitto configuration for local and deployed brokers |
-| `database/` | PostgreSQL schema used by the cloud backend |
-| `deploy/` | EC2 deployment scripts and production Docker Compose setup |
-| `docs/` | Contracts, design notes, implementation plans, and user-facing guides |
-| `end_devices/` | Silicon Labs end-device firmware projects |
-
-## Current MVP Features
-
-- device list and device state through the mobile app
-- light on/off commands from the app through Cloud and Gateway
-- command status tracking
-- motion occupancy display when Cloud has occupancy state or event data
-- automation rule creation from the app
-- Cloud automation rule storage, validation, and retained desired-state publish
-- event history through Cloud
-- EC2 deployment scripts for the backend stack
-
-Automation is intentionally simple in this version. The app creates and displays
-rules. Cloud stores them and publishes desired rule messages. Gateway command
-dispatch is implemented, but live app-created automation execution still needs
-SCRUM-51 hardware/EC2 evidence before it should be claimed as fully end-to-end.
-
-## Current Verification Status
-
-Last local audit: 2026-05-21 on branch
-`docs/51-scrum51-evidence-scrum8-ready`.
-
-- Cloud automation tests: `python -m pytest cloud/tests/ -q` -> 80 passed.
-- Mobile tests: `flutter test` in `mobile_app/` -> 56 passed.
-- SCRUM-51 still needs live evidence for final-report confidence: API evidence
-  against EC2, MQTT trace, gateway log slice, cloud DB rows, and mobile
-  screenshots/video tied to the same run.
-- Current gateway code subscribes to `commands/+/request`; no
-  `desired/automation/{id}` subscription was found in `gateway/Z3GatewayHost/app/`.
-  Treat Cloud->Gateway dynamic automation sync as not proven live until that path
-  is implemented and captured.
-- OTA/SCRUM-8 is a planned contract: Cloud should orchestrate metadata only,
-  Z3Gateway C should download and verify firmware from an artifact URL, and
-  firmware binaries must not be sent as MQTT payloads.
-
-## Run Locally
-
-Start the local MQTT broker:
-
-```bash
-cd mqtt/docker
-docker compose up -d
-```
-
-Run the Cloud API:
-
-```bash
-pip install -r cloud/requirements.txt
-python -m cloud.app.seed
-python -m cloud
-```
-
-Run Cloud tests:
-
-```bash
-pytest cloud/tests -q
-```
-
-Run the Flutter app:
-
-```bash
-cd mobile_app
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8000
-```
-
-For an Android emulator talking to a host machine API, use `10.0.2.2` instead
-of `localhost`.
-
-## Deploy
-
-Copy and fill the deployment environment file:
+### Cloud API
 
 ```powershell
-Copy-Item deploy\.env.deploy.example deploy\.env.deploy
+cd cloud
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m uvicorn cloud.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Deploy to EC2:
+Set `SB_DATABASE_URL`, `SB_MQTT_HOST`, `SB_MQTT_PORT`, and MQTT credential variables when running against PostgreSQL and Mosquitto. Local defaults exist for development, but production should use explicit secrets.
+
+### Mobile App
+
+```powershell
+cd mobile_app
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://localhost:8000
+```
+
+For authenticated remote API use, pass a token and keep release builds on HTTPS:
+
+```powershell
+flutter run `
+  --dart-define=API_BASE_URL=https://example.com `
+  --dart-define=API_AUTH_TOKEN=<token>
+```
+
+### Production Deploy
+
+Use `deploy/.env.deploy.example` as the template for `deploy/.env.deploy`, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1
 ```
 
-Useful follow-up commands:
+Do not commit `.env.deploy`, generated certificates, MQTT password files, or private keys.
 
-```powershell
-powershell -File deploy\logs.ps1 cloud-api
-powershell -File deploy\seed-remote.ps1
-powershell -File deploy\ssh.ps1
-```
+## Lean Documentation
 
-## Key Documentation
+- [Architecture](docs/ARCHITECTURE.md): system boundaries and data flow.
+- [Contracts](docs/CONTRACTS.md): REST and MQTT contracts for provisioning, OTA, automation, and capabilities.
+- [Operations](docs/OPERATIONS.md): local run, production deploy, networking, MQTT TLS, and troubleshooting.
+- [Security](docs/SECURITY.md): security model, known risks, hardening checklist, and post-scan actions.
+- [Developer Guide](docs/DEVELOPER_GUIDE.md): setup, tests, workflow, and branch/Jira expectations.
 
-| Document | Use it for |
-| --- | --- |
-| [docs/AUTOMATION_CONTRACT.md](docs/AUTOMATION_CONTRACT.md) | Automation rule contract and SCRUM-51 implementation audit note |
-| [docs/AUTOMATION_USER_GUIDE.md](docs/AUTOMATION_USER_GUIDE.md) | How to use the Automation feature in the app |
-| [docs/MQTT_CONTRACT.md](docs/MQTT_CONTRACT.md) | MQTT topic tree, envelopes, QoS, retain rules, and command lifecycle |
-| [docs/DEVICE_CAPABILITY_MATRIX.md](docs/DEVICE_CAPABILITY_MATRIX.md) | Supported MVP device types and capabilities |
-| [docs/ADAPTER_ACTION_MAP.md](docs/ADAPTER_ACTION_MAP.md) | Mapping between MQTT payloads and Z3Gateway C behavior |
-| [docs/CLOUD_IMPLEMENTATION_PLAN.md](docs/CLOUD_IMPLEMENTATION_PLAN.md) | Cloud API and database implementation notes |
-| [docs/OTA_CAMPAIGN_CONTRACT.md](docs/OTA_CAMPAIGN_CONTRACT.md) | OTA staging and delivery contract |
-| [docs/SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md](docs/SCRUM_51_EVIDENCE_AND_SCRUM_8_READY_AUDIT.md) | SCRUM-51 evidence gap audit and SCRUM-8 definition of ready |
-| [docs/README.md](docs/README.md) | Documentation index |
+## Repository Map
 
-## Branch and PR Rules
+| Path | Purpose |
+|---|---|
+| `cloud/` | FastAPI backend, routers, SQLAlchemy models, auth, MQTT bridge, tests, and web dev assets. |
+| `mobile_app/` | Flutter client for login, device control, provisioning, OTA, and automations. |
+| `gateway/` | Gateway host runtime that connects MQTT to the local Zigbee stack. |
+| `end_devices/` | Zigbee end-device firmware projects. |
+| `mqtt/` | Mosquitto production config, ACLs, and certificate setup inputs. |
+| `database/` | SQL schema and migrations. Runtime ORM code is the source of truth when it differs from older SQL snapshots. |
+| `deploy/` | EC2/Docker/Nginx/Mosquitto/PostgreSQL deployment scripts and examples. |
+| `docs/` | The current lean documentation set. |
 
-Use this branch format:
+## What Not To Touch Accidentally
 
-```text
-prefix/<jira-ticket-id>-<short-description>
-```
-
-Examples:
-
-```text
-feature/SCRUM-43-mobile-automation-rule-management
-docs/SCRUM-43-automation-app-docs
-```
-
-All work should merge into `main` through a pull request. Do not commit directly
-to `main`.
+Private keys, PEM files, generated certificates, local deploy env files, and untracked design/test artifacts are not documentation. Keep files such as `2110.pem` and other local secrets out of commits and out of cleanup sweeps.
