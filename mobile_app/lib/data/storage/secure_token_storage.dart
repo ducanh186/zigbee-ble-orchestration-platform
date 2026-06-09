@@ -35,8 +35,13 @@ class SecureTokenStorage implements TokenStorage {
       }
 
       final expiresAtRaw = decoded['expiresAt'];
+      final refreshToken = decoded['refreshToken'];
+      final refreshExpiresAtRaw = decoded['refreshExpiresAt'];
       return AuthSession(
         accessToken: accessToken,
+        refreshToken: refreshToken is String && refreshToken.isNotEmpty
+            ? refreshToken
+            : null,
         username: decoded['username'] as String?,
         userId: decoded['userId'] as String?,
         displayName: decoded['displayName'] as String?,
@@ -45,6 +50,9 @@ class SecureTokenStorage implements TokenStorage {
         mustChangePassword: decoded['mustChangePassword'] == true,
         expiresAt: expiresAtRaw is String
             ? DateTime.tryParse(expiresAtRaw)
+            : null,
+        refreshExpiresAt: refreshExpiresAtRaw is String
+            ? DateTime.tryParse(refreshExpiresAtRaw)
             : null,
       );
     } on FormatException {
@@ -65,7 +73,9 @@ class SecureTokenStorage implements TokenStorage {
         'role': session.role,
         'homeId': session.homeId,
         'mustChangePassword': session.mustChangePassword,
+        'refreshToken': session.refreshToken,
         'expiresAt': session.expiresAt?.toUtc().toIso8601String(),
+        'refreshExpiresAt': session.refreshExpiresAt?.toUtc().toIso8601String(),
       }),
     );
   }

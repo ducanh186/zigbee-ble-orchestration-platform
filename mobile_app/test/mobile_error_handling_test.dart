@@ -194,6 +194,10 @@ class _UnauthorizedAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
+
+  @override
   Future<void> logout() async {}
 
   @override

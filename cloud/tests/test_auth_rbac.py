@@ -107,6 +107,8 @@ async def test_login_returns_role_and_rejects_bad_password(client, db_session_fa
     assert body["role"] == "admin"
     assert body["home_id"] is None
     assert body["expires_at"]
+    assert body["refresh_token"]
+    assert body["refresh_expires_at"]
     async with db_session_factory() as session:
         user = (
             await session.execute(select(User).where(User.username == "admin"))
@@ -139,6 +141,110 @@ async def test_inactive_user_cannot_login(client, db_session_factory):
     )
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_rotates_token_and_rejects_reuse(client, db_session_factory):
+    await _create_user(
+        db_session_factory,
+        user_id="refresh-1",
+        username="refresh-parent",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+
+    login_response = await client.post(
+        "/auth/login",
+        json={"username": "refresh-parent", "password": "parent-pass"},
+    )
+    assert login_response.status_code == 200
+    first = login_response.json()
+
+    refreshed_response = await client.post(
+        "/auth/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+    assert refreshed_response.status_code == 200
+    refreshed = refreshed_response.json()
+    assert refreshed["access_token"]
+    assert refreshed["refresh_token"]
+    assert refreshed["refresh_token"] != first["refresh_token"]
+
+    me = await client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {refreshed['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["user_id"] == "refresh-1"
+
+    reused = await client.post(
+        "/auth/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+    assert reused.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_expired_refresh_token_is_rejected(
+    client,
+    db_session_factory,
+    monkeypatch,
+):
+    from cloud.app.config import settings
+
+    monkeypatch.setattr(settings, "auth_refresh_token_ttl_seconds", -1)
+    await _create_user(
+        db_session_factory,
+        user_id="refresh-expired-1",
+        username="refresh-expired",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+
+    login_response = await client.post(
+        "/auth/login",
+        json={"username": "refresh-expired", "password": "parent-pass"},
+    )
+    assert login_response.status_code == 200
+
+    refreshed = await client.post(
+        "/auth/refresh",
+        json={"refresh_token": login_response.json()["refresh_token"]},
+    )
+    assert refreshed.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_refresh_token(client, db_session_factory):
+    await _create_user(
+        db_session_factory,
+        user_id="logout-refresh-1",
+        username="logout-refresh",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+    login_response = await client.post(
+        "/auth/login",
+        json={"username": "logout-refresh", "password": "parent-pass"},
+    )
+    refresh_token = login_response.json()["refresh_token"]
+
+    logout = await client.post(
+        "/auth/logout",
+        json={"refresh_token": refresh_token},
+    )
+    assert logout.status_code == 204
+    assert (await client.post("/auth/logout", json={})).status_code == 204
+    assert (await client.post("/auth/logout")).status_code == 204
+
+    refreshed = await client.post(
+        "/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+    assert refreshed.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -231,7 +337,14 @@ async def test_change_password_rotates_hash_and_requires_new_password(
         must_change_password=True,
     )
 
-    token = await _login(client, "parent", "old-pass")
+    login_response = await client.post(
+        "/auth/login",
+        json={"username": "parent", "password": "old-pass"},
+    )
+    assert login_response.status_code == 200
+    login_body = login_response.json()
+    token = login_body["access_token"]
+    refresh_token = login_body["refresh_token"]
     changed = await client.post(
         "/auth/change-password",
         json={"old_password": "old-pass", "new_password": "new-pass"},
@@ -249,6 +362,11 @@ async def test_change_password_rotates_hash_and_requires_new_password(
     )
     assert new_login.status_code == 200
     assert new_login.json()["must_change_password"] is False
+    revoked_refresh = await client.post(
+        "/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+    assert revoked_refresh.status_code == 401
     async with db_session_factory() as session:
         user = (
             await session.execute(select(User).where(User.username == "parent"))

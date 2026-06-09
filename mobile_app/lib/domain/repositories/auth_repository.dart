@@ -8,6 +8,8 @@ abstract class AuthRepository {
     required String password,
   });
 
+  Future<AuthSession?> refreshSession({required String refreshToken});
+
   Future<void> changePassword({
     required String oldPassword,
     required String newPassword,

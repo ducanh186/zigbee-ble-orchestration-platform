@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     device_offline_scan_interval_seconds: int = 60
     auth_token_secret: str = Field(default_factory=_auth_token_secret_default)
     auth_token_ttl_seconds: int = 8 * 60 * 60
+    auth_refresh_token_ttl_seconds: int = 365 * 24 * 60 * 60
 
     model_config = {"env_prefix": "SB_", "env_file": ".env", "extra": "ignore"}
 

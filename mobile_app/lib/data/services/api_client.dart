@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../domain/models/auth_session.dart';
+
 /// Stable mobile-facing error categories produced by [ApiClient]. View models
 /// pattern-match on these to surface a friendly message without leaking raw
 /// exception text to the UI.
@@ -28,13 +30,21 @@ enum ApiErrorKind {
 }
 
 class ApiClient {
-  ApiClient({required String baseUrl, http.Client? httpClient})
-    : baseUrl = baseUrl.replaceFirst(RegExp(r'/$'), ''),
-      _httpClient = httpClient ?? http.Client();
+  ApiClient({
+    required String baseUrl,
+    http.Client? httpClient,
+    Future<AuthSession?> Function()? currentSessionProvider,
+    Future<AuthSession?> Function(String refreshToken)? refreshSession,
+  }) : baseUrl = baseUrl.replaceFirst(RegExp(r'/$'), ''),
+       _httpClient = httpClient ?? http.Client(),
+       _currentSessionProvider = currentSessionProvider,
+       _refreshSession = refreshSession;
 
   final String baseUrl;
   final http.Client _httpClient;
   String? _accessToken;
+  Future<AuthSession?> Function()? _currentSessionProvider;
+  Future<AuthSession?> Function(String refreshToken)? _refreshSession;
 
   /// Sets the bearer token attached to subsequent requests. Pass `null` to
   /// clear the token (e.g. on logout).
@@ -42,51 +52,90 @@ class ApiClient {
     _accessToken = token;
   }
 
-  Future<Object?> getJson(String path) async {
-    return _send(() async {
-      final response = await _httpClient.get(_uri(path), headers: _headers());
-      return _decode(response);
-    });
+  void configureAuthHooks({
+    Future<AuthSession?> Function()? currentSessionProvider,
+    Future<AuthSession?> Function(String refreshToken)? refreshSession,
+  }) {
+    _currentSessionProvider = currentSessionProvider;
+    _refreshSession = refreshSession;
   }
 
-  Future<Object?> postJson(String path, Map<String, Object?> body) async {
+  Future<Object?> getJson(String path, {bool authenticate = true}) async {
+    return _send(() async {
+      final response = await _httpClient.get(
+        _uri(path),
+        headers: _headers(authenticate: authenticate),
+      );
+      return _decode(response);
+    }, authenticate: authenticate);
+  }
+
+  Future<Object?> postJson(
+    String path,
+    Map<String, Object?> body, {
+    bool authenticate = true,
+  }) async {
     return _send(() async {
       final response = await _httpClient.post(
         _uri(path),
-        headers: _headers(includeJsonContentType: true),
+        headers: _headers(
+          includeJsonContentType: true,
+          authenticate: authenticate,
+        ),
         body: jsonEncode(body),
       );
       return _decode(response);
-    });
+    }, authenticate: authenticate);
   }
 
-  Future<Object?> patchJson(String path, Map<String, Object?> body) async {
+  Future<Object?> patchJson(
+    String path,
+    Map<String, Object?> body, {
+    bool authenticate = true,
+  }) async {
     return _send(() async {
       final response = await _httpClient.patch(
         _uri(path),
-        headers: _headers(includeJsonContentType: true),
+        headers: _headers(
+          includeJsonContentType: true,
+          authenticate: authenticate,
+        ),
         body: jsonEncode(body),
       );
       return _decode(response);
-    });
+    }, authenticate: authenticate);
   }
 
-  Future<Object?> deleteJson(String path) async {
+  Future<Object?> deleteJson(String path, {bool authenticate = true}) async {
     return _send(() async {
       final response = await _httpClient.delete(
         _uri(path),
-        headers: _headers(),
+        headers: _headers(authenticate: authenticate),
       );
       return _decode(response);
-    });
+    }, authenticate: authenticate);
   }
 
   /// Wraps a request lambda to normalize transport-level exceptions into a
   /// typed [ApiException]. HTTP-level errors are already handled by [_decode].
-  Future<Object?> _send(Future<Object?> Function() request) async {
+  Future<Object?> _send(
+    Future<Object?> Function() request, {
+    required bool authenticate,
+    bool allowRefresh = true,
+  }) async {
     try {
       return await request();
-    } on ApiException {
+    } on ApiException catch (error) {
+      if (authenticate && allowRefresh && error.statusCode == 401) {
+        final refreshed = await _attemptRefresh();
+        if (refreshed) {
+          return _send(
+            request,
+            authenticate: authenticate,
+            allowRefresh: false,
+          );
+        }
+      }
       rethrow;
     } on TimeoutException catch (error) {
       throw ApiException(
@@ -115,12 +164,42 @@ class ApiClient {
     }
   }
 
-  Map<String, String> _headers({bool includeJsonContentType = false}) {
+  Future<bool> _attemptRefresh() async {
+    final refreshSession = _refreshSession;
+    final currentSessionProvider = _currentSessionProvider;
+    if (refreshSession == null || currentSessionProvider == null) {
+      return false;
+    }
+
+    try {
+      final session = await currentSessionProvider();
+      final refreshToken = session?.refreshToken;
+      if (session == null ||
+          refreshToken == null ||
+          refreshToken.isEmpty ||
+          session.isRefreshExpired) {
+        return false;
+      }
+      final refreshed = await refreshSession(refreshToken);
+      if (refreshed == null) {
+        return false;
+      }
+      _accessToken = refreshed.accessToken;
+      return true;
+    } on ApiException {
+      return false;
+    }
+  }
+
+  Map<String, String> _headers({
+    bool includeJsonContentType = false,
+    bool authenticate = true,
+  }) {
     final headers = <String, String>{};
     if (includeJsonContentType) {
       headers['Content-Type'] = 'application/json';
     }
-    final token = _accessToken;
+    final token = authenticate ? _accessToken : null;
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
