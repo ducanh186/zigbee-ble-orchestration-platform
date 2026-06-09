@@ -52,6 +52,8 @@ void main() {
                 'home_id': 'home-1',
                 'must_change_password': true,
                 'expires_at': '2026-05-16T12:00:00Z',
+                'refresh_token': 'refresh-abc',
+                'refresh_expires_at': '2027-05-16T12:00:00Z',
               }),
               200,
               headers: {'content-type': 'application/json'},
@@ -73,8 +75,11 @@ void main() {
       expect(session.homeId, 'home-1');
       expect(session.mustChangePassword, isTrue);
       expect(session.expiresAt, DateTime.utc(2026, 5, 16, 12));
+      expect(session.refreshToken, 'refresh-abc');
+      expect(session.refreshExpiresAt, DateTime.utc(2027, 5, 16, 12));
       expect(tokenStorage.session?.username, 'parent');
       expect(tokenStorage.session?.accessToken, 'token-abc');
+      expect(tokenStorage.session?.refreshToken, 'refresh-abc');
     },
   );
 
@@ -84,6 +89,7 @@ void main() {
       final tokenStorage = FakeTokenStorage()
         ..session = AuthSession(
           accessToken: 'stored-token',
+          refreshToken: 'stored-refresh',
           username: 'parent',
           userId: 'parent-1',
           role: 'parent',
@@ -107,6 +113,8 @@ void main() {
                 'role': 'parent',
                 'home_id': 'home-1',
                 'must_change_password': true,
+                'refresh_token': 'stored-refresh',
+                'refresh_expires_at': '2026-12-31T12:00:00Z',
               }),
               200,
               headers: {'content-type': 'application/json'},
@@ -133,6 +141,61 @@ void main() {
       expect(paths, ['/auth/me', '/devices']);
       expect(authHeaders, ['Bearer stored-token', 'Bearer stored-token']);
       expect(tokenStorage.session?.displayName, 'Demo Parent');
+    },
+  );
+
+  test(
+    'restoreSession refreshes expired stored token and rotates refresh token',
+    () async {
+      final tokenStorage = FakeTokenStorage()
+        ..session = AuthSession(
+          accessToken: 'expired-token',
+          refreshToken: 'stored-refresh',
+          expiresAt: DateTime.now().toUtc().subtract(
+            const Duration(minutes: 1),
+          ),
+          refreshExpiresAt: DateTime.now().toUtc().add(const Duration(days: 1)),
+        );
+      final paths = <String>[];
+      final apiClient = ApiClient(
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          paths.add(request.url.path);
+          if (request.url.path == '/auth/refresh') {
+            final body = jsonDecode(request.body) as Map<String, Object?>;
+            expect(body['refresh_token'], 'stored-refresh');
+            return http.Response(
+              jsonEncode({
+                'access_token': 'new-token',
+                'refresh_token': 'new-refresh',
+                'username': 'parent',
+                'user_id': 'parent-1',
+                'display_name': 'Demo Parent',
+                'role': 'parent',
+                'home_id': 'home-1',
+                'must_change_password': false,
+                'expires_at': '2026-05-16T13:00:00Z',
+                'refresh_expires_at': '2027-05-16T13:00:00Z',
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{"detail":"unexpected"}', 500);
+        }),
+      );
+      final repository = RemoteAuthRepository(
+        apiClient: apiClient,
+        tokenStorage: tokenStorage,
+      );
+
+      final session = await repository.restoreSession();
+
+      expect(session?.accessToken, 'new-token');
+      expect(session?.refreshToken, 'new-refresh');
+      expect(paths, ['/auth/refresh']);
+      expect(tokenStorage.session?.accessToken, 'new-token');
+      expect(tokenStorage.session?.refreshToken, 'new-refresh');
     },
   );
 
@@ -228,29 +291,42 @@ void main() {
     );
   });
 
-  test('logout POSTs to /auth/logout', () async {
-    var calledMethod = '';
-    var calledPath = '';
-    final repository = RemoteAuthRepository(
-      apiClient: ApiClient(
-        baseUrl: 'http://98.83.4.87:8000',
-        httpClient: MockClient((request) async {
-          calledMethod = request.method;
-          calledPath = request.url.path;
-          return http.Response(
-            '',
-            204,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      ),
-    );
+  test(
+    'logout POSTs to /auth/logout with refresh token when available',
+    () async {
+      final tokenStorage = FakeTokenStorage()
+        ..session = const AuthSession(
+          accessToken: 'stored-token',
+          refreshToken: 'stored-refresh',
+        );
+      var calledMethod = '';
+      var calledPath = '';
+      var requestBody = <String, Object?>{};
+      final repository = RemoteAuthRepository(
+        tokenStorage: tokenStorage,
+        apiClient: ApiClient(
+          baseUrl: 'http://98.83.4.87:8000',
+          httpClient: MockClient((request) async {
+            calledMethod = request.method;
+            calledPath = request.url.path;
+            requestBody = jsonDecode(request.body) as Map<String, Object?>;
+            return http.Response(
+              '',
+              204,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
 
-    await repository.logout();
+      await repository.logout();
 
-    expect(calledMethod, 'POST');
-    expect(calledPath, '/auth/logout');
-  });
+      expect(calledMethod, 'POST');
+      expect(calledPath, '/auth/logout');
+      expect(requestBody, {'refresh_token': 'stored-refresh'});
+      expect(tokenStorage.clearCalls, 1);
+    },
+  );
 
   test('changePassword POSTs and clears local session', () async {
     final tokenStorage = FakeTokenStorage()

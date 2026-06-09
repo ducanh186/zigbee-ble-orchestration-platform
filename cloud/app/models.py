@@ -60,6 +60,25 @@ class User(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     home = relationship("Home", back_populates="users")
+    refresh_tokens = relationship("AuthRefreshToken", back_populates="user")
+
+
+class AuthRefreshToken(Base):
+    __tablename__ = "auth_refresh_tokens"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, unique=True, nullable=False)
+    issued_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="refresh_tokens")
+
+    __table_args__ = (
+        Index("ix_auth_refresh_tokens_user_revoked", "user_id", "revoked_at"),
+    )
 
 
 class Device(Base):

@@ -87,6 +87,14 @@ def create_access_token(user: User) -> str:
     return f"{signing_input}.{_b64url_encode(signature)}"
 
 
+def create_refresh_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def decode_access_token(token: str) -> dict:
     try:
         header_part, payload_part, signature_part = token.split(".", 2)

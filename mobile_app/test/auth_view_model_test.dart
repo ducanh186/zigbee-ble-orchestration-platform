@@ -23,6 +23,10 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
+
+  @override
   Future<void> logout() async {}
 
   @override
@@ -51,6 +55,10 @@ class FailingAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
+
+  @override
   Future<void> logout() async {}
 
   @override
@@ -71,6 +79,10 @@ class RestoreFailingAuthRepository implements AuthRepository {
   }) async {
     throw StateError('login is not part of this test');
   }
+
+  @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
 
   @override
   Future<void> logout() async {}

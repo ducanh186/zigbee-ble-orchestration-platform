@@ -1,6 +1,7 @@
 class AuthSession {
   const AuthSession({
     required this.accessToken,
+    this.refreshToken,
     this.username,
     this.userId,
     this.displayName,
@@ -8,9 +9,11 @@ class AuthSession {
     this.homeId,
     this.mustChangePassword = false,
     this.expiresAt,
+    this.refreshExpiresAt,
   });
 
   final String accessToken;
+  final String? refreshToken;
   final String? username;
   final String? userId;
   final String? displayName;
@@ -18,6 +21,7 @@ class AuthSession {
   final String? homeId;
   final bool mustChangePassword;
   final DateTime? expiresAt;
+  final DateTime? refreshExpiresAt;
 
   String get canonicalRole {
     final normalized = (role ?? '').trim().toLowerCase();
@@ -38,6 +42,14 @@ class AuthSession {
 
   bool get isExpired {
     final expiry = expiresAt;
+    if (expiry == null) {
+      return false;
+    }
+    return !DateTime.now().toUtc().isBefore(expiry.toUtc());
+  }
+
+  bool get isRefreshExpired {
+    final expiry = refreshExpiresAt;
     if (expiry == null) {
       return false;
     }

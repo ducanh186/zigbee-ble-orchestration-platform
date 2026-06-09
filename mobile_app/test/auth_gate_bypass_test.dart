@@ -21,6 +21,10 @@ class _NeverAuthenticatedRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
+
+  @override
   Future<void> logout() async {}
 
   @override
@@ -46,6 +50,10 @@ class _StoredSessionRepository implements AuthRepository {
   }) async {
     throw StateError('login should not be called when restoring a session');
   }
+
+  @override
+  Future<AuthSession?> refreshSession({required String refreshToken}) async =>
+      null;
 
   @override
   Future<void> logout() async {}

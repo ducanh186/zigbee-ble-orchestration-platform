@@ -233,6 +233,14 @@ class AuthChangePassword(BaseModel):
     new_password: str = Field(min_length=8, max_length=256)
 
 
+class AuthRefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class AuthLogout(BaseModel):
+    refresh_token: str | None = Field(default=None, min_length=1)
+
+
 class AuthUserOut(BaseModel):
     username: str
     user_id: str
@@ -244,6 +252,7 @@ class AuthUserOut(BaseModel):
 
 class AuthSessionOut(BaseModel):
     access_token: str
+    refresh_token: str
     username: str
     user_id: str
     display_name: str | None = None
@@ -251,8 +260,9 @@ class AuthSessionOut(BaseModel):
     home_id: str | None = None
     must_change_password: bool
     expires_at: datetime
+    refresh_expires_at: datetime
 
-    @field_serializer("expires_at")
+    @field_serializer("expires_at", "refresh_expires_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return v.isoformat() if v is not None else None
 
