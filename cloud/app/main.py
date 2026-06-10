@@ -81,6 +81,7 @@ app.include_router(gateways.router)
 app.include_router(gateways.devices_router)
 app.include_router(provisioning.router)
 app.include_router(provisioning.labels_router)
+app.include_router(provisioning.factory_devices_router)
 
 # -- Serve web dashboard --
 _webdev_dir = Path(__file__).resolve().parent.parent / "webdev"

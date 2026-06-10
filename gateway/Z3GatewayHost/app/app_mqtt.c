@@ -606,6 +606,33 @@ void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
   appMqttPublish(topicSuffix, envelope, 1, true);
 }
 
+void appMqttPublishDevicePresence(uint16_t nodeId, const char *eui64Str,
+                                  const char *deviceType, bool reachable)
+{
+  if (!sMosq) return;
+
+  char inner[320];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"%s\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"state\":{\"reachable\":%s}",
+    eui64Str, deviceType, eui64Str, (unsigned)nodeId,
+    reachable ? "true" : "false");
+
+  char envelope[640];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  // Topic: devices/{device_type}/{eui64}/presence (retained so late
+  // subscribers immediately learn current reachability).
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix), "devices/%s/%s/presence",
+           deviceType, eui64Str);
+
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
 void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
                                const char *deviceType, const char *eventName)
 {

@@ -668,3 +668,209 @@ async def test_gateway_provisioning_failed_marks_active_session_failed(
 
     assert session.status == "failed"
     assert session.reason == "install code rejected"
+
+
+# --- factory-device registration (register-factory-device endpoint) ----------
+
+# A deterministic, CRC-valid install code generated in-test so no real lab
+# install code is committed to git.
+from cloud.app.provisioning_install_code import append_install_code_crc
+
+FRESH_EUI64 = "000000000000004F"
+FRESH_INSTALL_CODE = append_install_code_crc("00112233445566778899AABBCCDDEEFF")
+
+
+@pytest.mark.asyncio
+async def test_register_factory_device_create_then_list_hides_code(
+    client, db_session_factory
+):
+    await _seed_room(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.post(
+        "/api/provisioning/factory-devices",
+        json={
+            "eui64": FRESH_EUI64,
+            "install_code": FRESH_INSTALL_CODE,
+            "device_type": "light",
+            "model": "EFR32MG12_LIGHT_KIT",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["eui64"] == FRESH_EUI64
+    assert data["device_type"] == "light"
+    assert data["is_active"] is True
+    assert data["has_install_code"] is True
+    assert "install_code" not in data  # never leak the secret
+
+    # GET list = proof-in-DB without exposing the raw code.
+    r2 = await client.get("/api/provisioning/factory-devices", headers=headers)
+    assert r2.status_code == 200, r2.text
+    rows = {row["eui64"]: row for row in r2.json()}
+    assert FRESH_EUI64 in rows
+    assert rows[FRESH_EUI64]["has_install_code"] is True
+    assert "install_code" not in rows[FRESH_EUI64]
+
+
+@pytest.mark.asyncio
+async def test_register_factory_device_upsert_returns_200(
+    client, db_session_factory
+):
+    await _seed_room(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    body = {
+        "eui64": FRESH_EUI64,
+        "install_code": FRESH_INSTALL_CODE,
+        "device_type": "light",
+    }
+    first = await client.post(
+        "/api/provisioning/factory-devices", json=body, headers=headers
+    )
+    assert first.status_code == 201, first.text
+    again = await client.post(
+        "/api/provisioning/factory-devices",
+        json={**body, "model": "UPDATED"},
+        headers=headers,
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["model"] == "UPDATED"
+
+
+@pytest.mark.asyncio
+async def test_register_factory_device_rejects_bad_install_code(
+    client, db_session_factory
+):
+    await _seed_room(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    r = await client.post(
+        "/api/provisioning/factory-devices",
+        json={
+            "eui64": FRESH_EUI64,
+            "install_code": "DEADBEEF",  # wrong length / CRC
+            "device_type": "light",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_register_factory_device_enables_session(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    # register first
+    reg = await client.post(
+        "/api/provisioning/factory-devices",
+        json={
+            "eui64": FRESH_EUI64,
+            "install_code": FRESH_INSTALL_CODE,
+            "device_type": "light",
+        },
+        headers=headers,
+    )
+    assert reg.status_code == 201, reg.text
+    # now a session for that eui64 must NOT 404 as not-factory-registered
+    sess = await client.post(
+        "/api/provisioning/sessions",
+        json=_create_body(device={"eui64": FRESH_EUI64, "device_type": "light"}),
+        headers=headers,
+    )
+    assert sess.status_code == 201, sess.text
+    assert sess.json()["eui64"] == FRESH_EUI64
+
+
+@pytest.mark.asyncio
+async def test_factory_devices_requires_auth(client, db_session_factory):
+    r = await client.get("/api/provisioning/factory-devices")
+    assert r.status_code == 401, r.text
+
+
+@pytest.mark.asyncio
+async def test_factory_devices_forbidden_for_viewer(client, db_session_factory):
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
+        home_id="home-1",
+    )
+    headers = await login_headers(client, "viewer", "viewer-pass")
+    r = await client.get("/api/provisioning/factory-devices", headers=headers)
+    assert r.status_code == 403, r.text
+
+
+@pytest.mark.asyncio
+async def test_create_session_auto_expires_stale_session(
+    client, db_session_factory, fake_mqtt
+):
+    """A non-terminal session past expires_at must auto-expire, not 409."""
+    from datetime import UTC, datetime, timedelta
+
+    from cloud.app.models import ProvisioningSession
+
+    await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    async with db_session_factory() as s:
+        s.add(
+            ProvisioningSession(
+                id="stale-1",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="permit_open",
+                expires_at=datetime.now(UTC).replace(tzinfo=None)
+                - timedelta(seconds=10),
+            )
+        )
+        await s.commit()
+
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
+    assert r.status_code == 201, r.text  # stale one auto-expired, not blocking
+    async with db_session_factory() as s:
+        stale = await s.get(ProvisioningSession, "stale-1")
+        assert stale.status == "expired"
+
+
+@pytest.mark.asyncio
+async def test_create_session_still_blocks_on_fresh_active(
+    client, db_session_factory, fake_mqtt
+):
+    """A non-terminal session still within its window must still 409."""
+    from datetime import UTC, datetime, timedelta
+
+    from cloud.app.models import ProvisioningSession
+
+    await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    async with db_session_factory() as s:
+        s.add(
+            ProvisioningSession(
+                id="fresh-1",
+                gateway_id=settings.gateway_id,
+                room_id="room-1",
+                eui64=VALID_EUI64,
+                install_code=VALID_INSTALL_CODE,
+                device_type="light",
+                status="permit_open",
+                expires_at=datetime.now(UTC).replace(tzinfo=None)
+                + timedelta(seconds=120),
+            )
+        )
+        await s.commit()
+
+    r = await client.post(
+        "/api/provisioning/sessions", json=_create_body(), headers=headers
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error_code"] == "SESSION_ALREADY_ACTIVE"

@@ -14,6 +14,8 @@ from pydantic import (
     model_validator,
 )
 
+from cloud.app.provisioning_install_code import normalize_install_code
+
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
 
 
@@ -424,6 +426,44 @@ class ProvisioningLabelOut(BaseModel):
     payload: dict[str, Any]
     payload_json: str
     qr_svg: str
+
+
+class FactoryDeviceRegister(BaseModel):
+    """Register a factory device + its install code into the factory registry.
+
+    The install code is validated (Zigbee CRC) and stored, but is never echoed
+    back in responses — see ``FactoryDeviceOut``.
+    """
+
+    eui64: str
+    install_code: str
+    device_type: Literal["light", "switch", "motion"]
+    model: str | None = None
+
+    @field_validator("eui64")
+    @classmethod
+    def _validate_eui64(cls, value: str) -> str:
+        if not _EUI64_RE.fullmatch(value):
+            raise ValueError("eui64 must be 16 hex characters")
+        return value.upper()
+
+    @field_validator("install_code")
+    @classmethod
+    def _validate_install_code(cls, value: str) -> str:
+        try:
+            return normalize_install_code(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+
+class FactoryDeviceOut(BaseModel):
+    """Safe factory-device view. Never exposes the raw install code."""
+
+    eui64: str
+    device_type: str
+    model: str | None = None
+    is_active: bool
+    has_install_code: bool
 
 
 class ProvisioningSessionCreate(BaseModel):

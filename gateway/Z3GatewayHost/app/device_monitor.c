@@ -1,4 +1,6 @@
 #include "device_monitor.h"
+#include "device_registry.h"
+#include "app_mqtt.h"
 #include "app_config.h"
 #include "app_utils.h"
 #include "app_log.h"
@@ -6,6 +8,7 @@
 #include "app/util/zigbee-framework/zigbee-device-common.h"
 
 #include <string.h>
+#include <strings.h>   // strcasecmp
 #include <stdio.h>
 
 // ===== Deferred setup queue =====
@@ -183,4 +186,150 @@ void deviceMonitorTick(void)
         break;
     }
   }
+}
+
+// ============================================================================
+// Presence heartbeat (see device_monitor.h)
+// ============================================================================
+
+#define PRESENCE_PROBE_INTERVAL_MS 20000u
+#define PRESENCE_FAIL_THRESHOLD    2u   // consecutive probe failures -> offline
+
+typedef struct {
+  bool        used;
+  char        eui[17];
+  char        type[16];
+  EmberNodeId nodeId;
+  uint8_t     endpoint;
+  bool        reachable;
+  bool        published;
+  uint8_t     failCount;
+} presence_t;
+
+static presence_t g_pres[DEVICE_REGISTRY_MAX] = {0};
+static uint32_t   g_presLastProbe = 0;
+
+static presence_t *presenceFindByEui(const char *euiStr)
+{
+  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+    if (g_pres[i].used && strcasecmp(g_pres[i].eui, euiStr) == 0)
+      return &g_pres[i];
+  }
+  return NULL;
+}
+
+static presence_t *presenceFindByNode(EmberNodeId nodeId)
+{
+  for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+    if (g_pres[i].used && g_pres[i].nodeId == nodeId)
+      return &g_pres[i];
+  }
+  return NULL;
+}
+
+static presence_t *presenceEnsure(const char *euiStr, const char *type,
+                                  EmberNodeId nodeId, uint8_t ep)
+{
+  presence_t *p = presenceFindByEui(euiStr);
+  if (!p) {
+    for (int i = 0; i < DEVICE_REGISTRY_MAX; i++) {
+      if (!g_pres[i].used) { p = &g_pres[i]; break; }
+    }
+    if (!p) return NULL;
+    memset(p, 0, sizeof(*p));
+    p->used = true;
+    strncpy(p->eui, euiStr, sizeof(p->eui) - 1);
+    p->reachable = true;   // assume online until a probe proves otherwise
+  }
+  strncpy(p->type, type, sizeof(p->type) - 1);
+  p->type[sizeof(p->type) - 1] = '\0';
+  p->nodeId = nodeId;
+  p->endpoint = ep ? ep : 1;
+  return p;
+}
+
+static void presenceSet(presence_t *p, bool reachable)
+{
+  if (p->published && p->reachable == reachable) return;
+  p->reachable = reachable;
+  p->published = true;
+  appMqttPublishDevicePresence(p->nodeId, p->eui, p->type, reachable);
+  appLogLog("PRESENCE", reachable ? "online" : "offline",
+            "\"eui64\":\"%s\",\"node_id\":\"0x%04X\"",
+            p->eui, (unsigned)p->nodeId);
+}
+
+static void presenceSendProbe(EmberNodeId nodeId, uint8_t ep)
+{
+  // ZCL Read Attributes (global) of On/Off 0x0000 — a benign read whose APS
+  // delivery status (reported in emberAfMessageSentCallback) is the liveness
+  // signal. sourceEndpoint = COORD_EP_TELEM so it never collides with the
+  // light command lifecycle tracked on COORD_EP_CONTROL.
+  uint8_t payload[2];
+  payload[0] = (uint8_t)(ZCL_ON_OFF_ATTRIBUTE_ID & 0xFFu);
+  payload[1] = (uint8_t)((ZCL_ON_OFF_ATTRIBUTE_ID >> 8) & 0xFFu);
+  emberAfFillExternalBuffer(
+    (ZCL_GLOBAL_COMMAND | ZCL_FRAME_CONTROL_CLIENT_TO_SERVER),
+    ZCL_ON_OFF_CLUSTER_ID,
+    ZCL_READ_ATTRIBUTES_COMMAND_ID,
+    "b",
+    payload,
+    sizeof(payload));
+  emberAfSetCommandEndpoints(COORD_EP_TELEM, ep);
+  (void)emberAfSendCommandUnicast(EMBER_OUTGOING_DIRECT, nodeId);
+}
+
+void devicePresenceTick(void)
+{
+  uint32_t now = msTick();
+  if ((now - g_presLastProbe) < PRESENCE_PROBE_INTERVAL_MS) return;
+  g_presLastProbe = now;
+
+  for (uint32_t i = 0; i < (uint32_t)DEVICE_REGISTRY_MAX; i++) {
+    EmberNodeId nid;
+    uint8_t ep;
+    char type[16];
+    char eui[17];
+    if (!deviceRegistryGetByIndex(i, &nid, &ep, type, sizeof(type),
+                                  eui, sizeof(eui))) {
+      continue;
+    }
+    // Probe lights only (mains routers that reliably APS-ACK). Sleepy end
+    // devices would not ACK and get falsely marked offline.
+    if (strcasecmp(type, "light") != 0) continue;
+
+    presence_t *p = presenceEnsure(eui, type, nid, ep);
+    if (!p) continue;
+    presenceSendProbe(nid, p->endpoint);
+  }
+}
+
+void devicePresenceOnSent(EmberNodeId nodeId, bool delivered)
+{
+  presence_t *p = presenceFindByNode(nodeId);
+  if (!p) return;   // not a tracked (light) device
+  if (delivered) {
+    p->failCount = 0;
+    presenceSet(p, true);
+  } else {
+    if (p->failCount < 0xFFu) p->failCount++;
+    if (p->failCount >= PRESENCE_FAIL_THRESHOLD) {
+      presenceSet(p, false);
+    }
+  }
+}
+
+void devicePresenceOnLeft(const EmberEUI64 eui64)
+{
+  char euiStr[17];
+  eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui64);
+  presence_t *p = presenceFindByEui(euiStr);
+  if (!p) {
+    device_resolved_t r;
+    if (!deviceRegistryResolve(euiStr, &r)) return;
+    p = presenceEnsure(euiStr, r.device_type, r.nodeId, r.endpoint);
+    if (!p) return;
+  }
+  p->failCount = PRESENCE_FAIL_THRESHOLD;
+  presenceSet(p, false);
 }
