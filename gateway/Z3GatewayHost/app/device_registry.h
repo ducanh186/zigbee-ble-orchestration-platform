@@ -51,6 +51,15 @@ bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out);
 // `outLen` must be >= 17.
 bool deviceRegistryGetEuiBeStrByNodeId(EmberNodeId nodeId, char *out, size_t outLen);
 
+// Iterate the registry by raw slot index in [0, DEVICE_REGISTRY_MAX).
+// Fills the out params for a USED slot and returns true; returns false for an
+// empty slot or out-of-range index. Used by the presence sweep to probe every
+// known device. Any out pointer may be NULL if that field is not needed.
+bool deviceRegistryGetByIndex(uint32_t idx, EmberNodeId *nodeIdOut,
+                              uint8_t *endpointOut,
+                              char *typeOut, size_t typeLen,
+                              char *euiOut, size_t euiLen);
+
 // Number of populated slots.
 uint32_t deviceRegistryCount(void);
 

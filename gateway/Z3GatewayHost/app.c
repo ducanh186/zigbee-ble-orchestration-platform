@@ -236,6 +236,7 @@ void emberAfMainTickCallback(void)
 {
   netMgrTick();
   deviceMonitorTick();
+  devicePresenceTick();
   appMqttTick();
   lightCtrlTick();
 }

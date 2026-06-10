@@ -149,6 +149,27 @@ bool deviceRegistryGetEuiBeStrByNodeId(EmberNodeId nodeId,
   return false;
 }
 
+bool deviceRegistryGetByIndex(uint32_t idx, EmberNodeId *nodeIdOut,
+                              uint8_t *endpointOut,
+                              char *typeOut, size_t typeLen,
+                              char *euiOut, size_t euiLen)
+{
+  if (idx >= (uint32_t)DEVICE_REGISTRY_MAX) return false;
+  reg_slot_t *s = &g_slots[idx];
+  if (!s->used) return false;
+  if (nodeIdOut)   *nodeIdOut = s->nodeId;
+  if (endpointOut) *endpointOut = s->endpoint;
+  if (typeOut && typeLen) {
+    strncpy(typeOut, s->device_type, typeLen - 1);
+    typeOut[typeLen - 1] = '\0';
+  }
+  if (euiOut && euiLen) {
+    strncpy(euiOut, s->eui64BeStr, euiLen - 1);
+    euiOut[euiLen - 1] = '\0';
+  }
+  return true;
+}
+
 uint32_t deviceRegistryCount(void)
 {
   uint32_t n = 0;
@@ -234,6 +255,12 @@ void emberAfTrustCenterJoinCallback(EmberNodeId newNodeId,
     (unsigned)newNodeId, euiStrTc,
     (unsigned)status, (unsigned)decision, key_type
   );
+
+  // Presence: a graceful network leave fires here — publish offline at once so
+  // the dashboard reflects it immediately instead of waiting for the reaper.
+  if (status == EMBER_DEVICE_LEFT) {
+    devicePresenceOnLeft(newNodeEui64);
+  }
 
   bool joined = (status == EMBER_STANDARD_SECURITY_SECURED_REJOIN
                  || status == EMBER_STANDARD_SECURITY_UNSECURED_JOIN);

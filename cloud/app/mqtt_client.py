@@ -128,6 +128,7 @@ class MQTTService:
         client.subscribe(f"{prefix}/devices/+/+/telemetry", qos=0)
         client.subscribe(f"{prefix}/devices/+/+/event", qos=0)
         client.subscribe(f"{prefix}/devices/+/+/registry", qos=0)
+        client.subscribe(f"{prefix}/devices/+/+/presence", qos=0)
         client.subscribe(f"{prefix}/commands/+/reply", qos=0)
         client.subscribe(f"{prefix}/gateway/online", qos=0)
         client.subscribe(f"{prefix}/gateway/health", qos=0)
@@ -159,6 +160,8 @@ class MQTTService:
                 self._handle_event(topic, payload)
             elif "/devices/" in topic and topic.endswith("/registry"):
                 self._handle_registry(topic, payload)
+            elif "/devices/" in topic and topic.endswith("/presence"):
+                self._handle_presence(topic, payload)
             elif "/commands/" in topic and topic.endswith("/reply"):
                 self._handle_command_reply(topic, payload)
             elif topic.endswith("/gateway/online"):
@@ -188,6 +191,11 @@ class MQTTService:
         device_type = parts[devices_idx + 1]
         device_id = parts[devices_idx + 2]
         inner = envelope.get("payload", {})
+        # Presence: gateway sets state.reachable=false when a device leaves the
+        # network or a liveness probe fails, so online flips immediately instead
+        # of waiting for the offline reaper. Absent => assume reachable (normal
+        # state reports), preserving prior behaviour.
+        reachable = bool((inner.get("state") or {}).get("reachable", True))
 
         # Validate payload by device_type (Phase 3.4)
         validated = validate_reported_payload(device_type, inner)
@@ -217,12 +225,12 @@ class MQTTService:
                         device_type=inner.get("device_type", device_type),
                         eui64=inner.get("eui64"),
                         name=device_id,
-                        is_online=True,
+                        is_online=reachable,
                         last_seen_at=last_seen,
                     )
                     session.add(device)
                 else:
-                    device.is_online = True
+                    device.is_online = reachable
                     device.last_seen_at = last_seen
                     if inner.get("eui64"):
                         device.eui64 = inner["eui64"]
@@ -235,6 +243,40 @@ class MQTTService:
                 session.add(state_row)
                 await session.commit()
                 logger.info("Saved reported state for %s", device_id)
+
+        self._run_async(_write)
+
+    def _handle_presence(self, topic: str, envelope: dict) -> None:
+        """Handle device presence -- set is_online from reachable WITHOUT
+        inserting a DeviceState row (so the last reported power/level is not
+        clobbered). The gateway publishes reachable=false on leave / probe
+        failure so offline reflects promptly; reachable=true heartbeats keep
+        last_seen_at fresh so the offline reaper does not fire for idle devices.
+        """
+        parts = topic.split("/")
+        devices_idx = parts.index("devices")
+        device_id = parts[devices_idx + 2]
+        inner = envelope.get("payload", {})
+        reachable = bool((inner.get("state") or {}).get("reachable", True))
+
+        async def _write():
+            if not self._db_session_factory:
+                return
+            from cloud.app.models import Device
+            from sqlalchemy import select
+
+            async with self._db_session_factory() as session:
+                device = (
+                    await session.execute(
+                        select(Device).where(Device.id == device_id)
+                    )
+                ).scalar_one_or_none()
+                if device is None:
+                    return  # presence for an unregistered device; ignore
+                device.is_online = reachable
+                device.last_seen_at = _ts_ms_to_naive_utc(envelope.get("ts"))
+                await session.commit()
+                logger.info("Presence %s online=%s", device_id, reachable)
 
         self._run_async(_write)
 
@@ -728,6 +770,7 @@ class MQTTService:
                                         room_id=prov.room_id,
                                         name=prov.model or eui64,
                                         is_online=True,
+                                        last_seen_at=occurred_at,
                                     )
                                     session.add(device)
                                 else:
@@ -737,6 +780,10 @@ class MQTTService:
                                     device.eui64 = eui64
                                     device.room_id = prov.room_id
                                     device.is_online = True
+                                    # Stamp last_seen so the offline reaper does
+                                    # not immediately flip a just-joined device
+                                    # back offline before its first report.
+                                    device.last_seen_at = occurred_at
                                 prov.status = "joined"
                                 prov.reason = None
                                 prov.install_code = ""

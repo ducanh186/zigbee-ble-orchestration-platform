@@ -10,7 +10,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 import qrcode
 import qrcode.image.svg
 from sqlalchemy import select
@@ -26,6 +26,8 @@ from cloud.app.database import get_db
 from cloud.app.models import Command, FactoryDevice, ProvisioningSession, Room, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import (
+    FactoryDeviceOut,
+    FactoryDeviceRegister,
     ProvisioningErrorCode,
     ProvisioningLabelCreate,
     ProvisioningLabelOut,
@@ -35,6 +37,67 @@ from cloud.app.schemas import (
 
 router = APIRouter(prefix="/api/provisioning/sessions", tags=["provisioning"])
 labels_router = APIRouter(prefix="/api/provisioning/labels", tags=["provisioning"])
+factory_devices_router = APIRouter(
+    prefix="/api/provisioning/factory-devices", tags=["provisioning"]
+)
+
+
+def _factory_device_out(device: FactoryDevice) -> FactoryDeviceOut:
+    return FactoryDeviceOut(
+        eui64=device.eui64,
+        device_type=device.device_type,
+        model=device.model,
+        is_active=device.is_active,
+        has_install_code=bool(device.install_code),
+    )
+
+
+@factory_devices_router.post(
+    "",
+    response_model=FactoryDeviceOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def register_factory_device(
+    body: FactoryDeviceRegister,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_parent_or_admin),
+):
+    """Idempotent upsert of a factory device + its (CRC-validated) install code.
+
+    The raw install code is stored but never logged or returned.
+    """
+    device = await db.get(FactoryDevice, body.eui64)
+    if device is None:
+        device = FactoryDevice(
+            eui64=body.eui64,
+            install_code=body.install_code,
+            device_type=body.device_type,
+            model=body.model,
+            is_active=True,
+        )
+        db.add(device)
+    else:
+        device.install_code = body.install_code
+        device.device_type = body.device_type
+        device.model = body.model
+        device.is_active = True
+        response.status_code = status.HTTP_200_OK
+    await db.commit()
+    await db.refresh(device)
+    return _factory_device_out(device)
+
+
+@factory_devices_router.get("", response_model=list[FactoryDeviceOut])
+async def list_factory_devices(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_parent_or_admin),
+):
+    """List factory devices without exposing raw install codes (proof-in-DB)."""
+    rows = (
+        await db.execute(select(FactoryDevice).order_by(FactoryDevice.eui64))
+    ).scalars().all()
+    return [_factory_device_out(row) for row in rows]
 
 DEFAULT_PROVISIONING_DURATION_SEC = 180
 DEFAULT_PREPARE_JOIN_TIMEOUT_MS = 5000
@@ -127,15 +190,24 @@ async def create_provisioning_session(
         )
     await ensure_room_visible(db, room, current_user)
 
-    active = (
+    now = datetime.now(UTC).replace(tzinfo=None)
+    active_sessions = (
         await db.execute(
             select(ProvisioningSession).where(
                 ProvisioningSession.eui64 == body.device.eui64,
                 ProvisioningSession.status.in_(NON_TERMINAL_STATUSES),
             )
         )
-    ).scalar_one_or_none()
-    if active is not None:
+    ).scalars().all()
+    blocking = None
+    for sess in active_sessions:
+        # Auto-expire stale non-terminal sessions so a lapsed permit window
+        # does not block re-provisioning the same device with a 409.
+        if sess.expires_at is not None and sess.expires_at <= now:
+            sess.status = "expired"
+        else:
+            blocking = sess
+    if blocking is not None:
         _raise_contract_error(
             409,
             ProvisioningErrorCode.SESSION_ALREADY_ACTIVE,
@@ -156,7 +228,6 @@ async def create_provisioning_session(
             "device_type does not match factory registry",
         )
 
-    now = datetime.now(UTC).replace(tzinfo=None)
     command_id = uuid4().hex
     target = {
         "eui64": body.device.eui64,

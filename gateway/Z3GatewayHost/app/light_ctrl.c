@@ -4,6 +4,7 @@
 #include "app_utils.h"
 #include "app_config.h"
 #include "device_registry.h"
+#include "device_monitor.h"   // devicePresenceOnSent
 
 #include <string.h>
 #include <stdio.h>
@@ -186,10 +187,15 @@ bool emberAfMessageSentCallback(EmberOutgoingMessageType type,
                                uint8_t *messageContents,
                                EmberStatus status)
 {
-  (void)type;
-  (void)indexOrDestination;
   (void)messageLength;
   (void)messageContents;
+
+  // Presence: any direct unicast's APS delivery status is a liveness signal.
+  // Feeds the per-device reachable flag (lights) regardless of cluster.
+  if (type == EMBER_OUTGOING_DIRECT) {
+    devicePresenceOnSent((EmberNodeId)indexOrDestination,
+                         status == EMBER_SUCCESS);
+  }
 
   if (!apsFrame) return false;
 

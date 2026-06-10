@@ -37,6 +37,14 @@ void appMqttPublishDeviceReportedFull(uint16_t nodeId, const char *eui64Str,
                                       const char *deviceType, const char *powerState,
                                       uint8_t level);
 
+// Publish device presence (online/offline) on a dedicated topic
+// `devices/{device_type}/{eui64}/presence` (QoS 1, retained). Payload state is
+// just `{"reachable": true|false}` so it never clobbers the last reported
+// power/level state row. Cloud maps reachable -> is_online immediately, which
+// makes leave/unreachable reflect without waiting for the offline reaper.
+void appMqttPublishDevicePresence(uint16_t nodeId, const char *eui64Str,
+                                  const char *deviceType, bool reachable);
+
 // Publish a device event (e.g. switch toggle).
 // Per MQTT_CONTRACT: devices/{device_type}/{device_id}/event (QoS1, no retain).
 // eventName: e.g. "toggle"
