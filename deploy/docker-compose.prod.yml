@@ -22,15 +22,16 @@ services:
       - "8883:8883"
     volumes:
       - ../mqtt/config/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
-      - ../mqtt/config/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro
-      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
-      - ./mosquitto/passwords:/mosquitto/passwords
+      - ./mosquitto/generated/acl.prod.conf:/mosquitto/config/acl.prod.conf:ro
+      - ./mosquitto/pki/ca/ca.crt:/mosquitto/certs/ca.crt:ro
+      - ./mosquitto/pki/server/server.crt:/mosquitto/certs/server.crt:ro
+      - ./mosquitto/pki/server/server.key:/mosquitto/certs/server.key:ro
+      - ./mosquitto/pki/clients/monitor.crt:/mosquitto/certs/clients/monitor.crt:ro
+      - ./mosquitto/pki/clients/monitor.key:/mosquitto/certs/clients/monitor.key:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
-    environment:
-      MQTT_MONITOR_PASSWORD: ${MQTT_MONITOR_PASSWORD:-monitor123}
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt --cert /mosquitto/certs/clients/monitor.crt --key /mosquitto/certs/clients/monitor.key -u monitor -P $$MQTT_MONITOR_PASSWORD -t '$$SYS/broker/uptime' -C 1 -W 3"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt --cert /mosquitto/certs/clients/monitor.crt --key /mosquitto/certs/clients/monitor.key -t '$$SYS/broker/uptime' -C 1 -W 3"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -66,7 +67,9 @@ services:
     env_file:
       - ./cloud/.env
     volumes:
-      - ${MQTT_CERT_DIR:-../mqtt/certs}:/mosquitto/certs:ro
+      - ./mosquitto/pki/ca/ca.crt:/mosquitto/certs/ca.crt:ro
+      - ./mosquitto/pki/clients/cloud-control.crt:/mosquitto/certs/clients/cloud-control.crt:ro
+      - ./mosquitto/pki/clients/cloud-control.key:/mosquitto/certs/clients/cloud-control.key:ro
     depends_on:
       mosquitto:
         condition: service_healthy

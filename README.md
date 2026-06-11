@@ -29,7 +29,7 @@ pip install -r requirements.txt
 python -m uvicorn cloud.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Set `SB_DATABASE_URL`, `SB_MQTT_HOST`, `SB_MQTT_PORT`, and MQTT credential variables when running against PostgreSQL and Mosquitto. Local defaults exist for development, but production should use explicit secrets.
+Set `SB_DATABASE_URL`, `SB_MQTT_HOST`, and `SB_MQTT_PORT` when running against PostgreSQL and Mosquitto. Local development can continue to use MQTT username/password authentication. Production uses mTLS certificate identity and does not send an MQTT username or password.
 
 ### Mobile App
 
@@ -49,13 +49,13 @@ flutter run `
 
 ### Production Deploy
 
-Use `deploy/.env.deploy.example` as the template for `deploy/.env.deploy`, then run:
+Use `deploy/.env.deploy.example` as the template for `deploy/.env.deploy`. Copy `deploy/mqtt-gateways.example.csv` to the ignored `deploy/mqtt-gateways.csv`, add one row and CSR per Gateway, then run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\deploy.ps1
 ```
 
-Do not commit `.env.deploy`, generated certificates, MQTT password files, or private keys.
+Do not commit `.env.deploy`, the real Gateway inventory, CSRs, generated ACLs, certificates, or private keys. Gateway private keys must be generated and retained on their Gateway hosts.
 
 ## Lean Documentation
 
@@ -63,6 +63,7 @@ Do not commit `.env.deploy`, generated certificates, MQTT password files, or pri
 - [Contracts](docs/CONTRACTS.md): REST and MQTT contracts for provisioning, OTA, automation, and capabilities.
 - [Operations](docs/OPERATIONS.md): local run, production deploy, networking, MQTT TLS, and troubleshooting.
 - [Security](docs/SECURITY.md): security model, known risks, hardening checklist, and post-scan actions.
+- [Gateway MQTT Handoff](docs/handoffs/MQTT_GATEWAY_CERT_IDENTITY_HANDOFF.md): required Gateway certificate-identity changes, readiness checks, cutover, and rollback.
 - [Developer Guide](docs/DEVELOPER_GUIDE.md): setup, tests, workflow, and branch/Jira expectations.
 
 ## Repository Map
@@ -73,9 +74,9 @@ Do not commit `.env.deploy`, generated certificates, MQTT password files, or pri
 | `mobile_app/` | Flutter client for login, device control, provisioning, OTA, and automations. |
 | `gateway/` | Gateway host runtime that connects MQTT to the local Zigbee stack. |
 | `end_devices/` | Zigbee end-device firmware projects. |
-| `mqtt/` | Mosquitto production config, ACLs, and certificate setup inputs. |
+| `mqtt/` | Mosquitto production transport configuration. |
 | `database/` | SQL schema and migrations. Runtime ORM code is the source of truth when it differs from older SQL snapshots. |
-| `deploy/` | EC2/Docker/Nginx/Mosquitto/PostgreSQL deployment scripts and examples. |
+| `deploy/` | EC2/Docker/Nginx/Mosquitto/PostgreSQL deployment scripts, Gateway inventory tooling, and generated PKI layout. |
 | `docs/` | The current lean documentation set. |
 
 ## What Not To Touch Accidentally

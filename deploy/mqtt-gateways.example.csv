@@ -1,0 +1,2 @@
+principal_id,tenant_id,site_id,gateway_id,csr_file
+gateway-hust-lab01-01,hust,lab01,gw-ubuntu-01,mqtt-csrs/gateway-hust-lab01-01.csr

@@ -9,9 +9,9 @@ The system controls physical devices, so security is not just login screens. The
 | Cloud REST API | Bearer-token auth through `cloud/app/auth.py`; user roles and home scope checks are used by control routes. |
 | User roles | Admin, parent/operator, and viewer-style access are enforced through dependency functions and access-control helpers. |
 | Mobile API access | Mobile attaches `Authorization: Bearer ...` when configured and release builds should reject unsafe remote HTTP. |
-| MQTT transport | Production Mosquitto uses TLS, client certificates, password files, and ACLs. |
-| MQTT namespace | Topics use `sb/v1/{tenant}/{site}/{gateway}`. This prefix is part of the authorization model. |
-| Gateway | Production gateway config requires MQTT host, port, username, password, tenant, site, gateway id, and certificate paths. |
+| MQTT transport | Production Mosquitto uses TLS 1.2+, required client certificates, certificate common names as identities, and generated ACLs. |
+| MQTT namespace | Topics use `sb/v1/{tenant}/{site}/{gateway}`. Each Gateway certificate is bound to one exact namespace tuple. |
+| Gateway | The production target requires MQTT host, port, TLS/mTLS paths, principal id, tenant, site, and gateway id. Username/password remains local-development only. |
 | Database | PostgreSQL stores users, password hashes, devices, commands, states, events, automations, factory devices, and provisioning sessions. |
 | Provisioning | Factory devices and install codes gate device joins. Active provisioning sessions should be short-lived. |
 
@@ -19,13 +19,13 @@ The system controls physical devices, so security is not just login screens. The
 
 These are the durable conclusions carried forward from the removed security scan artifacts and checked against the current source shape.
 
-### MQTT ACLs Are Still Too Broad
+### Gateway Cutover Is Not Complete Yet
 
-`mqtt/config/acl.prod.conf` uses wildcard tenant/site/gateway prefixes for Cloud, Gateway, and monitor identities. TLS and client certificates authenticate a client, but the ACL still allows broad topic access once the client is accepted. Narrow each MQTT identity to the tenant/site/gateway prefixes it actually owns.
+Broker and Cloud configuration support certificate identity, but Gateway C changes are intentionally outside this branch. Do not switch the production broker until Gateway owners confirm that each Gateway keeps its private key locally, uses a CSR common name equal to its inventory `principal_id`, no longer requires username/password in certificate mode, and uses a unique client id derived from the principal.
 
 ### Deploy Examples Still Contain Demo Defaults
 
-`deploy/.env.deploy.example` and deploy fallback logic include demo values such as `gateway123`, `cloud123`, `client123`, `monitor123`, `sb_user`, and `sb_pass`. The secure compose file is stricter, but operators can still copy weak defaults. Treat these as local examples only and rotate anything ever used on a reachable host.
+Database examples still contain local demo values such as `sb_user` and `sb_pass`. The secure compose file is stricter, but operators can still copy weak defaults. Treat these as local examples only and rotate anything ever used on a reachable host.
 
 ### Provisioning Install Codes Need Tight Handling
 
@@ -47,9 +47,10 @@ Release builds should enforce HTTPS and safer runtime config. Debug/profile buil
 
 ## Hardening Checklist
 
-- Bind MQTT ACLs to exact tenant/site/gateway prefixes per identity.
-- Use unique MQTT passwords per role and per deployed site.
-- Rotate all demo passwords before exposing EC2, MQTT, or Cloud to the internet.
+- Keep the real MQTT Gateway inventory and all generated PKI material out of Git.
+- Require unique certificate principals and exact tenant/site/gateway tuples.
+- Generate each Gateway private key on that Gateway and transfer only its CSR.
+- Keep the CA private key outside containers and restrict it to mode `0600`.
 - Keep Mosquitto TLS and mTLS enabled in production.
 - Keep `/health` public, but protect control, provisioning, automation, event, and inventory APIs.
 - Keep command creation and command read paths scoped to the user's home.
@@ -57,17 +58,16 @@ Release builds should enforce HTTPS and safer runtime config. Debug/profile buil
 - Redact install codes from logs, reports, and UI text unless there is a specific operational need.
 - Prefer the secure production compose file for non-demo deployments.
 - Store production auth secrets in deploy environment files or a secrets manager, not in Git.
-- Keep `.env.deploy`, MQTT password files, generated certificates, PEM keys, and private keys out of commits.
+- Keep `.env.deploy`, the real MQTT inventory, CSRs, generated ACLs, certificates, PEM keys, and private keys out of commits.
 - Run focused tests after any auth, MQTT, provisioning, or command-scope change.
 
 ## Post-Scan Action Items
 
-1. Replace wildcard MQTT production ACLs with per-identity topic rules.
-2. Remove weak deploy fallback credentials or make deploy fail closed when production secrets are missing.
-3. Decide retention rules for install codes in `factory_devices` and `provisioning_sessions`.
-4. Add or keep tests for command object scope, gateway command scope, automation action-device scope, and provisioning visibility.
-5. Keep mobile release transport tests around `API_BASE_URL`, `API_AUTH_TOKEN`, and insecure remote HTTP rejection.
-6. Review EC2 security groups and Nginx exposure before marking a deployment production-ready.
+1. Complete and verify the Gateway certificate-identity changes before broker cutover.
+2. Decide retention rules for install codes in `factory_devices` and `provisioning_sessions`.
+3. Add or keep tests for command object scope, gateway command scope, automation action-device scope, and provisioning visibility.
+4. Keep mobile release transport tests around `API_BASE_URL`, `API_AUTH_TOKEN`, and insecure remote HTTP rejection.
+5. Review EC2 security groups and Nginx exposure before marking a deployment production-ready.
 
 ## Verification Commands
 

@@ -88,7 +88,7 @@ async def test_handle_motion_event_auto_registers_and_persists():
 
 
 @pytest.mark.asyncio
-async def test_connect_configures_tls_and_mtls_when_enabled(monkeypatch):
+async def test_connect_uses_certificate_identity_without_password(monkeypatch):
     from cloud.app import mqtt_client as mqtt_module
 
     class FakeClient:
@@ -125,6 +125,7 @@ async def test_connect_configures_tls_and_mtls_when_enabled(monkeypatch):
         mqtt_port=8883,
         mqtt_username="client",
         mqtt_password="client-pass",
+        mqtt_cert_identity_enabled=True,
         mqtt_tls_enabled=True,
         mqtt_mtls_enabled=True,
         mqtt_ca_cert_path="/mosquitto/certs/ca.crt",
@@ -137,8 +138,8 @@ async def test_connect_configures_tls_and_mtls_when_enabled(monkeypatch):
 
     service.connect()
 
-    assert fake_client.username == "client"
-    assert fake_client.password == "client-pass"
+    assert fake_client.username is None
+    assert fake_client.password is None
     assert fake_client.tls_kwargs == {
         "ca_certs": "/mosquitto/certs/ca.crt",
         "certfile": "/mosquitto/certs/clients/cloud.crt",
@@ -146,6 +147,76 @@ async def test_connect_configures_tls_and_mtls_when_enabled(monkeypatch):
     }
     assert fake_client.connect_args == ("mosquitto", 8883)
     assert fake_client.loop_started is True
+
+
+@pytest.mark.asyncio
+async def test_connect_keeps_password_auth_for_local_development(monkeypatch):
+    from cloud.app import mqtt_client as mqtt_module
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.username = None
+            self.password = None
+            self.connect_args = None
+            self.loop_started = False
+
+        def username_pw_set(self, username, password):
+            self.username = username
+            self.password = password
+
+        def connect(self, host, port):
+            self.connect_args = (host, port)
+
+        def loop_start(self):
+            self.loop_started = True
+
+    fake_client = FakeClient()
+    monkeypatch.setattr(
+        mqtt_module.mqtt,
+        "Client",
+        lambda *args, **kwargs: fake_client,
+    )
+
+    service = mqtt_module.MQTTService()
+    service.settings = SimpleNamespace(
+        mqtt_host="localhost",
+        mqtt_port=1883,
+        mqtt_username="client",
+        mqtt_password="client-pass",
+        mqtt_cert_identity_enabled=False,
+        mqtt_tls_enabled=False,
+        mqtt_mtls_enabled=False,
+        mqtt_ca_cert_path=None,
+        mqtt_client_cert_path=None,
+        mqtt_client_key_path=None,
+        tenant_id="hust",
+        site_id="lab01",
+        gateway_id="gw-ubuntu-01",
+    )
+
+    service.connect()
+
+    assert fake_client.username == "client"
+    assert fake_client.password == "client-pass"
+    assert fake_client.connect_args == ("localhost", 1883)
+    assert fake_client.loop_started is True
+
+
+def test_certificate_identity_requires_tls_and_mtls() -> None:
+    from cloud.app import mqtt_client as mqtt_module
+
+    service = mqtt_module.MQTTService()
+    service.settings = SimpleNamespace(
+        mqtt_cert_identity_enabled=True,
+        mqtt_tls_enabled=True,
+        mqtt_mtls_enabled=False,
+        mqtt_ca_cert_path="/mosquitto/certs/ca.crt",
+        mqtt_client_cert_path=None,
+        mqtt_client_key_path=None,
+    )
+
+    with pytest.raises(RuntimeError, match="must be true"):
+        service._configure_tls()
 
 
 @pytest.mark.asyncio

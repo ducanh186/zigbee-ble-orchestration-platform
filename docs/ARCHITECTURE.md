@@ -70,6 +70,8 @@ Older SQL files are useful as snapshots, but check the ORM first when behavior m
 
 The split between REST and MQTT keeps Mobile simple: it talks only to Cloud, not directly to the broker or gateway. The cost is that Cloud must be strict about auth, object scope, command timeouts, and MQTT topic boundaries.
 
-MQTT gives the gateway a lightweight live channel, but topic namespace mistakes can become security bugs. The production ACL must bind each credential to the right tenant, site, and gateway prefix.
+MQTT gives the gateway a lightweight live channel, but topic namespace mistakes can become security bugs. Production Mosquitto derives the authenticated username from the client certificate common name. `deploy/mqtt-gateways.csv` maps each Gateway principal to one exact `tenant/site/gateway` tuple, and the generated ACL grants no access outside that tuple. The `cloud-control` certificate receives exact rules for every registered tuple, while `monitor` can read only `$SYS/#`.
+
+Cloud still runs with one configured `tenant/site/gateway` topic prefix per process. The broader `cloud-control` ACL supports registered namespaces at the broker boundary, but multi-Gateway application routing is a separate design change.
 
 PostgreSQL gives Cloud a reliable audit trail for commands and device state. The trade-off is that MQTT callbacks need careful session handling so live messages do not corrupt database state.

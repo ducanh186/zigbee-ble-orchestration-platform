@@ -47,6 +47,20 @@ for var in EC2_HOST EC2_USER EC2_KEY REMOTE_DIR; do
     fi
 done
 
+MQTT_GATEWAY_INVENTORY="${config[MQTT_GATEWAY_INVENTORY]:-deploy/mqtt-gateways.csv}"
+if [[ "$MQTT_GATEWAY_INVENTORY" == /* || "$MQTT_GATEWAY_INVENTORY" == *".."* ]]; then
+    echo "ERROR: MQTT_GATEWAY_INVENTORY must be a project-relative path."
+    exit 1
+fi
+if [[ ! "$MQTT_GATEWAY_INVENTORY" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "ERROR: MQTT_GATEWAY_INVENTORY contains unsupported characters."
+    exit 1
+fi
+if [[ ! -f "$PROJECT_DIR/$MQTT_GATEWAY_INVENTORY" ]]; then
+    echo "ERROR: MQTT Gateway inventory not found: $PROJECT_DIR/$MQTT_GATEWAY_INVENTORY"
+    exit 1
+fi
+
 echo ""
 echo "=== Deploying to $EC2_HOST ($REMOTE_DIR) ==="
 
@@ -71,6 +85,10 @@ tar -czf "$TEMP_TAR" -C "$PROJECT_DIR" \
     --exclude='.claude' \
     --exclude='mqtt/passwords' \
     --exclude='mqtt/data' \
+    --exclude='mqtt/certs' \
+    --exclude='deploy/mosquitto/passwords' \
+    --exclude='deploy/mosquitto/generated' \
+    --exclude='deploy/mosquitto/pki' \
     .
 
 echo "Packed project: $(du -k "$TEMP_TAR" | cut -f1) KB"
@@ -104,37 +122,10 @@ echo "--- [3/6] Preparing remote directories ---"
 ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 set -e
 cd $REMOTE_DIR
-mkdir -p deploy/mosquitto/passwords
 mkdir -p deploy/cloud
-mkdir -p mqtt/certs/clients
+mkdir -p deploy/mosquitto/generated
+mkdir -p deploy/mosquitto/pki
 echo 'Directories prepared.'
-REMOTE_EOF
-
-# ----------------------------------------------------------
-# Step 4: Generate MQTT passwords (4 users)
-# ----------------------------------------------------------
-echo ""
-echo "--- [4/6] Generating MQTT passwords ---"
-
-GW_PASS="${config[MQTT_GATEWAY_PASS]:-gateway123}"
-CLI_PASS="${config[MQTT_CLIENT_PASS]:-client123}"
-CLOUD_PASS="${config[MQTT_CLOUD_PASS]:-${config[MQTT_CLIENT_PASS]:-cloud123}}"
-MON_PASS="${config[MQTT_MONITOR_PASS]:-monitor123}"
-BRIDGE_PASS="${config[MQTT_BRIDGE_PASS]:-bridge123}"
-
-ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
-set -e
-cd $REMOTE_DIR
-PASSDIR=\$(pwd)/deploy/mosquitto/passwords
-docker run --rm -v "\$PASSDIR:/passwords" eclipse-mosquitto:2.0 sh -c "
-  touch /passwords/passwd
-  mosquitto_passwd -b /passwords/passwd gateway '$GW_PASS'
-  mosquitto_passwd -b /passwords/passwd cloud   '$CLOUD_PASS'
-  mosquitto_passwd -b /passwords/passwd client  '$CLI_PASS'
-  mosquitto_passwd -b /passwords/passwd monitor '$MON_PASS'
-  mosquitto_passwd -b /passwords/passwd bridge  '$BRIDGE_PASS'
-"
-echo 'MQTT passwords generated (5 users: gateway, cloud, client, monitor, bridge).'
 REMOTE_EOF
 
 # ----------------------------------------------------------
@@ -147,7 +138,15 @@ ssh "${SSH_OPTS[@]}" "$REMOTE" bash -s <<REMOTE_EOF
 set -e
 cd $REMOTE_DIR
 sed -i 's/\r$//' deploy/setup-mqtt-mtls.sh
-bash deploy/setup-mqtt-mtls.sh '$REMOTE_DIR' '$EC2_HOST'
+MOSQUITTO_UID=\$(docker run --rm eclipse-mosquitto:2.0 id -u mosquitto)
+MOSQUITTO_GID=\$(docker run --rm eclipse-mosquitto:2.0 id -g mosquitto)
+MOSQUITTO_UID="\$MOSQUITTO_UID" MOSQUITTO_GID="\$MOSQUITTO_GID" \
+  bash deploy/setup-mqtt-mtls.sh \
+    '$REMOTE_DIR' \
+    '$EC2_HOST' \
+    '$REMOTE_DIR/deploy/mosquitto/pki' \
+    '$REMOTE_DIR/$MQTT_GATEWAY_INVENTORY' \
+    '$REMOTE_DIR/deploy/mosquitto/generated/acl.prod.conf'
 REMOTE_EOF
 
 # ----------------------------------------------------------
@@ -161,8 +160,6 @@ PG_PASS="${config[POSTGRES_PASSWORD]:-sb_pass}"
 PG_DB="${config[POSTGRES_DB]:-sb_cloud}"
 SB_DB_URL="${config[SB_DATABASE_URL]:-postgresql+asyncpg://$PG_USER:$PG_PASS@postgres:5432/$PG_DB}"
 SB_MQTT_HOST="${config[SB_MQTT_HOST]:-mosquitto}"
-SB_MQTT_USER="cloud"
-SB_MQTT_PASS="$CLOUD_PASS"
 SB_TENANT="${config[SB_TENANT_ID]:-hust}"
 SB_SITE="${config[SB_SITE_ID]:-lab01}"
 SB_GW="${config[SB_GATEWAY_ID]:-gw-ubuntu-01}"
@@ -185,13 +182,12 @@ cat > $REMOTE_DIR/deploy/cloud/.env << 'ENVEOF'
 SB_DATABASE_URL=$SB_DB_URL
 SB_MQTT_HOST=$SB_MQTT_HOST
 SB_MQTT_PORT=8883
-SB_MQTT_USERNAME=$SB_MQTT_USER
-SB_MQTT_PASSWORD=$SB_MQTT_PASS
+SB_MQTT_CERT_IDENTITY_ENABLED=true
 SB_MQTT_TLS_ENABLED=true
 SB_MQTT_MTLS_ENABLED=true
 SB_MQTT_CA_CERT_PATH=/mosquitto/certs/ca.crt
-SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud.crt
-SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud.key
+SB_MQTT_CLIENT_CERT_PATH=/mosquitto/certs/clients/cloud-control.crt
+SB_MQTT_CLIENT_KEY_PATH=/mosquitto/certs/clients/cloud-control.key
 SB_TENANT_ID=$SB_TENANT
 SB_SITE_ID=$SB_SITE
 SB_GATEWAY_ID=$SB_GW
@@ -240,8 +236,6 @@ cp    ../cloud/__main__.py cloud/
 export POSTGRES_USER='$PG_USER'
 export POSTGRES_PASSWORD='$PG_PASS'
 export POSTGRES_DB='$PG_DB'
-export MQTT_MONITOR_PASSWORD='$MON_PASS'
-export MQTT_CERT_DIR='../mqtt/certs'
 
 # Detect compose command (plugin vs standalone)
 if docker compose version &>/dev/null; then
