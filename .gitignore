@@ -12,6 +12,11 @@ excalidraw.log
 **/.*/
 # Deploy secrets
 deploy/.env.deploy
+deploy/mqtt-gateways.csv
+deploy/mqtt-csrs/
+deploy/mosquitto/generated/
+deploy/mosquitto/pki/
+mqtt/certs/
 *.pem
 # Python
 __pycache__/

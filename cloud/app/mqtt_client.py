@@ -73,9 +73,10 @@ class MQTTService:
 
     def connect(self) -> None:
         self._loop = asyncio.get_running_loop()
-        self.client.username_pw_set(
-            self.settings.mqtt_username, self.settings.mqtt_password
-        )
+        if not getattr(self.settings, "mqtt_cert_identity_enabled", False):
+            self.client.username_pw_set(
+                self.settings.mqtt_username, self.settings.mqtt_password
+            )
         self._configure_tls()
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
@@ -87,6 +88,17 @@ class MQTTService:
         self.client.disconnect()
 
     def _configure_tls(self) -> None:
+        certificate_identity_enabled = getattr(
+            self.settings, "mqtt_cert_identity_enabled", False
+        )
+        if certificate_identity_enabled and (
+            not self.settings.mqtt_tls_enabled
+            or not self.settings.mqtt_mtls_enabled
+        ):
+            raise RuntimeError(
+                "SB_MQTT_TLS_ENABLED and SB_MQTT_MTLS_ENABLED must be true "
+                "when SB_MQTT_CERT_IDENTITY_ENABLED=true"
+            )
         if not self.settings.mqtt_tls_enabled:
             return
         if not self.settings.mqtt_ca_cert_path:

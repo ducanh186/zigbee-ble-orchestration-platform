@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     mqtt_port: int = 1883
     mqtt_username: str = "client"
     mqtt_password: str = "client"
+    mqtt_cert_identity_enabled: bool = False
     mqtt_tls_enabled: bool = False
     mqtt_mtls_enabled: bool = False
     mqtt_ca_cert_path: str | None = None
