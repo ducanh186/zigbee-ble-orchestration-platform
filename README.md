@@ -63,6 +63,7 @@ Do not commit `.env.deploy`, the real Gateway inventory, CSRs, generated ACLs, c
 - [Contracts](docs/CONTRACTS.md): REST and MQTT contracts for provisioning, OTA, automation, and capabilities.
 - [Operations](docs/OPERATIONS.md): local run, production deploy, networking, MQTT TLS, and troubleshooting.
 - [Security](docs/SECURITY.md): security model, known risks, hardening checklist, and post-scan actions.
+- [Gateway MQTT Handoff](docs/handoffs/MQTT_GATEWAY_CERT_IDENTITY_HANDOFF.md): required Gateway certificate-identity changes, readiness checks, cutover, and rollback.
 - [Developer Guide](docs/DEVELOPER_GUIDE.md): setup, tests, workflow, and branch/Jira expectations.
 
 ## Repository Map

@@ -88,6 +88,9 @@ The certificate common name is the MQTT principal. `cloud-control` has exact rea
 
 Gateway C code is not changed by this hardening branch. Production cutover is blocked until Gateway owners complete these requirements:
 
+The implementation handoff for the Gateway team is
+[`MQTT_GATEWAY_CERT_IDENTITY_HANDOFF.md`](handoffs/MQTT_GATEWAY_CERT_IDENTITY_HANDOFF.md).
+
 - Generate a private key locally with mode `0600`; never send that key to Cloud or the deployment host.
 - Generate a CSR whose common name exactly equals the inventory `principal_id`.
 - Install the returned Gateway certificate and CA certificate.

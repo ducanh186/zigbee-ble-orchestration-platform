@@ -9,6 +9,12 @@ SECURE_COMPOSE = REPO_ROOT / "deploy" / "docker-compose.prod-secure.yml"
 PROD_MOSQUITTO_CONF = REPO_ROOT / "mqtt" / "config" / "mosquitto.prod.conf"
 EXAMPLE_INVENTORY = REPO_ROOT / "deploy" / "mqtt-gateways.example.csv"
 IDENTITY_TOOL = REPO_ROOT / "deploy" / "mqtt_identity.py"
+GATEWAY_HANDOFF = (
+    REPO_ROOT
+    / "docs"
+    / "handoffs"
+    / "MQTT_GATEWAY_CERT_IDENTITY_HANDOFF.md"
+)
 DEPLOY_PS1 = REPO_ROOT / "deploy" / "deploy.ps1"
 DEPLOY_SH = REPO_ROOT / "deploy" / "deploy.sh"
 
@@ -85,3 +91,22 @@ def test_repository_contains_inventory_template_and_generator() -> None:
         "principal_id,tenant_id,site_id,gateway_id,csr_file"
     )
     assert IDENTITY_TOOL.is_file()
+
+
+def test_gateway_certificate_identity_handoff_is_complete() -> None:
+    handoff = GATEWAY_HANDOFF.read_text(encoding="utf-8")
+
+    for requirement in (
+        "SB_MQTT_CERT_IDENTITY_ENABLED=true",
+        "SB_MQTT_PRINCIPAL_ID",
+        "SB_MQTT_USERNAME",
+        "SB_MQTT_PASSWORD",
+        "z3gw-host",
+        "principal_id",
+        "tenant/site/gateway",
+        "Readiness Checklist",
+        "Smoke Tests",
+        "Coordinated Cutover",
+        "Rollback",
+    ):
+        assert requirement in handoff
