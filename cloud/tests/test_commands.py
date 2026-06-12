@@ -1,6 +1,9 @@
 """Tests for the command POST/GET router and MQTT publish."""
 from __future__ import annotations
 
+import importlib
+import importlib.util
+
 import pytest
 
 from cloud.tests.auth_helpers import create_auth_user, login_headers
@@ -16,6 +19,30 @@ async def _parent_headers(client, db_session_factory) -> dict[str, str]:
         home_id="home-1",
     )
     return await login_headers(client, "parent", "parent-pass")
+
+
+@pytest.mark.asyncio
+async def test_shared_command_service_persists_before_publish(
+    db_session_factory, fake_mqtt, seed_light
+):
+    module_name = "cloud.app.command_execution"
+    if importlib.util.find_spec(module_name) is None:
+        pytest.fail("shared command execution service is missing")
+    command_execution = importlib.import_module(module_name)
+
+    async with db_session_factory() as db:
+        command = await command_execution.execute_device_command(
+            db,
+            device_id=seed_light,
+            op="set",
+            target={"power": "on"},
+            timeout_ms=5000,
+            current_user=None,
+        )
+
+    assert command.device_id == seed_light
+    assert command.status == "accepted"
+    assert fake_mqtt.published[0]["command_id"] == command.id
 
 
 @pytest.mark.asyncio

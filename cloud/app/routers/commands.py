@@ -1,22 +1,19 @@
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pydantic import ValidationError
-
 from cloud.app.access_control import (
-    ensure_device_manageable,
     get_visible_device_or_404,
     is_parent_or_admin,
 )
 from cloud.app.auth import get_current_user, require_parent_or_admin
+from cloud.app.command_execution import (
+    CommandExecutionError,
+    execute_device_command,
+)
 from cloud.app.database import get_db
-from cloud.app.models import Command, Device, User
-from cloud.app.mqtt_client import mqtt_service
-from cloud.app.schemas import CommandCreate, CommandOut, translate_command_for_gateway
+from cloud.app.models import Command, User
+from cloud.app.schemas import CommandCreate, CommandOut
 
 router = APIRouter(prefix="/api", tags=["commands"])
 
@@ -32,49 +29,20 @@ async def create_command(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    # Verify device exists and get its type for command translation
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if device is None:
-        raise HTTPException(status_code=404, detail="Device not found")
-    await ensure_device_manageable(db, device, current_user)
-
-    # Translate user-friendly format to gateway wire format
     try:
-        mqtt_op, mqtt_target = translate_command_for_gateway(
-            device.device_type, body.op, body.target
+        return await execute_device_command(
+            db,
+            device_id=device_id,
+            op=body.op,
+            target=body.target,
+            timeout_ms=body.timeout_ms or 5000,
+            current_user=current_user,
         )
-    except (ValueError, ValidationError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-
-    command_id = uuid4().hex
-    timeout_ms = body.timeout_ms or 5000
-    expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
-        milliseconds=timeout_ms
-    )
-    cmd = Command(
-        id=command_id,
-        device_id=device_id,
-        op=mqtt_op,
-        target=mqtt_target,
-        status="accepted",
-        timeout_ms=timeout_ms,
-        expires_at=expires_at,
-    )
-    db.add(cmd)
-    await db.commit()
-    await db.refresh(cmd)
-
-    # Publish command request to MQTT
-    mqtt_service.publish_command(
-        command_id=command_id,
-        device_id=device_id,
-        op=mqtt_op,
-        target=mqtt_target,
-        timeout_ms=timeout_ms,
-    )
-
-    return cmd
+    except CommandExecutionError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        ) from exc
 
 
 @router.get("/commands/{command_id}", response_model=CommandOut)

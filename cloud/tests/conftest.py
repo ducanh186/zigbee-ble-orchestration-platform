@@ -133,15 +133,15 @@ async def db_session_factory(monkeypatch):
 @pytest_asyncio.fixture
 async def fake_mqtt(monkeypatch):
     fake = FakeMQTTPublisher()
+    import cloud.app.command_execution as cmdexecmod
     import cloud.app.mqtt_client as mqttmod
     import cloud.app.routers.automations as automod
-    import cloud.app.routers.commands as cmdmod
     import cloud.app.routers.gateways as gwmod
     import cloud.app.routers.provisioning as provmod
 
     monkeypatch.setattr(mqttmod, "mqtt_service", fake)
     monkeypatch.setattr(automod, "mqtt_service", fake)
-    monkeypatch.setattr(cmdmod, "mqtt_service", fake)
+    monkeypatch.setattr(cmdexecmod, "mqtt_service", fake)
     monkeypatch.setattr(gwmod, "mqtt_service", fake)
     monkeypatch.setattr(provmod, "mqtt_service", fake)
     yield fake
