@@ -262,4 +262,80 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get logsNoEvents => 'Chưa có nhật ký sự kiện.';
+
+  @override
+  String get environmentTitle => 'Môi trường';
+
+  @override
+  String get temperatureLabel => 'Nhiệt độ';
+
+  @override
+  String get humidityLabel => 'Độ ẩm';
+
+  @override
+  String get zigbeeLocalLabel => 'Zigbee nội bộ';
+
+  @override
+  String get sensorConditionLabel => 'Điều kiện';
+
+  @override
+  String get metricLabel => 'Chỉ số';
+
+  @override
+  String get operatorLabel => 'Toán tử';
+
+  @override
+  String get thresholdLabel => 'Ngưỡng';
+
+  @override
+  String get greaterThanOrEqualLabel => 'Lớn hơn hoặc bằng';
+
+  @override
+  String get lessThanOrEqualLabel => 'Nhỏ hơn hoặc bằng';
+
+  @override
+  String get degreesCelsiusUnit => '°C';
+
+  @override
+  String get percentUnit => '%';
+
+  @override
+  String get scheduleOnTemplate => 'Lịch bật';
+
+  @override
+  String get scheduleOffTemplate => 'Lịch tắt';
+
+  @override
+  String get scheduleTriggerLabel => 'Lịch';
+
+  @override
+  String get cronPresetWeekdaySeven => 'Mỗi ngày trong tuần lúc 07:00';
+
+  @override
+  String get cronPresetSundayTwentyTwo => 'Mỗi Chủ nhật lúc 22:00';
+
+  @override
+  String get cronPresetEverySixHours => 'Mỗi 6 giờ';
+
+  @override
+  String get rawCronLabel => 'Cron tùy chỉnh';
+
+  @override
+  String get targetTypeLabel => 'Loại mục tiêu';
+
+  @override
+  String get directLightLabel => 'Đèn trực tiếp';
+
+  @override
+  String get sceneLabel => 'Scene';
+
+  @override
+  String get noScenesAvailable => 'Không có scene khả dụng';
+
+  @override
+  String get sceneUnavailableMessage =>
+      'Scene chưa khả dụng. Hãy chọn một đèn trực tiếp.';
+
+  @override
+  String get invalidCronMessage => 'Nhập biểu thức cron hợp lệ gồm năm trường';
 }
