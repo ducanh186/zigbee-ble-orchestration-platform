@@ -57,6 +57,56 @@ void main() {
     },
   );
 
+  test('maps partial environment state into typed sensor values', () async {
+    final repository = RemoteDeviceRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://dashboard.iot-building.app',
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/api/devices/') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'id': 'environment-01',
+                  'device_type': 'environment',
+                  'eui64': '00124b0001dht011',
+                  'room_id': 'room-01',
+                  'name': 'DHT11 Sensor',
+                  'is_online': true,
+                },
+              ]),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.url.path == '/api/devices/environment-01/state') {
+            return http.Response(
+              jsonEncode({
+                'device_id': 'environment-01',
+                'state': {
+                  'temperature_c': 28.5,
+                  'humidity_percent': 48,
+                  'sensor': 'dht11',
+                  'reachable': true,
+                },
+                'reported_at': '10:11 06/13/2026',
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('unexpected path ${request.url.path}', 404);
+        }),
+      ),
+    );
+
+    final device = (await repository.fetchDevices()).single;
+
+    expect(device.isEnvironment, isTrue);
+    expect(device.temperatureC, 28.5);
+    expect(device.humidityPercent, 48);
+    expect(device.sensorKind, 'dht11');
+  });
+
   test(
     'renameDeviceName patches display label and preserves gateway identity',
     () async {
@@ -128,27 +178,23 @@ void main() {
     expect(events.single.eventType, 'occupancy_changed');
   });
 
-  test('derives gateway online status from cloud event logs', () async {
+  test('reads gateway online status from the dedicated endpoint', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
         baseUrl: 'http://98.83.4.87:8000',
         httpClient: MockClient((request) async {
-          expect(request.url.path, '/api/events/');
-          expect(request.url.query, 'limit=50');
+          expect(
+            request.url.path,
+            '/api/gateways/gw-ubuntu-01/status',
+          );
+          expect(request.url.query, isEmpty);
           return http.Response(
-            jsonEncode([
-              {
-                'id': 101,
-                'device_id': null,
-                'event_type': 'gateway_online',
-                'payload': {
-                  'value': 'online',
-                  'source': 'gateway',
-                  'gateway_id': 'gw-ubuntu-01',
-                },
-                'occurred_at': '10:11 05/07/2026',
-              },
-            ]),
+            jsonEncode({
+              'gateway_id': 'gw-ubuntu-01',
+              'status': 'online',
+              'event_type': 'gateway_online',
+              'occurred_at': '10:11 05/07/2026',
+            }),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -165,22 +211,19 @@ void main() {
   });
 
   test(
-    'does not invent home hub status when cloud logs contain no hub event',
+    'does not invent home hub status when the endpoint reports unknown',
     () async {
       final repository = RemoteDeviceRepository(
         apiClient: ApiClient(
           baseUrl: 'http://98.83.4.87:8000',
           httpClient: MockClient((request) async {
             return http.Response(
-              jsonEncode([
-                {
-                  'id': 23,
-                  'device_id': '0000000000000053',
-                  'event_type': 'occupancy_changed',
-                  'payload': {'occupancy': 'unoccupied'},
-                  'occurred_at': '09:20 05/06/2026',
-                },
-              ]),
+              jsonEncode({
+                'gateway_id': 'gw-ubuntu-01',
+                'status': 'unknown',
+                'event_type': null,
+                'occurred_at': null,
+              }),
               200,
               headers: {'content-type': 'application/json'},
             );
@@ -191,29 +234,22 @@ void main() {
       final status = await repository.fetchCloudStatus();
 
       expect(status.state, CloudConnectionState.unknown);
-      expect(status.detail, 'No home hub status log found in cloud events');
+      expect(status.detail, 'No home hub status log found in cloud');
     },
   );
 
-  test('derives gateway offline status from cloud event logs', () async {
+  test('reads gateway offline status from the dedicated endpoint', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
-        baseUrl: 'http://98.83.4.87:8000',
-        httpClient: MockClient((request) async {
-          return http.Response(
-            jsonEncode([
-              {
-                'id': 102,
-                'device_id': null,
+          baseUrl: 'http://98.83.4.87:8000',
+          httpClient: MockClient((request) async {
+            return http.Response(
+              jsonEncode({
+                'gateway_id': 'gw-ubuntu-01',
+                'status': 'offline',
                 'event_type': 'gateway_online',
-                'payload': {
-                  'value': 'offline',
-                  'source': 'gateway',
-                  'gateway_id': 'gw-ubuntu-01',
-                },
                 'occurred_at': '10:12 05/07/2026',
-              },
-            ]),
+              }),
             200,
             headers: {'content-type': 'application/json'},
           );

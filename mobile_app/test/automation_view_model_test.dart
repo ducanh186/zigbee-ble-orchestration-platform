@@ -47,7 +47,7 @@ void main() {
       expect(viewModel.errorMessage, isNotNull);
       expect(
         viewModel.errorMessage,
-        contains('Khong tao duoc automation rule'),
+        contains('Could not create automation rule'),
       );
       // Raw repository exception text must not be surfaced to the user.
       expect(viewModel.errorMessage, isNot(contains('network down')));
@@ -112,7 +112,7 @@ void main() {
       expect(viewModel.rules.single.id, 'automation-01');
       expect(
         viewModel.errorMessage,
-        contains('Khong xoa duoc automation rule'),
+        contains('Could not delete automation rule'),
       );
       expect(viewModel.errorMessage, isNot(contains('delete failed')));
     },

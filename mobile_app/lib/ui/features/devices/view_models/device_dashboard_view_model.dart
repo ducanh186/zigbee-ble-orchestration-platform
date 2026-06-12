@@ -86,7 +86,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong ket noi duoc Cloud API',
+        context: 'Could not connect to Cloud API',
       );
     } finally {
       _isLoading = false;
@@ -184,7 +184,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong doi duoc ten thiet bi',
+        context: 'Could not rename device',
       );
     } finally {
       _isRenamingDevice = false;

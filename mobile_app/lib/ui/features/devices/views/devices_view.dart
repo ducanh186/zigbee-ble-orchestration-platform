@@ -42,13 +42,13 @@ class _DevicesViewState extends State<DevicesView> {
               leading: widget.onBack == null
                   ? null
                   : IconButton(
-                      tooltip: 'Back',
+                      tooltip: l10n.backLabel,
                       onPressed: widget.onBack,
                       icon: const Icon(Icons.arrow_back),
                     ),
               actions: [
                 IconButton(
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refreshTooltip,
                   onPressed: viewModel.load,
                   icon: const Icon(Icons.refresh),
                 ),
@@ -77,7 +77,7 @@ class _DevicesViewState extends State<DevicesView> {
                   ),
                   const SizedBox(height: 12),
                   if (filteredDevices.isEmpty)
-                    const AppCard(child: Text('No matching device found.'))
+                    AppCard(child: Text(l10n.noMatchingDeviceMessage))
                   else
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
@@ -122,6 +122,7 @@ class _DeviceSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -133,7 +134,7 @@ class _DeviceSearchBar extends StatelessWidget {
           suffixIcon: query.isEmpty
               ? null
               : IconButton(
-                  tooltip: 'Clear search',
+                  tooltip: l10n.clearSearchTooltip,
                   onPressed: () => onChanged(''),
                   icon: const Icon(Icons.close),
                 ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../view_models/auth_view_model.dart';
@@ -42,6 +44,7 @@ class _LoginViewState extends State<LoginView> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final viewModel = context.watch<AuthViewModel>();
 
     return Scaffold(
@@ -57,10 +60,14 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.shield_outlined, size: 48, color: palette.primary),
+                    Icon(
+                      Icons.shield_outlined,
+                      size: 48,
+                      color: palette.primary,
+                    ),
                     const SizedBox(height: 16),
                     Text(
-                      'Sign in',
+                      l10n.signInTitle,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: palette.textPrimary,
@@ -70,7 +77,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Account access to your Smart Home.',
+                      l10n.signInSubtitle,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: palette.textSecondary,
@@ -88,13 +95,13 @@ class _LoginViewState extends State<LoginView> {
                             enabled: !viewModel.isLoading,
                             autofillHints: const [AutofillHints.username],
                             textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
+                            decoration: InputDecoration(
+                              labelText: l10n.usernameLabel,
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Enter your username';
+                                return l10n.usernameRequiredMessage;
                               }
                               return null;
                             },
@@ -107,21 +114,26 @@ class _LoginViewState extends State<LoginView> {
                             obscureText: true,
                             autofillHints: const [AutofillHints.password],
                             textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
+                            decoration: InputDecoration(
+                              labelText: l10n.passwordLabel,
                               prefixIcon: Icon(Icons.lock_outline),
                             ),
                             onFieldSubmitted: (_) => _submit(viewModel),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Enter your password';
+                                return l10n.passwordRequiredMessage;
                               }
                               return null;
                             },
                           ),
                           if (viewModel.errorMessage != null) ...[
                             const SizedBox(height: 12),
-                            _LoginError(message: viewModel.errorMessage!),
+                            _LoginError(
+                              message: localizedErrorMessage(
+                                l10n,
+                                viewModel.errorMessage!,
+                              ),
+                            ),
                           ],
                           const SizedBox(height: 16),
                           FilledButton(
@@ -137,7 +149,7 @@ class _LoginViewState extends State<LoginView> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text('Login'),
+                                : Text(l10n.loginAction),
                           ),
                         ],
                       ),

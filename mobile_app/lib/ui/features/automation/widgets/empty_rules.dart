@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// Empty state shown when the rule list is empty. Single thin-line icon +
@@ -12,6 +13,7 @@ class EmptyRules extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -35,7 +37,7 @@ class EmptyRules extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'No automation rules yet',
+            l10n.emptyRulesTitle,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -46,8 +48,7 @@ class EmptyRules extends StatelessWidget {
           SizedBox(
             width: 240,
             child: Text(
-              'Create a rule to react when a motion sensor or switch fires. '
-              'Cloud will save it and sync to your home hub.',
+              l10n.emptyRulesBody,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -61,7 +62,7 @@ class EmptyRules extends StatelessWidget {
             FilledButton.icon(
               onPressed: onCreate,
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('New rule'),
+              label: Text(l10n.newRuleTitle),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

@@ -37,7 +37,7 @@ class AutomationViewModel extends ChangeNotifier {
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong tai duoc automation rules',
+        context: 'Could not load automation rules',
       );
     } finally {
       _isLoading = false;
@@ -65,7 +65,7 @@ class AutomationViewModel extends ChangeNotifier {
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong tao duoc automation rule',
+        context: 'Could not create automation rule',
       );
     } finally {
       _isSaving = false;
@@ -98,7 +98,7 @@ class AutomationViewModel extends ChangeNotifier {
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong xoa duoc automation rule',
+        context: 'Could not delete automation rule',
       );
     } finally {
       notifyListeners();
@@ -117,7 +117,7 @@ class AutomationViewModel extends ChangeNotifier {
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Khong cap nhat duoc automation rule',
+        context: 'Could not update automation rule',
       );
     } finally {
       notifyListeners();

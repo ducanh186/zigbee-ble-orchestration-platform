@@ -11,18 +11,20 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.access_control import get_manageable_device_or_404
-from cloud.app.auth import require_admin, require_parent_or_admin
+from cloud.app.auth import get_current_user, require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command, User
+from cloud.app.models import Command, Event, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import (
     CommandOut,
     CommissioningCloseBody,
     CommissioningOpenBody,
+    GatewayStatusOut,
 )
 
 router = APIRouter(prefix="/api/gateways", tags=["gateways"])
@@ -62,6 +64,46 @@ def _insert_gateway_command(
     )
     db.add(cmd)
     return cmd
+
+
+@router.get("/{gateway_id}/status", response_model=GatewayStatusOut)
+async def get_gateway_status(
+    gateway_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    _verify_gateway_id(gateway_id)
+
+    result = await db.execute(
+        select(Event)
+        .where(
+            Event.device_id.is_(None),
+            Event.event_type == "gateway_online",
+        )
+        .order_by(Event.occurred_at.desc())
+    )
+    events = result.scalars().all()
+    event = next(
+        (
+            candidate
+            for candidate in events
+            if candidate.payload.get("gateway_id") in {None, gateway_id}
+        ),
+        None,
+    )
+    if event is None:
+        return GatewayStatusOut(gateway_id=gateway_id, status="unknown")
+
+    reported_status = str(event.payload.get("value", "")).strip().lower()
+    resolved_status = (
+        reported_status if reported_status in {"online", "offline"} else "unknown"
+    )
+    return GatewayStatusOut(
+        gateway_id=gateway_id,
+        status=resolved_status,
+        event_type=event.event_type,
+        occurred_at=event.occurred_at,
+    )
 
 
 @router.post(

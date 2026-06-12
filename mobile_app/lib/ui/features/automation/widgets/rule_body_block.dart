@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// Monospace `WHEN ... THEN ...` block. Reads the rule like a sentence using
@@ -13,8 +14,9 @@ class RuleBodyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final triggerEvent = _eventText(rule.trigger);
-    final actionVerb = _actionVerb(rule.actions);
+    final l10n = AppLocalizations.of(context)!;
+    final triggerEvent = _eventText(rule.trigger, l10n);
+    final actionVerb = _actionVerb(rule.actions, l10n);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -27,37 +29,60 @@ class RuleBodyBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Line(
-            label: 'WHEN',
+            label: l10n.whenLabel,
             labelColor: palette.primary,
             deviceId: rule.trigger.deviceId,
             detail: triggerEvent,
           ),
           const SizedBox(height: 4),
-          _ThenLine(actions: rule.actions, verb: actionVerb),
+          _ThenLine(
+            label: l10n.thenLabel,
+            actions: rule.actions,
+            verb: actionVerb,
+          ),
         ],
       ),
     );
   }
 
-  String _actionVerb(List<AutomationAction> actions) {
+  String _actionVerb(
+    List<AutomationAction> actions,
+    AppLocalizations l10n,
+  ) {
     if (actions.isEmpty) {
       return '';
     }
     return switch (actions.first.command) {
-      AutomationActionCommand.on => 'on',
-      AutomationActionCommand.off => 'off',
-      AutomationActionCommand.toggle => 'toggle',
+      AutomationActionCommand.on => l10n.turnOnLabel,
+      AutomationActionCommand.off => l10n.turnOffLabel,
+      AutomationActionCommand.toggle => l10n.toggleLabel,
     };
   }
 
-  String _eventText(AutomationTrigger trigger) {
+  String _eventText(
+    AutomationTrigger trigger,
+    AppLocalizations l10n,
+  ) {
+    if (trigger is SensorThresholdAutomationTrigger) {
+      final metric = trigger.metric == EnvironmentMetric.temperature
+          ? l10n.temperatureLabel
+          : l10n.humidityLabel;
+      final operator = trigger.operator == ThresholdOperator.gte ? '>=' : '<=';
+      final threshold = trigger.threshold == trigger.threshold.roundToDouble()
+          ? trigger.threshold.toStringAsFixed(0)
+          : trigger.threshold.toStringAsFixed(1);
+      final unit = trigger.metric == EnvironmentMetric.temperature
+          ? l10n.degreesCelsiusUnit
+          : l10n.percentUnit;
+      return '$metric $operator $threshold$unit';
+    }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {
       return occupancy == null
-          ? 'occupancy changes'
-          : 'occupancy changes: $occupancy';
+          ? l10n.occupancyChangesLabel
+          : l10n.occupancyChangesValue(occupancy.toString());
     }
-    return 'toggles';
+    return l10n.togglesLabel;
   }
 }
 
@@ -124,8 +149,13 @@ class _Line extends StatelessWidget {
 }
 
 class _ThenLine extends StatelessWidget {
-  const _ThenLine({required this.actions, required this.verb});
+  const _ThenLine({
+    required this.label,
+    required this.actions,
+    required this.verb,
+  });
 
+  final String label;
   final List<AutomationAction> actions;
   final String verb;
 
@@ -139,7 +169,7 @@ class _ThenLine extends StatelessWidget {
         SizedBox(
           width: 46,
           child: Text(
-            'THEN',
+            label,
             style: TextStyle(
               color: palette.success,
               fontFamily: 'JetBrains Mono',

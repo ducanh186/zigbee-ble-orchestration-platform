@@ -59,6 +59,29 @@ class SwitchReportedState(BaseModel):
     battery: int | None = Field(default=None, ge=0, le=100)
 
 
+class EnvironmentReportedState(BaseModel):
+    temperature_c: float | None = Field(default=None, ge=-20, le=80)
+    humidity_percent: float | None = Field(default=None, ge=0, le=100)
+    sensor: str | None = None
+    reachable: bool
+
+    @model_validator(mode="after")
+    def require_measurement(self):
+        if self.temperature_c is None and self.humidity_percent is None:
+            raise ValueError(
+                "environment state requires temperature_c or humidity_percent"
+            )
+        return self
+
+
+class EnvironmentReportedPayload(BaseModel):
+    device_id: str
+    device_type: Literal["environment"]
+    eui64: str | None = None
+    nwk_addr: str | None = None
+    state: EnvironmentReportedState
+
+
 class LightReportedPayload(BaseModel):
     """Inner payload of a light reported MQTT message."""
 
@@ -178,6 +201,10 @@ def validate_reported_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "light":
             return LightReportedPayload(**inner).model_dump()
+        if device_type == "environment":
+            return EnvironmentReportedPayload(**inner).model_dump(
+                exclude_none=True
+            )
         # switch reported is optional but validate if state present
         if device_type == "switch" and "state" in inner:
             SwitchReportedState(**inner.get("state", {}))
@@ -308,6 +335,17 @@ class CommandOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer("expires_at", "created_at", "updated_at")
+    def _ser_ts(self, v: datetime | None) -> str | None:
+        return _fmt_ts(v)
+
+
+class GatewayStatusOut(BaseModel):
+    gateway_id: str
+    status: Literal["online", "offline", "unknown"]
+    event_type: str | None = None
+    occurred_at: datetime | None = None
+
+    @field_serializer("occurred_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
 

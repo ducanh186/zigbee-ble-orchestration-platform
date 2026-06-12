@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import 'automation_visuals.dart';
 import 'rule_body_block.dart';
@@ -28,6 +29,7 @@ class RuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final opacity = rule.enabled ? 1.0 : 0.72;
     final showMutationControls = onDelete != null || onEnabledChanged != null;
 
@@ -100,7 +102,7 @@ class RuleCard extends StatelessWidget {
                     children: [
                       if (onDelete != null)
                         IconButton(
-                          tooltip: 'Delete rule',
+                          tooltip: l10n.deleteRuleTooltip,
                           icon: const Icon(Icons.delete_outline, size: 19),
                           color: palette.error,
                           onPressed: onDelete,

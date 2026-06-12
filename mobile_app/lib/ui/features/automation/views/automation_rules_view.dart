@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
@@ -31,6 +32,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return Consumer<AutomationViewModel>(
       builder: (context, automation, _) {
@@ -39,11 +41,11 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('Automation Rules'),
+              title: Text(l10n.automationRulesTitle),
               pinned: true,
               actions: [
                 IconButton(
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refreshTooltip,
                   icon: const Icon(Icons.refresh),
                   onPressed: automation.isLoading ? null : automation.load,
                 ),
@@ -83,10 +85,9 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                       children: [
                         Expanded(
                           child: SectionTitle(
-                            title: 'Rules',
+                            title: l10n.rulesSectionTitle,
                             action: Text(
-                              '${rules.length} rule'
-                              '${rules.length == 1 ? '' : 's'}',
+                          l10n.ruleCount(rules.length),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontFamily: 'JetBrains Mono',
@@ -143,19 +144,18 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
     AutomationViewModel automation,
     AutomationRule rule,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         final palette = context.palette;
         return AlertDialog(
-          title: const Text('Delete rule?'),
-          content: Text(
-            'This removes "${rule.name}" from the home hub sync list.',
-          ),
+          title: Text(l10n.deleteRuleTitle),
+          content: Text(l10n.deleteRuleBody(rule.name)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+                child: Text(l10n.cancelLabel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -163,7 +163,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
+                child: Text(l10n.deleteLabel),
             ),
           ],
         );
@@ -209,6 +209,7 @@ class _SavedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -222,7 +223,7 @@ class _SavedBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Rule created. Waiting for home hub sync.',
+              l10n.ruleCreatedMessage,
               style: TextStyle(
                 color: palette.success,
                 fontSize: 13,

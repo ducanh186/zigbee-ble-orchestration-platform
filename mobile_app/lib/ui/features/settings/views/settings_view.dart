@@ -169,7 +169,7 @@ class _SettingsOverview extends StatelessWidget {
                     _SettingsValueRow(
                       icon: Icons.palette_outlined,
                       title: l10n.settingsTheme,
-                      value: _themeModeLabel(themeController.mode),
+                      value: _themeModeLabel(themeController.mode, l10n),
                       onTap: () {
                         _showThemePicker(context, themeController, l10n);
                       },
@@ -180,6 +180,7 @@ class _SettingsOverview extends StatelessWidget {
                       title: l10n.settingsLanguage,
                       value: _languageLabel(
                         localeController.locale.languageCode,
+                        l10n,
                       ),
                       onTap: () {
                         _showLanguagePicker(context, localeController);
@@ -487,16 +488,18 @@ class _SettingsValueRow extends StatelessWidget {
   }
 }
 
-String _themeModeLabel(AppThemeMode mode) {
+String _themeModeLabel(AppThemeMode mode, AppLocalizations l10n) {
   return switch (mode) {
-    AppThemeMode.light => 'Light',
-    AppThemeMode.dark => 'Dark',
-    AppThemeMode.grey => 'Grey',
+    AppThemeMode.light => l10n.themeLightLabel,
+    AppThemeMode.dark => l10n.themeDarkLabel,
+    AppThemeMode.grey => l10n.themeGreyLabel,
   };
 }
 
-String _languageLabel(String languageCode) {
-  return languageCode == 'vi' ? 'Tiếng Việt' : 'English';
+String _languageLabel(String languageCode, AppLocalizations l10n) {
+  return languageCode == 'vi'
+      ? l10n.languageVietnameseLabel
+      : l10n.languageEnglishLabel;
 }
 
 Future<void> _showThemePicker(
@@ -514,7 +517,7 @@ Future<void> _showThemePicker(
             ListTile(title: Text(l10n.settingsTheme)),
             ListTile(
               leading: const Icon(Icons.light_mode_outlined),
-              title: const Text('Light'),
+              title: Text(l10n.themeLightLabel),
               onTap: () {
                 themeController.setMode(AppThemeMode.light);
                 Navigator.of(context).pop();
@@ -522,7 +525,7 @@ Future<void> _showThemePicker(
             ),
             ListTile(
               leading: const Icon(Icons.dark_mode_outlined),
-              title: const Text('Dark'),
+              title: Text(l10n.themeDarkLabel),
               onTap: () {
                 themeController.setMode(AppThemeMode.dark);
                 Navigator.of(context).pop();
@@ -530,7 +533,7 @@ Future<void> _showThemePicker(
             ),
             ListTile(
               leading: const Icon(Icons.tonality_outlined),
-              title: const Text('Grey'),
+              title: Text(l10n.themeGreyLabel),
               onTap: () {
                 themeController.setMode(AppThemeMode.grey);
                 Navigator.of(context).pop();
@@ -550,13 +553,14 @@ Future<void> _showLanguagePicker(
   return showModalBottomSheet<void>(
     context: context,
     builder: (context) {
+      final l10n = AppLocalizations.of(context)!;
       return SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.language_outlined),
-              title: const Text('English'),
+              title: Text(l10n.languageEnglishLabel),
               onTap: () {
                 localeController.setLocaleCode('en');
                 Navigator.of(context).pop();
@@ -564,7 +568,7 @@ Future<void> _showLanguagePicker(
             ),
             ListTile(
               leading: const Icon(Icons.language_outlined),
-              title: const Text('Tiếng Việt'),
+              title: Text(l10n.languageVietnameseLabel),
               onTap: () {
                 localeController.setLocaleCode('vi');
                 Navigator.of(context).pop();

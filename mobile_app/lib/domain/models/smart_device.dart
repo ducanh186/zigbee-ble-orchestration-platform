@@ -25,7 +25,12 @@ class SmartDevice {
 
   bool get isLight => deviceType == 'light';
   bool get isMotion => deviceType == 'motion';
+  bool get isEnvironment => deviceType == 'environment';
   bool get isReachable => isOnline && power != DevicePower.unreachable;
+  double? get temperatureC => (state['temperature_c'] as num?)?.toDouble();
+  double? get humidityPercent =>
+      (state['humidity_percent'] as num?)?.toDouble();
+  String? get sensorKind => state['sensor']?.toString();
   String get roomLabel =>
       roomId == null || roomId!.isEmpty ? 'No room' : roomId!;
   OccupancyState get occupancy => OccupancyState.fromValue(
