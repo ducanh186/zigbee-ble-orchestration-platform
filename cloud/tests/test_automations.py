@@ -75,6 +75,58 @@ def _motion_on_rule() -> dict:
     }
 
 
+def _schedule_on_rule(cron: str = "0 7 * * 1-5") -> dict:
+    return {
+        "name": "Weekday 7am light",
+        "enabled": True,
+        "trigger_type": "schedule",
+        "schedule_cron": cron,
+        "trigger": {"type": "schedule"},
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_schedule_rule_persists_cron(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json=_schedule_on_rule(),
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["trigger_type"] == "schedule"
+    assert response.json()["schedule_cron"] == "0 7 * * 1-5"
+
+
+@pytest.mark.asyncio
+async def test_create_schedule_rule_rejects_bad_cron(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json=_schedule_on_rule("bad cron"),
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_create_automation_persists_pending_rule(
     client, db_session_factory, fake_mqtt
