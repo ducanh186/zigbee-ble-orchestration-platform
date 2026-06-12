@@ -105,15 +105,28 @@ void main() {
       expect(capturedBody, {
         'name': 'Motion turns on lab lights',
         'enabled': true,
+        'trigger_type': 'event',
+        'schedule_cron': null,
         'trigger': {
+          'type': 'device_event',
           'device_id': 'pir-01',
           'device_type': 'motion',
           'event': 'occupancy_changed',
           'state': {'occupancy': 'occupied'},
         },
         'actions': [
-          {'device_id': 'light-01', 'device_type': 'light', 'command': 'on'},
-          {'device_id': 'light-02', 'device_type': 'light', 'command': 'on'},
+          {
+            'type': 'device_command',
+            'device_id': 'light-01',
+            'device_type': 'light',
+            'command': 'on',
+          },
+          {
+            'type': 'device_command',
+            'device_id': 'light-02',
+            'device_type': 'light',
+            'command': 'on',
+          },
         ],
       });
       expect(rule.syncStatus, AutomationSyncStatus.pending);
@@ -164,6 +177,8 @@ void main() {
       );
 
       final trigger = capturedBody!['trigger'] as Map<String, Object?>;
+      expect(capturedBody!['trigger_type'], 'event');
+      expect(trigger['type'], 'device_event');
       expect(
         trigger['event'],
         'switch_toggle',
@@ -217,13 +232,21 @@ void main() {
     expect(capturedBody, {
       'name': 'Switch toggles lab light',
       'enabled': true,
+      'trigger_type': 'event',
+      'schedule_cron': null,
       'trigger': {
+        'type': 'device_event',
         'device_id': 'switch-01',
         'device_type': 'switch',
         'event': 'switch_toggle',
       },
       'actions': [
-        {'device_id': 'light-01', 'device_type': 'light', 'command': 'toggle'},
+        {
+          'type': 'device_command',
+          'device_id': 'light-01',
+          'device_type': 'light',
+          'command': 'toggle',
+        },
       ],
     });
   });
@@ -268,13 +291,19 @@ void main() {
     );
 
     expect(capturedBody!['trigger'], {
+      'type': 'device_event',
       'device_id': 'pir-01',
       'device_type': 'motion',
       'event': 'occupancy_changed',
       'state': {'occupancy': 'occupied'},
     });
     expect(capturedBody!['actions'], [
-      {'device_id': 'light-01', 'device_type': 'light', 'command': 'on'},
+      {
+        'type': 'device_command',
+        'device_id': 'light-01',
+        'device_type': 'light',
+        'command': 'on',
+      },
     ]);
   });
 
@@ -321,8 +350,18 @@ void main() {
     );
 
     expect(capturedBody!['actions'], [
-      {'device_id': 'light-01', 'device_type': 'light', 'command': 'on'},
-      {'device_id': 'light-02', 'device_type': 'light', 'command': 'off'},
+      {
+        'type': 'device_command',
+        'device_id': 'light-01',
+        'device_type': 'light',
+        'command': 'on',
+      },
+      {
+        'type': 'device_command',
+        'device_id': 'light-02',
+        'device_type': 'light',
+        'command': 'off',
+      },
     ]);
   });
 
@@ -366,13 +405,19 @@ void main() {
     );
 
     expect(capturedBody!['trigger'], {
+      'type': 'device_event',
       'device_id': 'pir-01',
       'device_type': 'motion',
       'event': 'occupancy_changed',
       'state': {'occupancy': 'unoccupied'},
     });
     expect(capturedBody!['actions'], [
-      {'device_id': 'light-01', 'device_type': 'light', 'command': 'off'},
+      {
+        'type': 'device_command',
+        'device_id': 'light-01',
+        'device_type': 'light',
+        'command': 'off',
+      },
     ]);
   });
 

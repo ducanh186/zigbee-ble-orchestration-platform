@@ -20,6 +20,7 @@ class AutomationVisuals {
       AutomationDeviceType.light => Icons.lightbulb_outline,
       AutomationDeviceType.motion => Icons.sensors,
       AutomationDeviceType.switchDevice => Icons.toggle_off,
+      AutomationDeviceType.environment => Icons.thermostat,
     };
   }
 

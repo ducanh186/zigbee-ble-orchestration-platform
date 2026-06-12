@@ -21,6 +21,7 @@ class AutomationRuleApiModel {
       enabled: json['enabled'] as bool? ?? true,
       trigger: AutomationTriggerApiModel.fromJson(
         Map<String, Object?>.from(json['trigger'] as Map? ?? const {}),
+        scheduleCron: json['schedule_cron'] as String?,
       ),
       actions: (json['actions'] as List? ?? const [])
           .whereType<Map>()
@@ -66,100 +67,75 @@ class AutomationRuleApiModel {
 }
 
 class AutomationTriggerApiModel {
-  const AutomationTriggerApiModel({
-    required this.deviceId,
-    required this.deviceType,
-    required this.event,
-    this.state = const {},
-  });
+  const AutomationTriggerApiModel({required this.value});
 
-  factory AutomationTriggerApiModel.fromJson(Map<String, Object?> json) {
-    return AutomationTriggerApiModel(
-      deviceId: json['device_id'] as String? ?? '',
-      deviceType: AutomationDeviceType.fromJson(json['device_type']),
-      event: AutomationTriggerEvent.fromJson(json['event']),
-      state: Map<String, Object?>.from(json['state'] as Map? ?? const {}),
-    );
+  factory AutomationTriggerApiModel.fromJson(
+    Map<String, Object?> json, {
+    String? scheduleCron,
+  }) {
+    final type = json['type'] as String? ?? 'device_event';
+    final trigger = switch (type) {
+      'schedule' => ScheduleAutomationTrigger(cron: scheduleCron ?? ''),
+      'sensor_threshold' => SensorThresholdAutomationTrigger(
+        deviceId: json['device_id'] as String? ?? '',
+        metric: json['metric'] == 'humidity_percent'
+            ? EnvironmentMetric.humidity
+            : EnvironmentMetric.temperature,
+        operator: json['operator'] == 'lte'
+            ? ThresholdOperator.lte
+            : ThresholdOperator.gte,
+        threshold: (json['threshold'] as num?)?.toDouble() ?? 0,
+      ),
+      _ => EventAutomationTrigger(
+        deviceId: json['device_id'] as String? ?? '',
+        deviceType: AutomationDeviceType.fromJson(json['device_type']),
+        event: AutomationTriggerEvent.fromJson(json['event']),
+        state: Map<String, Object?>.from(json['state'] as Map? ?? const {}),
+      ),
+    };
+    return AutomationTriggerApiModel(value: trigger);
   }
 
   factory AutomationTriggerApiModel.fromDomain(AutomationTrigger trigger) {
-    return AutomationTriggerApiModel(
-      deviceId: trigger.deviceId,
-      deviceType: trigger.deviceType,
-      event: trigger.event,
-      state: trigger.state,
-    );
+    return AutomationTriggerApiModel(value: trigger);
   }
 
-  final String deviceId;
-  final AutomationDeviceType deviceType;
-  final AutomationTriggerEvent event;
-  final Map<String, Object?> state;
+  final AutomationTrigger value;
 
-  AutomationTrigger toDomain() {
-    return AutomationTrigger(
-      deviceId: deviceId,
-      deviceType: deviceType,
-      event: event,
-      state: state,
-    );
-  }
+  AutomationTrigger toDomain() => value;
 
-  Map<String, Object?> toJson() {
-    final json = <String, Object?>{
-      'device_id': deviceId,
-      'device_type': deviceType.wireValue,
-      'event': event.wireValue,
-    };
-    if (state.isNotEmpty) {
-      json['state'] = state;
-    }
-    return json;
-  }
+  Map<String, Object?> toJson() => value.toJson();
 }
 
 class AutomationActionApiModel {
-  const AutomationActionApiModel({
-    required this.deviceId,
-    required this.deviceType,
-    required this.command,
-  });
+  const AutomationActionApiModel({required this.value});
 
   factory AutomationActionApiModel.fromJson(Map<String, Object?> json) {
+    final type = json['type'] as String? ?? 'device_command';
+    final action = switch (type) {
+      'scene_activate' => SceneActivateAutomationAction(
+        groupId: json['group_id'] as String? ?? '',
+        sceneId: json['scene_id'] as String? ?? '',
+      ),
+      _ => DeviceCommandAutomationAction(
+        deviceId: json['device_id'] as String? ?? '',
+        command: AutomationActionCommand.fromJson(json['command']),
+      ),
+    };
     return AutomationActionApiModel(
-      deviceId: json['device_id'] as String? ?? '',
-      deviceType: AutomationDeviceType.fromJson(json['device_type']),
-      command: AutomationActionCommand.fromJson(json['command']),
+      value: action,
     );
   }
 
   factory AutomationActionApiModel.fromDomain(AutomationAction action) {
-    return AutomationActionApiModel(
-      deviceId: action.deviceId,
-      deviceType: action.deviceType,
-      command: action.command,
-    );
+    return AutomationActionApiModel(value: action);
   }
 
-  final String deviceId;
-  final AutomationDeviceType deviceType;
-  final AutomationActionCommand command;
+  final AutomationAction value;
 
-  AutomationAction toDomain() {
-    return AutomationAction(
-      deviceId: deviceId,
-      deviceType: deviceType,
-      command: command,
-    );
-  }
+  AutomationAction toDomain() => value;
 
-  Map<String, Object?> toJson() {
-    return {
-      'device_id': deviceId,
-      'device_type': deviceType.wireValue,
-      'command': command.wireValue,
-    };
-  }
+  Map<String, Object?> toJson() => value.toJson();
 }
 
 class AutomationRuleDraftApiModel {
@@ -171,6 +147,8 @@ class AutomationRuleDraftApiModel {
     return {
       'name': draft.name,
       'enabled': draft.enabled,
+      'trigger_type': draft.trigger.triggerType.wireValue,
+      'schedule_cron': draft.scheduleCron,
       'trigger': AutomationTriggerApiModel.fromDomain(draft.trigger).toJson(),
       'actions': draft.actions
           .map((action) => AutomationActionApiModel.fromDomain(action).toJson())
