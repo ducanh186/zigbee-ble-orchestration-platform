@@ -595,6 +595,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No event log yet.'**
   String get logsNoEvents;
+
+  /// No description provided for @environmentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment'**
+  String get environmentTitle;
+
+  /// No description provided for @temperatureLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Temperature'**
+  String get temperatureLabel;
+
+  /// No description provided for @humidityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Humidity'**
+  String get humidityLabel;
+
+  /// No description provided for @zigbeeLocalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Zigbee local'**
+  String get zigbeeLocalLabel;
+
+  /// No description provided for @sensorConditionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Condition'**
+  String get sensorConditionLabel;
+
+  /// No description provided for @metricLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get metricLabel;
+
+  /// No description provided for @operatorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator'**
+  String get operatorLabel;
+
+  /// No description provided for @thresholdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold'**
+  String get thresholdLabel;
+
+  /// No description provided for @greaterThanOrEqualLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Greater than or equal'**
+  String get greaterThanOrEqualLabel;
+
+  /// No description provided for @lessThanOrEqualLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Less than or equal'**
+  String get lessThanOrEqualLabel;
+
+  /// No description provided for @degreesCelsiusUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'°C'**
+  String get degreesCelsiusUnit;
+
+  /// No description provided for @percentUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'%'**
+  String get percentUnit;
+
+  /// No description provided for @scheduleOnTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule on'**
+  String get scheduleOnTemplate;
+
+  /// No description provided for @scheduleOffTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule off'**
+  String get scheduleOffTemplate;
+
+  /// No description provided for @scheduleTriggerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get scheduleTriggerLabel;
+
+  /// No description provided for @cronPresetWeekdaySeven.
+  ///
+  /// In en, this message translates to:
+  /// **'Every weekday 07:00'**
+  String get cronPresetWeekdaySeven;
+
+  /// No description provided for @cronPresetSundayTwentyTwo.
+  ///
+  /// In en, this message translates to:
+  /// **'Every Sunday 22:00'**
+  String get cronPresetSundayTwentyTwo;
+
+  /// No description provided for @cronPresetEverySixHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 6 hours'**
+  String get cronPresetEverySixHours;
+
+  /// No description provided for @rawCronLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom cron'**
+  String get rawCronLabel;
+
+  /// No description provided for @targetTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Target type'**
+  String get targetTypeLabel;
+
+  /// No description provided for @directLightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct light'**
+  String get directLightLabel;
+
+  /// No description provided for @sceneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scene'**
+  String get sceneLabel;
+
+  /// No description provided for @noScenesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No scenes available'**
+  String get noScenesAvailable;
+
+  /// No description provided for @sceneUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Scenes are unavailable. Select a direct light.'**
+  String get sceneUnavailableMessage;
+
+  /// No description provided for @invalidCronMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid five-field cron expression'**
+  String get invalidCronMessage;
 }
 
 class _AppLocalizationsDelegate
