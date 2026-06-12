@@ -7,14 +7,14 @@ class MockAutomationRepository implements AutomationRepository {
       id: 'automation-mock-01',
       name: 'Motion turns on lab lights',
       enabled: true,
-      trigger: const AutomationTrigger(
+      trigger: const EventAutomationTrigger(
         deviceId: 'pir-01',
         deviceType: AutomationDeviceType.motion,
         event: AutomationTriggerEvent.occupancyChanged,
         state: {'occupancy': 'occupied'},
       ),
       actions: const [
-        AutomationAction(
+        DeviceCommandAutomationAction(
           deviceId: 'light-01',
           deviceType: AutomationDeviceType.light,
           command: AutomationActionCommand.on,
