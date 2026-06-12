@@ -8,6 +8,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     func,
 )
 from sqlalchemy import JSON as _JSON
@@ -177,6 +178,13 @@ class Automation(Base):
     site_id = Column(String, nullable=False)
     gateway_id = Column(String, nullable=False)
     version = Column(Integer, nullable=False, default=1, server_default="1")
+    trigger_type = Column(
+        String,
+        nullable=False,
+        default="event",
+        server_default="event",
+    )
+    schedule_cron = Column(Text, nullable=True)
     trigger = Column("trigger", JSON, nullable=False, quote=True)
     actions = Column(JSON, nullable=False)
     # Monotonic version bumped on every cloud-side mutation. Gateway uses this
