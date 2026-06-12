@@ -299,12 +299,11 @@ class ApiException implements Exception {
   String toString() => 'API $statusCode (${kind.name}): $message';
 }
 
-/// Maps any thrown object to a user-friendly Vietnamese (ASCII-folded) string
-/// suitable for surfacing in the mobile UI. View models call this in their
-/// `catch` blocks instead of interpolating raw exception text.
+/// Maps any thrown object to a stable English message. The presentation layer
+/// localizes this message for the active app locale.
 ///
 /// The optional [context] is prepended so callers can tailor the leading
-/// phrase per feature (e.g. "Khong tai duoc automation rules").
+/// phrase per feature (e.g. "Could not load automation rules").
 String friendlyErrorMessage(Object error, {String? context}) {
   final base = _baseFriendlyMessage(error);
   if (context == null || context.isEmpty) {
@@ -317,18 +316,18 @@ String _baseFriendlyMessage(Object error) {
   if (error is ApiException) {
     switch (error.kind) {
       case ApiErrorKind.timeout:
-        return 'Mang phan hoi qua lau. Vui long thu lai.';
+        return 'The network response took too long. Try again.';
       case ApiErrorKind.offline:
-        return 'Khong co ket noi mang. Kiem tra Wi-Fi hoac du lieu di dong.';
+        return 'No network connection. Check Wi-Fi or mobile data.';
       case ApiErrorKind.validation:
-        return 'Du lieu khong hop le. Kiem tra lai cac truong nhap.';
+        return 'The data is invalid. Check the input fields.';
       case ApiErrorKind.unauthorized:
-        return 'Phien dang nhap khong hop le. Vui long dang nhap lai.';
+        return 'Your session is invalid. Sign in again.';
       case ApiErrorKind.server:
-        return 'May chu dang gap su co. Vui long thu lai sau.';
+        return 'The server has a problem. Try again later.';
       case ApiErrorKind.unknown:
-        return 'Da xay ra loi khong xac dinh. Vui long thu lai.';
+        return 'An unknown error occurred. Try again.';
     }
   }
-  return 'Da xay ra loi khong xac dinh. Vui long thu lai.';
+  return 'An unknown error occurred. Try again.';
 }

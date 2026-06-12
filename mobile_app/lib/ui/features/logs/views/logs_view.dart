@@ -35,13 +35,13 @@ class _LogsViewState extends State<LogsView> {
               leading: widget.onBack == null
                   ? null
                   : IconButton(
-                      tooltip: 'Back',
+                      tooltip: l10n.backLabel,
                       onPressed: widget.onBack,
                       icon: const Icon(Icons.arrow_back),
                     ),
               actions: [
                 IconButton(
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refreshTooltip,
                   onPressed: viewModel.load,
                   icon: const Icon(Icons.refresh),
                 ),

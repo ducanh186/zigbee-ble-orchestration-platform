@@ -53,6 +53,13 @@ async def _seed_automation_devices(db_session_factory) -> None:
                     name="Motion Sensor",
                     is_online=True,
                 ),
+                Device(
+                    id="environment-01",
+                    device_type="environment",
+                    room_id="room-1",
+                    name="DHT11 Sensor",
+                    is_online=True,
+                ),
             ]
         )
         await session.commit()
@@ -82,6 +89,29 @@ def _schedule_on_rule(cron: str = "0 7 * * 1-5") -> dict:
         "trigger_type": "schedule",
         "schedule_cron": cron,
         "trigger": {"type": "schedule"},
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+    }
+
+
+def _high_temperature_rule() -> dict:
+    return {
+        "name": "High temperature turns on lab light",
+        "enabled": True,
+        "trigger": {
+            "type": "sensor_threshold",
+            "device_id": "environment-01",
+            "device_type": "environment",
+            "metric": "temperature_c",
+            "operator": "gte",
+            "threshold": 30,
+        },
         "actions": [
             {
                 "type": "device_command",
@@ -125,6 +155,49 @@ async def test_create_schedule_rule_rejects_bad_cron(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_schedule_rule_accepts_scene_action(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _parent_headers(client, db_session_factory)
+    rule = _schedule_on_rule()
+    rule["actions"] = [
+        {
+            "type": "scene_activate",
+            "group_id": "group-lab",
+            "scene_id": "scene-all-off",
+        }
+    ]
+
+    response = await client.post(
+        "/api/automations",
+        json=rule,
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["actions"] == rule["actions"]
+
+
+@pytest.mark.asyncio
+async def test_create_sensor_threshold_automation(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json=_high_temperature_rule(),
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["trigger"] == _high_temperature_rule()["trigger"]
+    assert created["actions"] == _high_temperature_rule()["actions"]
 
 
 @pytest.mark.asyncio

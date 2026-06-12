@@ -121,7 +121,7 @@ void main() {
     expect(viewModel.isAuthenticated, isFalse);
     expect(find.byKey(const Key('login-submit')), findsOneWidget);
     // The banner shows the friendly Vietnamese message, not raw HTTP text.
-    expect(find.textContaining('Dang nhap that bai'), findsOneWidget);
+    expect(find.textContaining('Login failed'), findsOneWidget);
     expect(find.textContaining('invalid credentials'), findsNothing);
     expect(find.textContaining('API 401'), findsNothing);
   });

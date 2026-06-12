@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from cloud.app.schemas import (
     AutomationCreate,
+    EnvironmentReportedState,
     LightCommandTarget,
     LightReportedPayload,
     LightReportedState,
@@ -83,6 +84,24 @@ class TestAutomationContracts:
             "group_id": "group-lab",
             "scene_id": "scene-all-on",
         }
+
+
+class TestEnvironmentReportedState:
+    def test_accepts_partial_temperature_report(self):
+        state = EnvironmentReportedState(
+            temperature_c=28.5,
+            sensor="dht11",
+            reachable=True,
+        )
+        assert state.temperature_c == 28.5
+        assert state.humidity_percent is None
+
+    def test_rejects_out_of_range_humidity(self):
+        with pytest.raises(ValidationError):
+            EnvironmentReportedState(
+                humidity_percent=101,
+                reachable=True,
+            )
 
 
 # ---- LightReportedState ----

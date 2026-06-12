@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../view_models/auth_view_model.dart';
 
@@ -36,6 +38,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final viewModel = context.watch<AuthViewModel>();
 
     return Scaffold(
@@ -52,7 +55,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Change password',
+                      l10n.changePasswordTitle,
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontSize: 24,
@@ -63,22 +66,23 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
                     TextFormField(
                       controller: _oldPasswordController,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Current password',
+                      decoration: InputDecoration(
+                        labelText: l10n.currentPasswordLabel,
                       ),
-                      validator: (value) =>
-                          value == null || value.isEmpty ? 'Required' : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? l10n.requiredMessage
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _newPasswordController,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'New password',
+                      decoration: InputDecoration(
+                        labelText: l10n.newPasswordLabel,
                       ),
                       validator: (value) {
                         if (value == null || value.length < 8) {
-                          return 'Use at least 8 characters';
+                          return l10n.passwordMinimumMessage;
                         }
                         return null;
                       },
@@ -86,7 +90,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
                     if (viewModel.errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(
-                        viewModel.errorMessage!,
+                        localizedErrorMessage(l10n, viewModel.errorMessage!),
                         style: TextStyle(color: palette.error),
                       ),
                     ],
@@ -101,7 +105,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Update password'),
+                          : Text(l10n.updatePasswordAction),
                     ),
                   ],
                 ),

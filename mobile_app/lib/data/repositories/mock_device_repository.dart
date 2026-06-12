@@ -56,6 +56,21 @@ class MockDeviceRepository implements DeviceRepository {
       power: DevicePower.unknown,
       reportedAt: '07:15 05/07/2026',
     ),
+    const SmartDevice(
+      id: 'environment-01',
+      deviceType: 'environment',
+      name: 'DHT11 Sensor',
+      roomId: 'lab01',
+      isOnline: true,
+      power: DevicePower.unknown,
+      reportedAt: '07:16 05/07/2026',
+      state: {
+        'temperature_c': 28.5,
+        'humidity_percent': 48,
+        'sensor': 'dht11',
+        'reachable': true,
+      },
+    ),
   ];
 
   final List<EventLog> _events = [

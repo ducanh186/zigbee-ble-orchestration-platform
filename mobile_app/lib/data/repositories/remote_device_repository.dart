@@ -11,79 +11,56 @@ import '../models/event_api_model.dart';
 import '../services/api_client.dart';
 
 class RemoteDeviceRepository implements DeviceRepository {
-  RemoteDeviceRepository({required ApiClient apiClient})
-    : _apiClient = apiClient;
+  RemoteDeviceRepository({
+    required ApiClient apiClient,
+    this.gatewayId = 'gw-ubuntu-01',
+  }) : _apiClient = apiClient;
 
   final ApiClient _apiClient;
+  final String gatewayId;
 
   @override
   Future<CloudStatus> fetchCloudStatus() async {
     try {
-      final json = await _apiClient.getJson('/api/events/?limit=50');
-      final events = (json as List).whereType<Map>();
-      for (final rawEvent in events) {
-        final status = _gatewayStatusFromEvent(
-          Map<String, Object?>.from(rawEvent),
-        );
-        if (status != null) {
-          return status;
-        }
-      }
-      return const CloudStatus.unknown(
-        detail: 'No home hub status log found in cloud events',
+      final json = await _apiClient.getJson(
+        '/api/gateways/$gatewayId/status',
+      );
+      return _gatewayStatusFromJson(
+        Map<String, Object?>.from(json as Map),
       );
     } catch (error) {
       return CloudStatus.unknown(
-        detail: 'Cannot read cloud event logs: $error',
+        detail: 'Cannot read home hub status: $error',
       );
     }
   }
 
-  CloudStatus? _gatewayStatusFromEvent(Map<String, Object?> event) {
-    final eventType = event['event_type']?.toString() ?? '';
-    final payloadRaw = event['payload'];
-    final payload = payloadRaw is Map
-        ? Map<String, Object?>.from(payloadRaw)
-        : const <String, Object?>{};
-    final payloadEvent = payload['event']?.toString() ?? '';
-    final source = payload['source']?.toString();
-    final hasGatewayMarker =
-        eventType.startsWith('gateway_') ||
-        payloadEvent.startsWith('gateway_') ||
-        payload.containsKey('gateway_id') ||
-        source == 'gateway' && event['device_id'] == null;
-
-    if (!hasGatewayMarker) {
-      return null;
-    }
-
-    final value = (payload['value'] ?? payload['status'] ?? payload['state'])
-        ?.toString()
-        .toLowerCase();
-    final gatewayId = payload['gateway_id']?.toString();
-    final occurredAt = event['occurred_at']?.toString();
-    final resolvedEventType = eventType.isEmpty ? payloadEvent : eventType;
+  CloudStatus _gatewayStatusFromJson(Map<String, Object?> json) {
+    final value = json['status']?.toString().toLowerCase();
+    final resolvedGatewayId = json['gateway_id']?.toString();
+    final eventType = json['event_type']?.toString();
+    final occurredAt = json['occurred_at']?.toString();
 
     if (value == 'online') {
       return CloudStatus.online(
-        gatewayId: gatewayId,
-        eventType: resolvedEventType,
+        gatewayId: resolvedGatewayId,
+        eventType: eventType,
         occurredAt: occurredAt,
       );
     }
     if (value == 'offline') {
       return CloudStatus.offline(
         detail: 'Home hub reported offline',
-        gatewayId: gatewayId,
-        eventType: resolvedEventType,
+        gatewayId: resolvedGatewayId,
+        eventType: eventType,
         occurredAt: occurredAt,
       );
     }
 
     return CloudStatus.unknown(
-      detail: value ?? 'Home hub log has no status value',
-      gatewayId: gatewayId,
-      eventType: resolvedEventType,
+      detail: 'No home hub status log found in cloud',
+      gatewayId: resolvedGatewayId,
+      eventType: eventType,
       occurredAt: occurredAt,
     );
   }

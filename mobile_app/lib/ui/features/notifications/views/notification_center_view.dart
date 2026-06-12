@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/event_log.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -30,6 +31,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final unreadCount = widget.events
         .where((event) => !widget.readEventIds.contains(event.id))
         .length;
@@ -40,17 +42,17 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
-          title: const Text('Notification Center'),
+          title: Text(l10n.notificationCenterTitle),
           pinned: true,
           leading: IconButton(
-            tooltip: 'Back',
+            tooltip: l10n.backLabel,
             onPressed: widget.onBack,
             icon: const Icon(Icons.arrow_back),
           ),
           actions: [
             TextButton(
               onPressed: widget.events.isEmpty ? null : widget.onMarkAllRead,
-              child: const Text('Mark all read'),
+              child: Text(l10n.markAllReadLabel),
             ),
           ],
         ),
@@ -63,7 +65,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                 child: Row(
                   children: [
                     StatusBadge(
-                      label: 'Unread $unreadCount',
+                      label: l10n.unreadCount(unreadCount),
                       tone: unreadCount == 0
                           ? BadgeTone.neutral
                           : BadgeTone.primary,
@@ -71,7 +73,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Important cloud and home hub events',
+                        l10n.importantEventsLabel,
                         style: TextStyle(color: context.palette.textSecondary),
                       ),
                     ),
@@ -85,7 +87,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
                 children: [
                   for (final category in _NotificationCategory.values)
                     ChoiceChip(
-                      label: Text(category.label),
+                      label: Text(category.localizedLabel(l10n)),
                       selected: _selectedCategory == category,
                       onSelected: (_) {
                         setState(() => _selectedCategory = category);
@@ -95,7 +97,7 @@ class _NotificationCenterViewState extends State<NotificationCenterView> {
               ),
               const SizedBox(height: 12),
               if (visibleEvents.isEmpty)
-                const AppCard(child: Text('No notifications in this category.'))
+                AppCard(child: Text(l10n.noNotificationsMessage))
               else
                 AppCard(
                   padding: EdgeInsets.zero,
@@ -138,6 +140,7 @@ class _NotificationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final category = _NotificationCategory.fromEvent(event);
 
     return Container(
@@ -168,7 +171,7 @@ class _NotificationRow extends StatelessWidget {
                       ),
                     ),
                     StatusBadge(
-                      label: category.label,
+                      label: category.localizedLabel(l10n),
                       tone: read ? BadgeTone.neutral : BadgeTone.primary,
                       showDot: !read,
                     ),
@@ -196,7 +199,7 @@ class _NotificationRow extends StatelessWidget {
           const SizedBox(width: 8),
           TextButton(
             onPressed: read ? null : onMarkRead,
-            child: const Text('Mark read'),
+            child: Text(l10n.markReadLabel),
           ),
         ],
       ),
@@ -216,6 +219,17 @@ enum _NotificationCategory {
 
   final String label;
   final IconData icon;
+
+  String localizedLabel(AppLocalizations l10n) {
+    return switch (this) {
+      _NotificationCategory.all => l10n.notificationCategoryAll,
+      _NotificationCategory.command => l10n.notificationCategoryCommand,
+      _NotificationCategory.automation => l10n.notificationCategoryAutomation,
+      _NotificationCategory.gateway => l10n.notificationCategoryGateway,
+      _NotificationCategory.ota => l10n.notificationCategoryOta,
+      _NotificationCategory.other => l10n.notificationCategoryOther,
+    };
+  }
 
   static _NotificationCategory fromEvent(EventLog event) {
     final text = '${event.eventType} ${event.message} ${event.commandId ?? ''}'

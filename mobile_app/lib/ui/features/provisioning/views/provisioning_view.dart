@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../../domain/models/provisioning_session.dart';
 import '../../../../domain/repositories/provisioning_repository.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
@@ -63,29 +64,33 @@ class _ProvisioningViewState extends State<ProvisioningView> {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        AppLocalizations.of(context)?.provisioningTab ?? 'Provisioning';
+    final l10n = AppLocalizations.of(context)!;
     final payload = _payload;
     final session = _session;
 
     return CustomScrollView(
       slivers: [
-        SliverAppBar(title: Text(title), pinned: true),
+        SliverAppBar(title: Text(l10n.provisioningTab), pinned: true),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           sliver: SliverList.list(
             children: [
-              const SectionTitle(title: 'Provisioning wizard'),
+              SectionTitle(title: l10n.provisioningWizardTitle),
               const SizedBox(height: 8),
-              _SessionStatusCard(session: session, error: _error),
+              _SessionStatusCard(
+                session: session,
+                error: _error == null
+                    ? null
+                    : localizedErrorMessage(l10n, _error!),
+              ),
               const SizedBox(height: 12),
               AppCard(
                 child: TextField(
                   key: const Key('provisioning-room-field'),
                   controller: _roomController,
-                  decoration: const InputDecoration(
-                    labelText: 'Room ID',
-                    prefixIcon: Icon(Icons.meeting_room_outlined),
+                  decoration: InputDecoration(
+                    labelText: l10n.roomIdLabel,
+                    prefixIcon: const Icon(Icons.meeting_room_outlined),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -102,7 +107,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                             key: const Key('provisioning-scan-button'),
                             onPressed: _scanQr,
                             icon: const Icon(Icons.qr_code_scanner),
-                            label: const Text('Scan QR'),
+                            label: Text(l10n.scanQrLabel),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -111,7 +116,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                             key: const Key('provisioning-apply-manual-button'),
                             onPressed: _applyManualQr,
                             icon: const Icon(Icons.input),
-                            label: const Text('Use manual'),
+                            label: Text(l10n.useManualLabel),
                           ),
                         ),
                       ],
@@ -122,9 +127,9 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                       controller: _manualQrController,
                       minLines: 2,
                       maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'QR JSON',
-                        prefixIcon: Icon(Icons.data_object),
+                      decoration: InputDecoration(
+                        labelText: l10n.qrJsonLabel,
+                        prefixIcon: const Icon(Icons.data_object),
                       ),
                     ),
                     if (payload != null) ...[
@@ -135,7 +140,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                           key: const Key('provisioning-clear-payload-button'),
                           onPressed: _clearPayload,
                           icon: const Icon(Icons.clear),
-                          label: const Text('Clear'),
+                          label: Text(l10n.clearLabel),
                         ),
                       ),
                     ],
@@ -158,7 +163,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.play_arrow),
-                    label: const Text('Start provisioning'),
+                    label: Text(l10n.startProvisioningLabel),
                   ),
                   if (session != null && !session.isTerminal) ...[
                     const SizedBox(height: 8),
@@ -166,7 +171,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                       key: const Key('provisioning-cancel-button'),
                       onPressed: _cancelProvisioning,
                       icon: const Icon(Icons.close),
-                      label: const Text('Cancel'),
+                      label: Text(l10n.cancelLabel),
                     ),
                   ],
                 ],
@@ -261,11 +266,11 @@ class _ProvisioningViewState extends State<ProvisioningView> {
         _session = null;
         _error = null;
       });
-    } on FormatException catch (error) {
+    } on FormatException {
       setState(() {
         _payload = null;
         _session = null;
-        _error = error.message;
+        _error = validationErrorMessage;
       });
     } catch (error) {
       setState(() {
@@ -328,8 +333,9 @@ class _ProvisioningQrScannerPageState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan provisioning QR')),
+      appBar: AppBar(title: Text(l10n.scanProvisioningQrTitle)),
       body: Stack(
         children: [
           MobileScanner(controller: _controller, onDetect: _handleDetect),
@@ -373,6 +379,7 @@ class _SessionStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final status = session?.status;
 
     return AppCard(
@@ -394,7 +401,7 @@ class _SessionStatusCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _statusCopy(status, session?.reason),
+                  _statusCopy(status, session?.reason, l10n),
                   style: TextStyle(color: palette.textSecondary),
                 ),
                 if (error != null) ...[
@@ -435,16 +442,20 @@ class _SessionStatusCard extends StatelessWidget {
     };
   }
 
-  String _statusCopy(ProvisioningStatus? status, String? reason) {
+  String _statusCopy(
+    ProvisioningStatus? status,
+    String? reason,
+    AppLocalizations l10n,
+  ) {
     return switch (status) {
-      ProvisioningStatus.pending => 'Session created in Cloud.',
-      ProvisioningStatus.permitOpen => 'Device join window is accepting this device.',
-      ProvisioningStatus.joining => 'Device is joining the Zigbee network.',
-      ProvisioningStatus.joined => 'Device joined and is ready for room use.',
-      ProvisioningStatus.failed => reason ?? 'Provisioning failed.',
-      ProvisioningStatus.expired => 'Provisioning session expired.',
-      ProvisioningStatus.cancelled => 'Provisioning session cancelled.',
-      null => 'Enter room and device identity.',
+      ProvisioningStatus.pending => l10n.provisioningSessionCreated,
+      ProvisioningStatus.permitOpen => l10n.provisioningPermitOpen,
+      ProvisioningStatus.joining => l10n.provisioningJoining,
+      ProvisioningStatus.joined => l10n.provisioningJoined,
+      ProvisioningStatus.failed => reason ?? l10n.provisioningFailed,
+      ProvisioningStatus.expired => l10n.provisioningExpired,
+      ProvisioningStatus.cancelled => l10n.provisioningCancelled,
+      null => l10n.provisioningReady,
     };
   }
 }
@@ -457,6 +468,7 @@ class _DeviceIdentityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return AppCard(
       child: payload == null
@@ -464,10 +476,10 @@ class _DeviceIdentityCard extends StatelessWidget {
               children: [
                 Icon(Icons.qr_code_scanner, color: palette.textSecondary),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Device identity required',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    l10n.deviceIdentityRequired,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -475,18 +487,18 @@ class _DeviceIdentityCard extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Device identity',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                Text(
+                  l10n.deviceIdentityTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
                 _IdentityRow(label: 'EUI64', value: payload!.eui64),
                 _IdentityRow(
-                  label: 'Type',
+                  label: l10n.deviceTypeLabel,
                   value: payload!.deviceType.wireValue,
                 ),
                 if (payload!.model != null)
-                  _IdentityRow(label: 'Model', value: payload!.model!),
+                  _IdentityRow(label: l10n.modelLabel, value: payload!.model!),
               ],
             ),
     );

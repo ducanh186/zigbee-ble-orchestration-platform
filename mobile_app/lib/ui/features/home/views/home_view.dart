@@ -10,6 +10,7 @@ import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
+import '../widgets/environment_metric_card.dart';
 import '../widgets/gateway_status_card.dart';
 
 class HomeView extends StatelessWidget {
@@ -28,6 +29,14 @@ class HomeView extends StatelessWidget {
 
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
+        SmartDevice? environmentSensor;
+        for (final device in viewModel.devices) {
+          if (device.isEnvironment) {
+            environmentSensor = device;
+            break;
+          }
+        }
+
         return CustomScrollView(
           slivers: [
             SliverAppBar(
@@ -35,7 +44,7 @@ class HomeView extends StatelessWidget {
               pinned: true,
               actions: [
                 IconButton(
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refreshTooltip,
                   onPressed: viewModel.load,
                   icon: const Icon(Icons.refresh),
                 ),
@@ -58,8 +67,43 @@ class HomeView extends StatelessWidget {
                     viewModel: viewModel,
                     onOpenDevices: onOpenDevices,
                   ),
+                  if (environmentSensor != null) ...[
+                    const SizedBox(height: 18),
+                    SectionTitle(title: l10n.environmentTitle),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: EnvironmentMetricCard(
+                            icon: Icons.thermostat_outlined,
+                            value: environmentSensor.temperatureC,
+                            unit: '°C',
+                            label: l10n.temperatureLabel,
+                            sensorLabel:
+                                environmentSensor.sensorKind?.toUpperCase() ??
+                                environmentSensor.name,
+                            sourceLabel: l10n.zigbeeLocalLabel,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: EnvironmentMetricCard(
+                            icon: Icons.water_drop_outlined,
+                            value: environmentSensor.humidityPercent,
+                            unit: '%',
+                            label: l10n.humidityLabel,
+                            sensorLabel:
+                                environmentSensor.sensorKind?.toUpperCase() ??
+                                environmentSensor.name,
+                            sourceLabel: l10n.zigbeeLocalLabel,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 18),
-                  const SectionTitle(title: 'Quick lights'),
+                  SectionTitle(title: l10n.quickLightsTitle),
                   const SizedBox(height: 8),
                   _QuickLightGrid(
                     lights: viewModel.lights.take(4).toList(),
@@ -88,11 +132,12 @@ class _MetricRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(
           child: _MetricTile(
-            label: 'Devices',
+            label: l10n.devicesMetricLabel,
             value: viewModel.devices.length,
             onTap: onOpenDevices,
           ),
@@ -100,7 +145,7 @@ class _MetricRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            label: 'Online',
+            label: l10n.onlineMetricLabel,
             value: viewModel.onlineCount,
             tone: BadgeTone.success,
           ),
@@ -108,7 +153,7 @@ class _MetricRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            label: 'Unreach',
+            label: l10n.unreachableMetricLabel,
             value: viewModel.unreachableCount,
             tone: BadgeTone.warning,
           ),
@@ -179,8 +224,9 @@ class _QuickLightGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (lights.isEmpty) {
-      return const AppCard(child: Text('No LIGHT node found.'));
+      return AppCard(child: Text(l10n.noLightNodeMessage));
     }
 
     return GridView.builder(

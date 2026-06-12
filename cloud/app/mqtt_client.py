@@ -207,8 +207,6 @@ class MQTTService:
         # network or a liveness probe fails, so online flips immediately instead
         # of waiting for the offline reaper. Absent => assume reachable (normal
         # state reports), preserving prior behaviour.
-        reachable = bool((inner.get("state") or {}).get("reachable", True))
-
         # Validate payload by device_type (Phase 3.4)
         validated = validate_reported_payload(device_type, inner)
         if validated is None:
@@ -218,6 +216,10 @@ class MQTTService:
             )
             # Still persist raw data but log the warning
             validated = inner
+        normalized_inner = validated
+        reachable = bool(
+            (normalized_inner.get("state") or {}).get("reachable", True)
+        )
 
         async def _write():
             if not self._db_session_factory:
@@ -234,8 +236,11 @@ class MQTTService:
                 if not device:
                     device = Device(
                         id=device_id,
-                        device_type=inner.get("device_type", device_type),
-                        eui64=inner.get("eui64"),
+                        device_type=normalized_inner.get(
+                            "device_type",
+                            device_type,
+                        ),
+                        eui64=normalized_inner.get("eui64"),
                         name=device_id,
                         is_online=reachable,
                         last_seen_at=last_seen,
@@ -244,12 +249,26 @@ class MQTTService:
                 else:
                     device.is_online = reachable
                     device.last_seen_at = last_seen
-                    if inner.get("eui64"):
-                        device.eui64 = inner["eui64"]
+                    if normalized_inner.get("eui64"):
+                        device.eui64 = normalized_inner["eui64"]
 
+                state = normalized_inner.get("state", normalized_inner)
+                if device_type == "environment":
+                    previous = (
+                        await session.execute(
+                            select(DeviceState)
+                            .where(DeviceState.device_id == device_id)
+                            .order_by(DeviceState.reported_at.desc())
+                            .limit(1)
+                        )
+                    ).scalar_one_or_none()
+                    state = {
+                        **(previous.state if previous is not None else {}),
+                        **state,
+                    }
                 state_row = DeviceState(
                     device_id=device_id,
-                    state=inner.get("state", inner),
+                    state=state,
                     reported_at=last_seen,
                 )
                 session.add(state_row)

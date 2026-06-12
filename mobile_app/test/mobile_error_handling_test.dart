@@ -7,6 +7,9 @@ import 'package:http/testing.dart';
 import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/auth_session.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
+import 'package:zigbee_smart_building/l10n/app_localizations_en.dart';
+import 'package:zigbee_smart_building/l10n/app_localizations_vi.dart';
+import 'package:zigbee_smart_building/l10n/localized_error_message.dart';
 import 'package:zigbee_smart_building/ui/features/auth/view_models/auth_view_model.dart';
 
 void main() {
@@ -125,10 +128,10 @@ void main() {
         kind: ApiErrorKind.unauthorized,
         message: 'API 401: {"detail":"bad token"}',
       );
-      final message = friendlyErrorMessage(raw, context: 'Dang nhap that bai');
+      final message = friendlyErrorMessage(raw, context: 'Login failed');
 
-      expect(message, contains('Dang nhap that bai'));
-      expect(message, contains('Phien dang nhap'));
+      expect(message, contains('Login failed'));
+      expect(message, contains('Your session is invalid'));
       // Raw exception payload must NOT leak into the user-facing message.
       expect(message, isNot(contains('bad token')));
       expect(message, isNot(contains('{"detail"')));
@@ -143,15 +146,40 @@ void main() {
       );
       final message = friendlyErrorMessage(raw);
 
-      expect(message, contains('Khong co ket noi mang'));
+      expect(message, contains('No network connection'));
       expect(message, isNot(contains('Failed host lookup')));
     });
 
     test('falls back to a generic message for non-ApiException errors', () {
       final message = friendlyErrorMessage(Exception('boom'));
 
-      expect(message, contains('khong xac dinh'));
+      expect(message, contains('An unknown error occurred'));
       expect(message, isNot(contains('boom')));
+    });
+
+    test('localizes stable error messages to English and Vietnamese', () {
+      const message = 'Login failed. Your session is invalid. Sign in again.';
+
+      expect(localizedErrorMessage(AppLocalizationsEn(), message), message);
+      expect(
+        localizedErrorMessage(AppLocalizationsVi(), message),
+        'Đăng nhập thất bại. Phiên đăng nhập không hợp lệ. '
+        'Vui lòng đăng nhập lại.',
+      );
+    });
+
+    test('maps raw format and unknown exceptions to localized messages', () {
+      expect(
+        localizedErrorMessage(
+          AppLocalizationsVi(),
+          'FormatException: invalid provisioning QR',
+        ),
+        'Dữ liệu không hợp lệ. Hãy kiểm tra lại các trường nhập.',
+      );
+      expect(
+        localizedErrorMessage(AppLocalizationsEn(), 'Exception: boom'),
+        'An unknown error occurred. Try again.',
+      );
     });
   });
 
@@ -167,8 +195,8 @@ void main() {
 
         expect(viewModel.isAuthenticated, isFalse);
         expect(viewModel.errorMessage, isNotNull);
-        expect(viewModel.errorMessage, contains('Dang nhap that bai'));
-        expect(viewModel.errorMessage, contains('Phien dang nhap'));
+        expect(viewModel.errorMessage, contains('Login failed'));
+        expect(viewModel.errorMessage, contains('Your session is invalid'));
         // The raw ApiException toString() format must not be surfaced.
         expect(viewModel.errorMessage, isNot(contains('API 401')));
         expect(viewModel.errorMessage, isNot(contains('invalid credentials')));

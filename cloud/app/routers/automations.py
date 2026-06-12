@@ -120,20 +120,31 @@ async def _validate_rule_template(
                 f"actions exceed MVP cap of {MAX_ACTIONS_PER_AUTOMATION} per automation"
             ),
         )
-    trigger_kind = trigger.get("type", "device_event")
-    if trigger_kind == "schedule":
-        trigger_device_type = None
-        event = None
+    trigger_type = trigger.get("type", "device_event")
+    trigger_device_type: str | None = None
+    event: str | None = None
+
+    if trigger_type == "schedule":
+        pass
     else:
         trigger_device_id = _require_string(trigger, "device_id")
         trigger_device_type = _require_string(trigger, "device_type")
-        event = _require_string(trigger, "event")
 
-        if trigger_device_type not in {"switch", "motion"}:
-            raise HTTPException(
-                status_code=422,
-                detail="Unsupported trigger device_type",
-            )
+        if trigger_type == "sensor_threshold":
+            if trigger_device_type != "environment":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Sensor threshold trigger device_type must be environment",
+                )
+        elif trigger_type == "device_event":
+            event = _require_string(trigger, "event")
+            if trigger_device_type not in {"switch", "motion"}:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Unsupported trigger device_type",
+                )
+        else:
+            raise HTTPException(status_code=422, detail="Unsupported trigger type")
 
         await _require_device(
             db,
@@ -143,6 +154,7 @@ async def _validate_rule_template(
             current_user,
         )
 
+    if trigger_type == "device_event":
         # Normalize event in-place so the caller's `trigger` dict — which is what
         # gets persisted to DB and published on MQTT — carries the canonical value.
         trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
@@ -150,6 +162,17 @@ async def _validate_rule_template(
 
     action_commands: list[str] = []
     for action in actions:
+        action_type = action.get("type", "device_command")
+        if action_type == "scene_activate":
+            if trigger_type != "schedule":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Scene actions require a schedule trigger",
+                )
+            _require_string(action, "group_id")
+            _require_string(action, "scene_id")
+            continue
+
         action_device_id = _require_string(action, "device_id")
         action_device_type = _require_string(action, "device_type")
         command = _require_string(action, "command")
@@ -160,7 +183,7 @@ async def _validate_rule_template(
         await _require_device(db, action_device_id, "light", "Action", current_user)
         action_commands.append(command)
 
-    if trigger_kind == "schedule":
+    if trigger_type in {"schedule", "sensor_threshold"}:
         return
 
     if trigger_device_type == "switch":
