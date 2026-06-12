@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from cloud.app.schemas import (
+    AutomationCreate,
     LightCommandTarget,
     LightReportedPayload,
     LightReportedState,
@@ -14,6 +15,72 @@ from cloud.app.schemas import (
     validate_event_payload,
     validate_reported_payload,
 )
+
+
+# ---- Automation contracts ----
+
+class TestAutomationContracts:
+    def test_existing_event_rule_gets_canonical_discriminators(self):
+        body = AutomationCreate(
+            name="Motion turns on light",
+            trigger={
+                "device_id": "motion-1",
+                "device_type": "motion",
+                "event": "occupancy_changed",
+                "state": {"occupancy": "occupied"},
+            },
+            actions=[
+                {
+                    "device_id": "light-1",
+                    "device_type": "light",
+                    "command": "on",
+                }
+            ],
+        )
+
+        assert body.trigger["type"] == "device_event"
+        assert body.actions[0]["type"] == "device_command"
+
+    def test_sensor_threshold_rejects_out_of_range_value(self):
+        with pytest.raises(ValidationError, match="temperature_c threshold"):
+            AutomationCreate(
+                name="Invalid temperature",
+                trigger={
+                    "type": "sensor_threshold",
+                    "device_id": "environment-1",
+                    "device_type": "environment",
+                    "metric": "temperature_c",
+                    "operator": "gte",
+                    "threshold": 100,
+                },
+                actions=[
+                    {
+                        "type": "device_command",
+                        "device_id": "light-1",
+                        "device_type": "light",
+                        "command": "on",
+                    }
+                ],
+            )
+
+    def test_scene_action_accepts_light_scene_identity(self):
+        body = AutomationCreate(
+            name="Scheduled lab scene",
+            trigger={"type": "schedule"},
+            actions=[
+                {
+                    "type": "scene_activate",
+                    "group_id": "group-lab",
+                    "scene_id": "scene-all-on",
+                }
+            ],
+        )
+
+        assert body.actions[0] == {
+            "type": "scene_activate",
+            "group_id": "group-lab",
+            "scene_id": "scene-all-on",
+        }
 
 
 # ---- LightReportedState ----
