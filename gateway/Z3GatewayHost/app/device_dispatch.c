@@ -182,6 +182,19 @@ bool deviceDispatch(const sb_command_t *cmd)
     return dispatchGatewayOp(cmd);
   }
 
+  // Device metadata op: bind a cloud room_id to a device in the registry.
+  // Gateway is RAM-only; cloud re-pushes on reconnect. No Zigbee traffic.
+  if (strcmp(cmd->op, "device.set_room") == 0) {
+    bool ok = deviceRegistrySetRoom(cmd->device_id, cmd->room_id);
+    appMqttPublishCommandReply(cmd->command_id, cmd->device_id,
+                               ok ? "executed" : "failed",
+                               ok ? NULL : "unknown_device");
+    appLogLog("DISPATCH", ok ? "set_room" : "set_room_fail",
+              "\"command_id\":\"%s\",\"device_id\":\"%s\",\"room_id\":\"%s\"",
+              cmd->command_id, cmd->device_id, cmd->room_id);
+    return ok;
+  }
+
   // v1 only supports op="device.command" over the MQTT device path
   if (strcmp(cmd->op, "device.command") != 0) {
     appMqttPublishCommandReply(cmd->command_id, cmd->device_id,
