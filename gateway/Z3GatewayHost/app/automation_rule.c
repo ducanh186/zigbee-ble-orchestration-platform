@@ -259,6 +259,60 @@ static bool parseComparator(const char *s, AutomationComparator_t *out)
   return false;
 }
 
+// Cloud contract metric names (docs/handoffs/gateway-environment-sensor-contract.md):
+// "temperature_c" / "humidity_percent". (Distinct from the telemetry-side
+// "temperature"/"humidity" strings parseMetric handles.)
+static bool parseEnvMetric(const char *s, AutomationMetric_t *out)
+{
+  if (!s) return false;
+  if (strcmp(s, "temperature_c") == 0)    { *out = AUTO_METRIC_TEMPERATURE; return true; }
+  if (strcmp(s, "humidity_percent") == 0) { *out = AUTO_METRIC_HUMIDITY;    return true; }
+  return false;
+}
+
+// Parse a JSON number in whole units (optional '-', integer part, optional
+// 1-2 decimal digits) at the key anchor and return it scaled to centi-units
+// to match the ZCL MeasuredValue scale: 30 -> 3000, 28.5 -> 2850,
+// -5.25 -> -525. Extra fractional digits beyond 2 are ignored.
+static bool findCentiIn(const char *json, const char *keyAnchor, int32_t *out)
+{
+  if (!json || !keyAnchor || !out) return false;
+  const char *p = findKey(json, keyAnchor);
+  if (!p) return false;
+  p += strlen(keyAnchor);
+  p = skipToValueStart(p);
+  if (!p) return false;
+
+  bool neg = false;
+  if (*p == '-') { neg = true; p++; }
+
+  bool any = false;
+  int32_t whole = 0;
+  while (*p && isdigit((unsigned char)*p)) {
+    any = true;
+    whole = whole * 10 + (int32_t)(*p - '0');
+    p++;
+  }
+
+  int32_t centiFrac = 0;
+  if (*p == '.') {
+    p++;
+    int digits = 0;
+    while (digits < 2 && *p && isdigit((unsigned char)*p)) {
+      centiFrac = centiFrac * 10 + (int32_t)(*p - '0');
+      p++;
+      digits++;
+    }
+    if (digits == 1) centiFrac *= 10;   // ".5" -> 50 centi
+    while (*p && isdigit((unsigned char)*p)) p++;  // ignore extra precision
+  }
+
+  if (!any) return false;
+  int32_t val = whole * 100 + centiFrac;
+  *out = neg ? -val : val;
+  return true;
+}
+
 //---------------------------------------------------------------------------
 // Topic helpers
 //---------------------------------------------------------------------------
@@ -803,14 +857,18 @@ void automationRuleHandleMqttPayload(const char *topic, const char *body)
     publishReported(automation_id, versionU, "failed", "invalid_payload");
     return;
   }
-  if (!findQuotedStringIn(trigBuf, "\"event\":",
-                          parsed.trig_event, sizeof(parsed.trig_event))) {
-    publishReported(automation_id, versionU, "failed", "invalid_payload");
-    return;
-  }
-  if (!isAllowedTriggerEvent(parsed.trig_event, parsed.trig_device_type)) {
-    publishReported(automation_id, versionU, "failed", "unsupported_trigger");
-    return;
+  // Switch/motion carry an "event" field; environment carries a "type"
+  // field instead (parsed in the environment block below).
+  if (parsed.trig_device_type != AUTO_DEV_ENVIRONMENT) {
+    if (!findQuotedStringIn(trigBuf, "\"event\":",
+                            parsed.trig_event, sizeof(parsed.trig_event))) {
+      publishReported(automation_id, versionU, "failed", "invalid_payload");
+      return;
+    }
+    if (!isAllowedTriggerEvent(parsed.trig_event, parsed.trig_device_type)) {
+      publishReported(automation_id, versionU, "failed", "unsupported_trigger");
+      return;
+    }
   }
   // Optional state.occupancy for motion
   if (parsed.trig_device_type == AUTO_DEV_MOTION) {
@@ -823,26 +881,40 @@ void automationRuleHandleMqttPayload(const char *topic, const char *body)
     }
   }
 
-  // Environment: metric + comparator + threshold (centi-unit) from trigBuf.
+  // Environment threshold trigger — cloud contract
+  // (docs/handoffs/gateway-environment-sensor-contract.md):
+  //   "type":"sensor_threshold",
+  //   "metric":"temperature_c"|"humidity_percent",
+  //   "operator":"gte"|"lte",
+  //   "threshold":<number, whole units e.g. 30 or 28.5>
+  // Stored as centi-units to match the ZCL MeasuredValue scale the runtime
+  // hook compares against. trig_event is set to "threshold_crossed"
+  // internally so the matching hook + event echo stay uniform.
   if (parsed.trig_device_type == AUTO_DEV_ENVIRONMENT) {
-    char metricStr[16] = {0};
-    char cmpStr[8] = {0};
+    char typeStr[24] = {0};
+    char metricStr[20] = {0};
+    char opStr[8] = {0};
+    if (!findQuotedStringIn(trigBuf, "\"type\":", typeStr, sizeof(typeStr))
+     || strcmp(typeStr, "sensor_threshold") != 0) {
+      publishReported(automation_id, versionU, "failed", "unsupported_trigger");
+      return;
+    }
     if (!findQuotedStringIn(trigBuf, "\"metric\":", metricStr, sizeof(metricStr))
-     || !parseMetric(metricStr, &parsed.trig_metric)) {
+     || !parseEnvMetric(metricStr, &parsed.trig_metric)) {
       publishReported(automation_id, versionU, "failed", "unsupported_trigger");
       return;
     }
-    if (!findQuotedStringIn(trigBuf, "\"comparator\":", cmpStr, sizeof(cmpStr))
-     || !parseComparator(cmpStr, &parsed.trig_comparator)) {
+    if (!findQuotedStringIn(trigBuf, "\"operator\":", opStr, sizeof(opStr))
+     || !parseComparator(opStr, &parsed.trig_comparator)) {
       publishReported(automation_id, versionU, "failed", "unsupported_trigger");
       return;
     }
-    uint32_t thr = 0;
-    if (!findUintIn(trigBuf, "\"threshold\":", &thr)) {
+    if (!findCentiIn(trigBuf, "\"threshold\":", &parsed.trig_threshold)) {
       publishReported(automation_id, versionU, "failed", "invalid_payload");
       return;
     }
-    parsed.trig_threshold = (int32_t)thr;
+    strncpy(parsed.trig_event, "threshold_crossed",
+            sizeof(parsed.trig_event) - 1);
     parsed.cond_met = false;   // first crossing should fire
   }
 

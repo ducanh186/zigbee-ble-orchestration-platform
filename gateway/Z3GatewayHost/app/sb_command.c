@@ -119,6 +119,10 @@ bool sbCommandParse(const char *topic, const char *body, sb_command_t *out)
   (void)findQuotedString(body, "\"command\":",
                          out->command, sizeof(out->command));
 
+  // target.room_id (device.set_room op)
+  (void)findQuotedString(body, "\"room_id\":",
+                         out->room_id, sizeof(out->room_id));
+
   // target.duration_sec (gateway ops, e.g. open_network)
   uint32_t dsec = 0;
   if (findUintExact(body, "\"duration_sec\":", &dsec)) {

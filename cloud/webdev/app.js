@@ -379,6 +379,8 @@ function renderDetail() {
     els.statePayload.innerHTML = buildLightStateVisual(currentState);
   } else if (device.device_type === "motion" && currentState && !currentState.error) {
     els.statePayload.innerHTML = buildMotionStateVisual(currentState);
+  } else if (device.device_type === "environment" && currentState && !currentState.error) {
+    els.statePayload.innerHTML = buildEnvironmentStateVisual(currentState);
   } else {
     els.statePayload.textContent = prettyJson(currentState || {});
   }
@@ -928,6 +930,11 @@ function buildDeviceStateHint(device, stateInfo) {
     const cls = occ ? "state-hint on" : "state-hint off";
     return `<div class="${cls}"><span class="state-icon">${icon}</span><span>${label}</span></div>`;
   }
+  if (device.device_type === "environment") {
+    const t = Number.isFinite(+s.temperature_c) ? +s.temperature_c : "--";
+    const h = Number.isFinite(+s.humidity_percent) ? +s.humidity_percent : "--";
+    return `<div class="state-hint on"><span class="state-icon">&#127777;</span><span>${t}&deg;C &middot; ${h}%</span></div>`;
+  }
   return "";
 }
 
@@ -948,6 +955,33 @@ function buildLightStateVisual(stateData) {
       ${reachable ? "Reachable" : "Unreachable"}
     </div>
   </div>
+  ${reportedAt ? `<div class="visual-reported">Last reported: ${escapeHtml(reportedAt)}</div>` : ""}
+  <details class="visual-raw"><summary>Raw JSON</summary><pre>${escapeHtml(prettyJson(stateData))}</pre></details>
+</div>`;
+}
+
+function buildEnvironmentStateVisual(stateData) {
+  const s = stateData.state || stateData;
+  const reachable = s.reachable !== false;
+  const reportedAt = stateData.reported_at || "";
+  const t = Number.isFinite(+s.temperature_c) ? +s.temperature_c : "--";
+  const h = Number.isFinite(+s.humidity_percent) ? +s.humidity_percent : "--";
+  const sensor = s.sensor ? escapeHtml(String(s.sensor)) : "environment";
+  return `<div class="visual-state">
+  <div class="visual-state-row">
+    <div class="visual-power on">
+      <span class="visual-power-icon">&#127777;</span>
+      <span class="visual-power-label">${t}&deg;C</span>
+    </div>
+    <div class="visual-power on">
+      <span class="visual-power-icon">&#128167;</span>
+      <span class="visual-power-label">${h}%</span>
+    </div>
+    <div class="visual-reachable ${reachable ? "" : "unreachable"}">
+      ${reachable ? "Reachable" : "Unreachable"}
+    </div>
+  </div>
+  <div class="visual-reported">Sensor: ${sensor}</div>
   ${reportedAt ? `<div class="visual-reported">Last reported: ${escapeHtml(reportedAt)}</div>` : ""}
   <details class="visual-raw"><summary>Raw JSON</summary><pre>${escapeHtml(prettyJson(stateData))}</pre></details>
 </div>`;

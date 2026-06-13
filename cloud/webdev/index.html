@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Smart Home Account Center</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260609-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260613-env2" />
   </head>
   <body>
     <div class="login-overlay" id="loginOverlay" hidden>
@@ -78,7 +78,8 @@
               <button class="segment active" data-device-filter="all" type="button">All</button>
               <button class="segment" data-device-filter="light" type="button">Light</button>
               <button class="segment" data-device-filter="switch" type="button">Switch</button>
-              <button class="segment" data-device-filter="motion" type="button">Sensors</button>
+              <button class="segment" data-device-filter="motion" type="button">Motion</button>
+              <button class="segment" data-device-filter="environment" type="button">Environment</button>
             </div>
           </div>
           <div id="deviceList" class="device-list"></div>
@@ -249,6 +250,6 @@
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="/static/app.js?v=20260609-1" type="module"></script>
+    <script src="/static/app.js?v=20260613-env2" type="module"></script>
   </body>
 </html>
