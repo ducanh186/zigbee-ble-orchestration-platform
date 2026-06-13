@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
 
+from croniter import croniter
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -437,9 +438,20 @@ def _validated_actions(
     return normalized_actions
 
 
+def validate_five_field_cron(value: str) -> str:
+    normalized = value.strip()
+    if len(normalized.split()) != 5 or not croniter.is_valid(normalized):
+        raise ValueError(
+            "schedule_cron must be a valid five-field cron expression"
+        )
+    return normalized
+
+
 class AutomationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     enabled: bool = True
+    trigger_type: Literal["event", "schedule"] = "event"
+    schedule_cron: str | None = None
     trigger: dict[str, Any]
     actions: list[dict[str, Any]] = Field(min_length=1)
 
@@ -456,6 +468,30 @@ class AutomationCreate(BaseModel):
     ) -> list[dict[str, Any]]:
         return _validated_actions(values)
 
+    @model_validator(mode="after")
+    def validate_trigger_contract(self):
+        trigger_kind = self.trigger.get("type")
+        if self.trigger_type == "schedule":
+            if trigger_kind != "schedule":
+                raise ValueError(
+                    "schedule trigger_type requires trigger.type=schedule"
+                )
+            if self.schedule_cron is None:
+                raise ValueError(
+                    "schedule trigger_type requires schedule_cron"
+                )
+            self.schedule_cron = validate_five_field_cron(self.schedule_cron)
+        else:
+            if trigger_kind == "schedule":
+                raise ValueError(
+                    "event trigger_type cannot use trigger.type=schedule"
+                )
+            if self.schedule_cron is not None:
+                raise ValueError(
+                    "event trigger_type requires schedule_cron=null"
+                )
+        return self
+
 
 class AutomationUpdate(BaseModel):
     """PUT body. All fields optional; only provided fields are mutated."""
@@ -463,6 +499,8 @@ class AutomationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     enabled: bool | None = None
     version: int | None = Field(default=None, ge=1)
+    trigger_type: Literal["event", "schedule"] | None = None
+    schedule_cron: str | None = None
     trigger: dict[str, Any] | None = None
     actions: list[dict[str, Any]] | None = Field(default=None, min_length=1)
 
@@ -491,6 +529,8 @@ class AutomationOut(BaseModel):
     site_id: str
     gateway_id: str
     version: int
+    trigger_type: Literal["event", "schedule"]
+    schedule_cron: str | None
     trigger: dict[str, Any]
     actions: list[dict[str, Any]]
     sync_status: Literal["pending", "synced", "failed", "deleted"]

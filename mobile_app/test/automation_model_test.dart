@@ -85,4 +85,17 @@ void main() {
       'scene_id': 'scene-all-on',
     });
   });
+
+  test('schedule templates force the expected light command', () {
+    expect(
+      AutomationRuleTemplate.scheduleOn.actionCommand,
+      AutomationActionCommand.on,
+    );
+    expect(
+      AutomationRuleTemplate.scheduleOff.actionCommand,
+      AutomationActionCommand.off,
+    );
+    expect(AutomationRuleTemplate.scheduleOn.isSchedule, isTrue);
+    expect(AutomationRuleTemplate.scheduleOff.isSchedule, isTrue);
+  });
 }

@@ -1,0 +1,30 @@
+{
+  "device_name": "Z3_DHT11_Sensor",
+  "description": "Zigbee 3.0 environment sensor application (Router) with DHT11 temperature/humidity on PD8, button input, and network manager. Recycled from Z3_Occupancy_Sensor. Uses NVM3 persistent storage.",
+  "zigbee_device_type": "Router",
+  "target": {
+    "mcu": "EFR32MG12P332F1024GL125",
+    "board": "BRD4162A (EFR32MG12 2.4 GHz 19 dBm Radio Board)",
+    "mainboard": "BRD4001A (Wireless Starter Kit Mainboard)"
+  },
+  "build": {
+    "sdk": "Gecko SDK v4.5.0",
+    "sdk_id": "com.silabs.sdk.stack.super:4.5.0._1927637552",
+    "toolchain": "GNU ARM 12.2.rel1 (SimplicityStudio_v5 toolchain; system 10.3.1 link-fails on --no-warn-rwx-segments)",
+    "toolchain_id": "gnu_arm:12.2.rel1_2023.7",
+    "build_config": "LINK_LIBRARIES (links against precompiled SDK libraries)",
+    "ide": "CLI make (Studio-generated makefile cloned from Z3_Occupancy_Sensor, paths rewritten)"
+  },
+  "firmware_version": "source-only, no version tag yet",
+  "source_commit": "4f6e2d9 (2026-06-12, plus uncommitted Z3_DHT11_Sensor working tree)",
+  "source_path": "end_devices/Z3_DHT11_Sensor/",
+  "binaries": {
+    "status": "READY",
+    "expected_outputs": [
+      "Z3_DHT11_Sensor.s37 (Motorola S-record, primary flash image)"
+    ],
+    "flash_command": "commander flash artifact/Z3_DHT11_Sensor/Z3_DHT11_Sensor.s37 --serialno <kit-jlink> (no masserase: preserves MFG install-code token + NVM3)"
+  },
+  "build_instructions": "Build dir: ~/SimplicityStudio/v5_workspace/Z3_DHT11_Sensor/'GNU ARM v12.2.1 - Default' (sources sync from end_devices/Z3_DHT11_Sensor via ~/ss_v5/v5_workspace/Z3_DHT11_Sensor). PATH must include /home/phu/SimplicityStudio_v5/developer/toolchains/gnu_arm/12.2.rel1_2023.7/bin, then `make all -j$(nproc)`. See docs/handoff/dht11_environment_sensor_local_handoff.md.",
+  "date_generated": "2026-06-12"
+}

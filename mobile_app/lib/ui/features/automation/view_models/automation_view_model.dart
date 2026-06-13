@@ -4,25 +4,34 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../data/services/api_client.dart';
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../domain/models/light_scene.dart';
 import '../../../../domain/repositories/automation_repository.dart';
+import '../../../../domain/repositories/scene_repository.dart';
 
 class AutomationViewModel extends ChangeNotifier {
   AutomationViewModel({
     required AutomationRepository repository,
+    SceneRepository? sceneRepository,
     this.pollDelay = const Duration(seconds: 3),
     this.maxPollAttempts = 5,
-  }) : _repository = repository;
+  }) : _repository = repository,
+       _sceneRepository = sceneRepository;
 
   final AutomationRepository _repository;
+  final SceneRepository? _sceneRepository;
   final Duration pollDelay;
   final int maxPollAttempts;
 
   List<AutomationRule> _rules = [];
+  List<LightScene> _scenes = [];
+  SceneAvailability _sceneAvailability = SceneAvailability.unavailable;
   bool _isLoading = false;
   bool _isSaving = false;
   String? _errorMessage;
 
   List<AutomationRule> get rules => List.unmodifiable(_rules);
+  List<LightScene> get scenes => List.unmodifiable(_scenes);
+  SceneAvailability get sceneAvailability => _sceneAvailability;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
@@ -39,10 +48,24 @@ class AutomationViewModel extends ChangeNotifier {
         error,
         context: 'Could not load automation rules',
       );
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
+
+    if (_sceneRepository != null) {
+      try {
+        _scenes = await _sceneRepository.fetchScenes();
+        _sceneAvailability = _sceneRepository.lastAvailability;
+      } catch (error) {
+        _scenes = [];
+        _sceneAvailability = SceneAvailability.unavailable;
+        _errorMessage ??= friendlyErrorMessage(
+          error,
+          context: 'Khong tai duoc scenes',
+        );
+      }
+    }
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> createRule(AutomationRuleDraft draft) async {

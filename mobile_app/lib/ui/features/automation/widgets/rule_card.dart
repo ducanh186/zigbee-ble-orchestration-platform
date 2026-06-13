@@ -29,9 +29,12 @@ class RuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
+    final scheduleLabel = l10n?.scheduleTriggerLabel ?? 'Schedule';
     final opacity = rule.enabled ? 1.0 : 0.72;
     final showMutationControls = onDelete != null || onEnabledChanged != null;
+    final isSchedule =
+        rule.trigger.triggerType == AutomationTriggerType.schedule;
 
     return Opacity(
       opacity: opacity,
@@ -66,7 +69,9 @@ class RuleCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    AutomationVisuals.templateIcon(template),
+                    isSchedule
+                        ? Icons.schedule
+                        : AutomationVisuals.templateIcon(template),
                     size: 18,
                     color: palette.primary,
                   ),
@@ -87,7 +92,7 @@ class RuleCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        template.label,
+                        isSchedule ? scheduleLabel : template.label,
                         style: TextStyle(
                           fontSize: 11,
                           color: palette.textSecondary,
@@ -102,7 +107,7 @@ class RuleCard extends StatelessWidget {
                     children: [
                       if (onDelete != null)
                         IconButton(
-                          tooltip: l10n.deleteRuleTooltip,
+                          tooltip: l10n?.deleteRuleTooltip ?? 'Delete rule',
                           icon: const Icon(Icons.delete_outline, size: 19),
                           color: palette.error,
                           onPressed: onDelete,

@@ -16,6 +16,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
@@ -668,6 +669,7 @@ static const char *inferredClustersJson(const char *deviceType)
   if (strcmp(deviceType, "light")  == 0) return "[\"0x0006\",\"0x0008\"]";
   if (strcmp(deviceType, "switch") == 0) return "[\"0x0006\",\"0x0001\"]";
   if (strcmp(deviceType, "motion") == 0) return "[\"0x0406\"]";
+  if (strcmp(deviceType, "environment") == 0) return "[\"0x0402\",\"0x0405\"]";
   if (strcmp(deviceType, "lock")   == 0) return "[\"0x0101\"]";
   return "[]";
 }
@@ -715,7 +717,7 @@ void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
   // Keep this list aligned with inferredClustersJson() - any device_type
   // the gateway can ever publish must appear here so we never leak a stale
   // retained slot.
-  static const char *types[] = {"light", "switch", "motion", "unknown"};
+  static const char *types[] = {"light", "switch", "motion", "environment", "unknown"};
   for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
     if (keepType && strcmp(keepType, types[i]) == 0) continue;
 
@@ -886,6 +888,51 @@ void appMqttPublishMotionReported(uint16_t nodeId,
   char topicSuffix[120];
   snprintf(topicSuffix, sizeof(topicSuffix),
            "devices/motion/%s/reported", eui64Str);
+
+  // QoS 1, retain=true so the dashboard reflects current state on connect.
+  appMqttPublish(topicSuffix, envelope, 1, true);
+}
+
+void appMqttPublishEnvironmentReported(uint16_t nodeId,
+                                       const char *eui64Str,
+                                       int32_t temperature_centi,
+                                       int32_t humidity_centi)
+{
+  if (!sMosq || !eui64Str || !*eui64Str) return;
+
+  // Centi-unit -> decimal string, or "null" if the metric was never observed
+  // (the two metrics arrive in separate cluster reports). abs() is only
+  // applied to real values, never to the INT32_MIN sentinel.
+  char tempField[24];
+  char humField[24];
+  if (temperature_centi == INT32_MIN) {
+    snprintf(tempField, sizeof(tempField), "null");
+  } else {
+    snprintf(tempField, sizeof(tempField), "%d.%02d",
+             (int)(temperature_centi / 100), (int)(abs(temperature_centi) % 100));
+  }
+  if (humidity_centi == INT32_MIN) {
+    snprintf(humField, sizeof(humField), "null");
+  } else {
+    snprintf(humField, sizeof(humField), "%d.%02d",
+             (int)(humidity_centi / 100), (int)(abs(humidity_centi) % 100));
+  }
+
+  char inner[320];
+  snprintf(inner, sizeof(inner),
+    "\"device_id\":\"%s\","
+    "\"device_type\":\"environment\","
+    "\"eui64\":\"%s\","
+    "\"nwk_addr\":\"0x%04X\","
+    "\"state\":{\"temperature_c\":%s,\"humidity_percent\":%s,\"reachable\":true}",
+    eui64Str, eui64Str, (unsigned)nodeId, tempField, humField);
+
+  char envelope[512];
+  buildEnvelope(envelope, sizeof(envelope), inner);
+
+  char topicSuffix[120];
+  snprintf(topicSuffix, sizeof(topicSuffix),
+           "devices/environment/%s/reported", eui64Str);
 
   // QoS 1, retain=true so the dashboard reflects current state on connect.
   appMqttPublish(topicSuffix, envelope, 1, true);

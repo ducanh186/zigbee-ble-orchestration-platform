@@ -148,7 +148,9 @@ enum AutomationRuleTemplate {
   switchTogglesOneLight,
   switchTogglesLights,
   motionOccupiedTurnsOnLights,
-  motionUnoccupiedTurnsOffLights;
+  motionUnoccupiedTurnsOffLights,
+  scheduleOn,
+  scheduleOff;
 
   String get label => switch (this) {
     AutomationRuleTemplate.switchTogglesOneLight => 'Switch toggles one light',
@@ -157,6 +159,8 @@ enum AutomationRuleTemplate {
       'Motion becomes occupied',
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       'Motion becomes unoccupied',
+    AutomationRuleTemplate.scheduleOn => 'Schedule on',
+    AutomationRuleTemplate.scheduleOff => 'Schedule off',
   };
 
   String get actionLabel => switch (this) {
@@ -166,6 +170,8 @@ enum AutomationRuleTemplate {
       'Turn selected lights on',
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       'Turn selected lights off',
+    AutomationRuleTemplate.scheduleOn => 'Turn selected light on',
+    AutomationRuleTemplate.scheduleOff => 'Turn selected light off',
   };
 
   AutomationDeviceType get triggerDeviceType => switch (this) {
@@ -175,6 +181,8 @@ enum AutomationRuleTemplate {
     AutomationRuleTemplate.motionOccupiedTurnsOnLights ||
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationDeviceType.motion,
+    AutomationRuleTemplate.scheduleOn || AutomationRuleTemplate.scheduleOff =>
+      throw StateError('Schedule templates do not use a trigger device'),
   };
 
   AutomationTriggerEvent get triggerEvent => switch (this) {
@@ -184,6 +192,8 @@ enum AutomationRuleTemplate {
     AutomationRuleTemplate.motionOccupiedTurnsOnLights ||
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationTriggerEvent.occupancyChanged,
+    AutomationRuleTemplate.scheduleOn || AutomationRuleTemplate.scheduleOff =>
+      throw StateError('Schedule templates do not use a trigger event'),
   };
 
   AutomationActionCommand get actionCommand => switch (this) {
@@ -194,6 +204,8 @@ enum AutomationRuleTemplate {
       AutomationActionCommand.on,
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationActionCommand.off,
+    AutomationRuleTemplate.scheduleOn => AutomationActionCommand.on,
+    AutomationRuleTemplate.scheduleOff => AutomationActionCommand.off,
   };
 
   Map<String, Object?> get triggerState => switch (this) {
@@ -207,7 +219,11 @@ enum AutomationRuleTemplate {
   };
 
   bool get allowsMultipleTargets =>
-      this != AutomationRuleTemplate.switchTogglesOneLight;
+      this != AutomationRuleTemplate.switchTogglesOneLight && !isSchedule;
+
+  bool get isSchedule =>
+      this == AutomationRuleTemplate.scheduleOn ||
+      this == AutomationRuleTemplate.scheduleOff;
 }
 
 enum AutomationTriggerType {
@@ -399,11 +415,7 @@ final class SceneActivateAutomationAction extends AutomationAction {
 
   @override
   Map<String, Object?> toJson() {
-    return {
-      'type': 'scene_activate',
-      'group_id': groupId,
-      'scene_id': sceneId,
-    };
+    return {'type': 'scene_activate', 'group_id': groupId, 'scene_id': sceneId};
   }
 }
 
@@ -487,23 +499,23 @@ class AutomationRuleDraft {
   AutomationTrigger get trigger {
     return _typedTrigger ??
         EventAutomationTrigger(
-      deviceId: triggerDeviceId,
-      deviceType: triggerDeviceType,
-      event: triggerEvent,
-      state: triggerState,
-    );
+          deviceId: triggerDeviceId,
+          deviceType: triggerDeviceType,
+          event: triggerEvent,
+          state: triggerState,
+        );
   }
 
   List<AutomationAction> get actions {
     return _typedActions ??
         targetLightIds
-        .map(
-          (deviceId) => DeviceCommandAutomationAction(
-            deviceId: deviceId,
-            command: targetActionCommands[deviceId] ?? actionCommand,
-          ),
-        )
-        .toList(growable: false);
+            .map(
+              (deviceId) => DeviceCommandAutomationAction(
+                deviceId: deviceId,
+                command: targetActionCommands[deviceId] ?? actionCommand,
+              ),
+            )
+            .toList(growable: false);
   }
 }
 

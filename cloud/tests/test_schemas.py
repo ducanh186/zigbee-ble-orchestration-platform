@@ -67,6 +67,8 @@ class TestAutomationContracts:
     def test_scene_action_accepts_light_scene_identity(self):
         body = AutomationCreate(
             name="Scheduled lab scene",
+            trigger_type="schedule",
+            schedule_cron="0 7 * * 1-5",
             trigger={"type": "schedule"},
             actions=[
                 {

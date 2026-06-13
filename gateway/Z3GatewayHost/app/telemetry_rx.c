@@ -12,10 +12,23 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <limits.h>
 
 // ===== Cached light level for enriching reported state =====
 // Updated when we receive Level Control cluster reports.
 static uint8_t s_lastLightLevel = 0;
+
+// ===== Per-node environment cache =====
+// Temperature (0x0402) and humidity (0x0405) arrive in separate reports; we
+// cache the latest of each per sender so the published reported state can
+// carry both fields. INT32_MIN = not yet observed (-> JSON null).
+#define ENV_CACHE_MAX 4
+static struct {
+  EmberNodeId nodeId;
+  bool        valid;
+  int32_t     tempCenti;
+  int32_t     humCenti;
+} s_envCache[ENV_CACHE_MAX];
 
 // ===== This is the correct callback for receiving attribute reports =====
 // The ZCL framework calls this BEFORE emberAfPreCommandReceivedCallback.
@@ -228,6 +241,91 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
 
           // Phase 3 automation hook.
           automationRuleOnMotionOccupancyChanged(euiStr, occStr);
+        }
+      } else {
+        break;
+      }
+    }
+    return false;
+  }
+
+  // --- Temperature Measurement (0x0402) / Relative Humidity (0x0405) ---
+  // DHT11 environment sensor reports MeasuredValue 0x0000 in centi-units
+  // (0x0402 int16s 0.01C, 0x0405 uint16 0.01%RH). We log it and feed it into
+  // the automation engine (environment threshold rules). No telemetry MQTT
+  // publish yet — that is Cloud/App work (see docs/handoffs/).
+  if (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID
+      || clusterId == ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID) {
+    bool isTemp = (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID);
+    uint8_t wantType = isTemp ? ZCL_INT16S_ATTRIBUTE_TYPE
+                              : ZCL_INT16U_ATTRIBUTE_TYPE;
+
+    while (i + 3 <= bufLen) {
+      uint16_t attrId = u16le(&buffer[i]);
+      uint8_t type = buffer[i + 2];
+      i += 3;
+
+      if (attrId == 0x0000 && type == wantType) {
+        if (i + 2 > bufLen) break;
+        int32_t centi = isTemp ? (int32_t)(int16_t)u16le(&buffer[i])
+                               : (int32_t)u16le(&buffer[i]);
+        i += 2;
+
+        EmberNodeId sender = emberGetSender();
+        char euiStr[20] = "unknown";
+        EmberEUI64 eui;
+        if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
+          eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+        } else {
+          (void)deviceRegistryGetEuiBeStrByNodeId(sender, euiStr,
+                                                  sizeof(euiStr));
+        }
+
+        int32_t whole = centi / 100;
+        int32_t frac = centi % 100;
+        if (frac < 0) frac = -frac;
+        if (isTemp) {
+          emberAfCorePrintln("ENV: temp=%d.%02dC from 0x%04X (%s)",
+                             (int)whole, (int)frac, (unsigned)sender, euiStr);
+          appLogLog("ENV", "report",
+                    "\"device_id\":\"%s\",\"node_id\":\"0x%04X\","
+                    "\"temperature_c_x100\":%d",
+                    euiStr, (unsigned)sender, (int)centi);
+        } else {
+          emberAfCorePrintln("ENV: humidity=%d.%02d%% from 0x%04X (%s)",
+                             (int)whole, (int)frac, (unsigned)sender, euiStr);
+          appLogLog("ENV", "report",
+                    "\"device_id\":\"%s\",\"node_id\":\"0x%04X\","
+                    "\"humidity_pct_x100\":%d",
+                    euiStr, (unsigned)sender, (int)centi);
+        }
+
+        // Feed into the automation engine (environment threshold rules).
+        automationRuleOnEnvironmentReport(euiStr,
+                                          isTemp ? "temperature" : "humidity",
+                                          centi);
+
+        // Cache the latest temp+humidity per node and publish a combined
+        // retained reported state so the dashboard can show live values.
+        {
+          int slot = -1, freeSlot = -1;
+          for (int s = 0; s < ENV_CACHE_MAX; s++) {
+            if (s_envCache[s].valid && s_envCache[s].nodeId == sender) { slot = s; break; }
+            if (freeSlot < 0 && !s_envCache[s].valid) freeSlot = s;
+          }
+          if (slot < 0) {
+            slot = (freeSlot >= 0) ? freeSlot : 0;
+            s_envCache[slot].valid     = true;
+            s_envCache[slot].nodeId    = sender;
+            s_envCache[slot].tempCenti = INT32_MIN;
+            s_envCache[slot].humCenti  = INT32_MIN;
+          }
+          if (isTemp) s_envCache[slot].tempCenti = centi;
+          else        s_envCache[slot].humCenti  = centi;
+
+          appMqttPublishEnvironmentReported(sender, euiStr,
+                                            s_envCache[slot].tempCenti,
+                                            s_envCache[slot].humCenti);
         }
       } else {
         break;

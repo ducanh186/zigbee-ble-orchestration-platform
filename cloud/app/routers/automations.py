@@ -121,30 +121,44 @@ async def _validate_rule_template(
             ),
         )
     trigger_type = trigger.get("type", "device_event")
-    trigger_device_id = _require_string(trigger, "device_id")
-    trigger_device_type = _require_string(trigger, "device_type")
 
-    if trigger_type == "sensor_threshold":
-        if trigger_device_type != "environment":
-            raise HTTPException(
-                status_code=422,
-                detail="Sensor threshold trigger device_type must be environment",
-            )
-        event = ""
+    if trigger_type == "schedule":
+        # Schedule triggers fire on a cron expression, not a device event, so
+        # there is no trigger device or event to validate.
+        trigger_device_type = None
+        event = None
     else:
-        event = _require_string(trigger, "event")
-        if trigger_device_type not in {"switch", "motion"}:
-            raise HTTPException(status_code=422, detail="Unsupported trigger device_type")
+        trigger_device_id = _require_string(trigger, "device_id")
+        trigger_device_type = _require_string(trigger, "device_type")
 
-    await _require_device(
-        db, trigger_device_id, trigger_device_type, "Trigger", current_user
-    )
+        if trigger_type == "sensor_threshold":
+            if trigger_device_type != "environment":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Sensor threshold trigger device_type must be environment",
+                )
+            event = ""
+        else:
+            event = _require_string(trigger, "event")
+            if trigger_device_type not in {"switch", "motion"}:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Unsupported trigger device_type",
+                )
 
-    if trigger_type == "device_event":
-        # Normalize event in-place so the caller's `trigger` dict — which is what
-        # gets persisted to DB and published on MQTT — carries the canonical value.
-        trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
-        event = trigger["event"]
+        await _require_device(
+            db,
+            trigger_device_id,
+            trigger_device_type,
+            "Trigger",
+            current_user,
+        )
+
+        if trigger_type == "device_event":
+            # Normalize event in-place so the caller's `trigger` dict — which is what
+            # gets persisted to DB and published on MQTT — carries the canonical value.
+            trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
+            event = trigger["event"]
 
     action_commands: list[str] = []
     for action in actions:
@@ -158,7 +172,7 @@ async def _validate_rule_template(
         await _require_device(db, action_device_id, "light", "Action", current_user)
         action_commands.append(command)
 
-    if trigger_type == "sensor_threshold":
+    if trigger_type in {"schedule", "sensor_threshold"}:
         return
 
     if trigger_device_type == "switch":
@@ -241,6 +255,8 @@ async def create_automation(
         site_id=settings.site_id,
         gateway_id=settings.gateway_id,
         version=1,
+        trigger_type=body.trigger_type,
+        schedule_cron=body.schedule_cron,
         trigger=body.trigger,
         actions=body.actions,
         sync_status="pending",
@@ -310,19 +326,41 @@ async def update_automation(
     # If trigger or actions change, re-validate the resulting rule body. We
     # validate against the *merged* values so partial updates still get the
     # same template guardrails as create.
-    new_trigger = body.trigger if body.trigger is not None else rule.trigger
-    new_actions = body.actions if body.actions is not None else rule.actions
-    if body.trigger is not None or body.actions is not None:
-        await _validate_rule_template(db, new_trigger, new_actions, current_user)
+    merged = AutomationCreate(
+        name=body.name if body.name is not None else rule.name,
+        enabled=body.enabled if body.enabled is not None else rule.enabled,
+        trigger_type=(
+            body.trigger_type
+            if body.trigger_type is not None
+            else rule.trigger_type
+        ),
+        schedule_cron=(
+            body.schedule_cron
+            if "schedule_cron" in body.model_fields_set
+            else rule.schedule_cron
+        ),
+        trigger=body.trigger if body.trigger is not None else rule.trigger,
+        actions=body.actions if body.actions is not None else rule.actions,
+    )
+    await _validate_rule_template(
+        db,
+        merged.trigger,
+        merged.actions,
+        current_user,
+    )
 
     if body.name is not None:
         rule.name = body.name
     if body.enabled is not None:
         rule.enabled = body.enabled
+    if body.trigger_type is not None:
+        rule.trigger_type = merged.trigger_type
+    if "schedule_cron" in body.model_fields_set:
+        rule.schedule_cron = merged.schedule_cron
     if body.trigger is not None:
-        rule.trigger = body.trigger
+        rule.trigger = merged.trigger
     if body.actions is not None:
-        rule.actions = body.actions
+        rule.actions = merged.actions
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
