@@ -121,12 +121,13 @@ async def _validate_rule_template(
             ),
         )
     trigger_type = trigger.get("type", "device_event")
+    trigger_device_type: str | None = None
+    event: str | None = None
 
     if trigger_type == "schedule":
         # Schedule triggers fire on a cron expression, not a device event, so
         # there is no trigger device or event to validate.
-        trigger_device_type = None
-        event = None
+        pass
     else:
         trigger_device_id = _require_string(trigger, "device_id")
         trigger_device_type = _require_string(trigger, "device_type")
@@ -137,14 +138,15 @@ async def _validate_rule_template(
                     status_code=422,
                     detail="Sensor threshold trigger device_type must be environment",
                 )
-            event = ""
-        else:
+        elif trigger_type == "device_event":
             event = _require_string(trigger, "event")
             if trigger_device_type not in {"switch", "motion"}:
                 raise HTTPException(
                     status_code=422,
                     detail="Unsupported trigger device_type",
                 )
+        else:
+            raise HTTPException(status_code=422, detail="Unsupported trigger type")
 
         await _require_device(
             db,
@@ -154,14 +156,25 @@ async def _validate_rule_template(
             current_user,
         )
 
-        if trigger_type == "device_event":
-            # Normalize event in-place so the caller's `trigger` dict — which is what
-            # gets persisted to DB and published on MQTT — carries the canonical value.
-            trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
-            event = trigger["event"]
+    if trigger_type == "device_event":
+        # Normalize event in-place so the caller's `trigger` dict — which is what
+        # gets persisted to DB and published on MQTT — carries the canonical value.
+        trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
+        event = trigger["event"]
 
     action_commands: list[str] = []
     for action in actions:
+        action_type = action.get("type", "device_command")
+        if action_type == "scene_activate":
+            if trigger_type != "schedule":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Scene actions require a schedule trigger",
+                )
+            _require_string(action, "group_id")
+            _require_string(action, "scene_id")
+            continue
+
         action_device_id = _require_string(action, "device_id")
         action_device_type = _require_string(action, "device_type")
         command = _require_string(action, "command")

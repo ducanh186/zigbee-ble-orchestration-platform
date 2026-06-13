@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,6 +71,6 @@ async def execute_automation_rule(
 
     rule.last_run_status = "failed" if failed_reason else "executed"
     rule.last_error = failed_reason
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
     await db.commit()
     return events
