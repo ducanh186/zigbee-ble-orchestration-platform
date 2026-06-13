@@ -924,7 +924,8 @@ void appMqttPublishEnvironmentReported(uint16_t nodeId,
     "\"device_type\":\"environment\","
     "\"eui64\":\"%s\","
     "\"nwk_addr\":\"0x%04X\","
-    "\"state\":{\"temperature_c\":%s,\"humidity_percent\":%s,\"reachable\":true}",
+    "\"state\":{\"temperature_c\":%s,\"humidity_percent\":%s,"
+    "\"sensor\":\"dht11\",\"reachable\":true}",
     eui64Str, eui64Str, (unsigned)nodeId, tempField, humField);
 
   char envelope[512];

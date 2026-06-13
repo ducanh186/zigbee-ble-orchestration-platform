@@ -184,3 +184,13 @@ No Gateway payload change is required for this endpoint as long as the current
 - `gte` and `lte` rules execute only on condition crossing.
 - A disabled threshold rule does not execute.
 - Existing motion, switch, and light MQTT flows remain unchanged.
+
+## Gateway Implementation Status (feat/107, 2026-06-13)
+
+Implemented and verified against this contract:
+
+- **Classification** — `device_discovery.c` classifies server cluster `0x0402`/`0x0405` as `device_type=environment`; registry published to `devices/environment/{eui}/registry` (durable EUI64 device_id).
+- **Reported telemetry** — `devices/environment/{eui}/reported` (retained), inner payload `{device_id, device_type:"environment", eui64, nwk_addr, state:{temperature_c, humidity_percent, sensor:"dht11", reachable}}`. Centi→decimal conversion done; a metric absent in a partial report is emitted as JSON `null` (never invented as 0); temp-only/humidity-only reports preserve the other value via the Cloud-side merge. Sentinel `0x8000`/`0xFFFF` are not published (driver/firmware drops them). Verified: cloud `validate_reported_payload("environment", …)` accepts it (full + temp-only).
+- **Threshold rule** — parser accepts the Cloud `sensor_threshold` trigger verbatim: `type`, `metric` (`temperature_c`/`humidity_percent`), `operator` (`gte`/`lte`), `threshold` (whole units, float ok). Whole-unit threshold is scaled ×100 to centi internally. Edge-triggered (`false→true` only), re-arms on drop below, per-rule 500 ms cooldown, disabled rules skipped, action via existing light path + `automations/{id}/event`.
+- **Verified live** — cloud-format rule (`temperature_c gte 27.5`) synced (`AUTO upsert`) and fired (`AUTO fired ... trigger:threshold_crossed`) on a real DHT11 report. Physical light on/off was demonstrated earlier on `feat/hum_sensor_creation` with the light kit present (identical action path); in the `feat/107` run the light kit was not plugged, so the fire logged `unknown_device` for the action — gateway logic confirmed, bulb pending kit presence.
+- Existing motion/switch/light MQTT flows unchanged (add-only branches).
