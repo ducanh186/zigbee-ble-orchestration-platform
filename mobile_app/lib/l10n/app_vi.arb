@@ -322,6 +322,7 @@
   "targetTypeLabel": "Loại mục tiêu",
   "directLightLabel": "Đèn trực tiếp",
   "sceneLabel": "Scene",
+  "activateLabel": "Kích hoạt",
   "noScenesAvailable": "Không có scene khả dụng",
   "sceneUnavailableMessage": "Scene chưa khả dụng. Hãy chọn một đèn trực tiếp.",
   "invalidCronMessage": "Nhập biểu thức cron hợp lệ gồm năm trường"

@@ -82,6 +82,24 @@ def _motion_on_rule() -> dict:
     }
 
 
+def _schedule_on_rule(cron: str = "0 7 * * 1-5") -> dict:
+    return {
+        "name": "Weekday 7am light",
+        "enabled": True,
+        "trigger_type": "schedule",
+        "schedule_cron": cron,
+        "trigger": {"type": "schedule"},
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+    }
+
+
 def _high_temperature_rule() -> dict:
     return {
         "name": "High temperature turns on lab light",
@@ -94,24 +112,6 @@ def _high_temperature_rule() -> dict:
             "operator": "gte",
             "threshold": 30,
         },
-        "actions": [
-            {
-                "type": "device_command",
-                "device_id": "light-01",
-                "device_type": "light",
-                "command": "on",
-            }
-        ],
-    }
-
-
-def _schedule_on_rule(cron: str = "0 7 * * 1-5") -> dict:
-    return {
-        "name": "Weekday 7am light",
-        "enabled": True,
-        "trigger_type": "schedule",
-        "schedule_cron": cron,
-        "trigger": {"type": "schedule"},
         "actions": [
             {
                 "type": "device_command",
@@ -174,6 +174,30 @@ async def test_create_schedule_rule_rejects_bad_cron(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_schedule_rule_accepts_scene_action(
+    client, db_session_factory, fake_mqtt
+):
+    headers = await _parent_headers(client, db_session_factory)
+    rule = _schedule_on_rule()
+    rule["actions"] = [
+        {
+            "type": "scene_activate",
+            "group_id": "group-lab",
+            "scene_id": "scene-all-off",
+        }
+    ]
+
+    response = await client.post(
+        "/api/automations",
+        json=rule,
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["actions"] == rule["actions"]
 
 
 @pytest.mark.asyncio

@@ -557,7 +557,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     if (template?.isSchedule ?? false) {
       final schedule = _scheduleSelection;
       final target = _scheduleTarget;
-      if (schedule == null || target == null) {
+      if (schedule == null || !schedule.isValid || target == null) {
         return;
       }
       final action = switch (target) {
@@ -597,6 +597,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         draft = AutomationRuleDraft.typed(
           name: _nameController.text.trim(),
           enabled: _enabled,
+          template: template,
           trigger: SensorThresholdAutomationTrigger(
             deviceId: triggerId,
             metric: _environmentMetric,

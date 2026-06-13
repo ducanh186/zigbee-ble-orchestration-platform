@@ -14,10 +14,10 @@ class RuleBodyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final l10n = AppLocalizations.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final trigger = rule.trigger;
     final triggerDeviceId = switch (trigger) {
-      ScheduleAutomationTrigger() => 'schedule',
+      ScheduleAutomationTrigger() => l10n.scheduleTriggerLabel,
       _ => trigger.deviceId,
     };
     final triggerEvent = _eventText(trigger, l10n);
@@ -33,42 +33,48 @@ class RuleBodyBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Line(
-            label: 'WHEN',
+            label: l10n.whenLabel,
             labelColor: palette.primary,
             deviceId: triggerDeviceId,
             detail: triggerEvent,
           ),
           const SizedBox(height: 4),
-          _ThenLine(actions: rule.actions),
+          _ThenLine(
+            label: l10n.thenLabel,
+            actions: rule.actions,
+          ),
         ],
       ),
     );
   }
 
-  String _eventText(AutomationTrigger trigger, AppLocalizations? l10n) {
-    if (trigger case ScheduleAutomationTrigger(:final cron)) {
-      return cron;
-    }
+  String _eventText(
+    AutomationTrigger trigger,
+    AppLocalizations l10n,
+  ) {
     if (trigger is SensorThresholdAutomationTrigger) {
       final metric = trigger.metric == EnvironmentMetric.temperature
-          ? (l10n?.temperatureLabel ?? 'Temperature')
-          : (l10n?.humidityLabel ?? 'Humidity');
+          ? l10n.temperatureLabel
+          : l10n.humidityLabel;
       final operator = trigger.operator == ThresholdOperator.gte ? '>=' : '<=';
       final threshold = trigger.threshold == trigger.threshold.roundToDouble()
           ? trigger.threshold.toStringAsFixed(0)
           : trigger.threshold.toStringAsFixed(1);
       final unit = trigger.metric == EnvironmentMetric.temperature
-          ? (l10n?.degreesCelsiusUnit ?? '°C')
-          : (l10n?.percentUnit ?? '%');
+          ? l10n.degreesCelsiusUnit
+          : l10n.percentUnit;
       return '$metric $operator $threshold$unit';
+    }
+    if (trigger case ScheduleAutomationTrigger(:final cron)) {
+      return cron;
     }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {
       return occupancy == null
-          ? 'occupancy changes'
-          : 'occupancy changes: $occupancy';
+          ? l10n.occupancyChangesLabel
+          : l10n.occupancyChangesValue(occupancy.toString());
     }
-    return 'toggles';
+    return l10n.togglesLabel;
   }
 }
 
@@ -135,13 +141,18 @@ class _Line extends StatelessWidget {
 }
 
 class _ThenLine extends StatelessWidget {
-  const _ThenLine({required this.actions});
+  const _ThenLine({
+    required this.label,
+    required this.actions,
+  });
 
+  final String label;
   final List<AutomationAction> actions;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +160,7 @@ class _ThenLine extends StatelessWidget {
         SizedBox(
           width: 46,
           child: Text(
-            'THEN',
+            label,
             style: TextStyle(
               color: palette.success,
               fontFamily: 'JetBrains Mono',
@@ -180,7 +191,7 @@ class _ThenLine extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _verbText(action),
+                      _verbText(action, l10n),
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontFamily: 'JetBrains Mono',
@@ -206,10 +217,18 @@ class _ThenLine extends StatelessWidget {
     };
   }
 
-  String _verbText(AutomationAction action) {
+  String _verbText(
+    AutomationAction action,
+    AppLocalizations? l10n,
+  ) {
     return switch (action) {
-      DeviceCommandAutomationAction(:final command) => command.wireValue,
-      SceneActivateAutomationAction() => 'activate',
+      DeviceCommandAutomationAction(command: AutomationActionCommand.on) =>
+        l10n?.turnOnLabel ?? 'on',
+      DeviceCommandAutomationAction(command: AutomationActionCommand.off) =>
+        l10n?.turnOffLabel ?? 'off',
+      DeviceCommandAutomationAction(command: AutomationActionCommand.toggle) =>
+        l10n?.toggleLabel ?? 'toggle',
+      SceneActivateAutomationAction() => l10n?.activateLabel ?? 'activate',
     };
   }
 }

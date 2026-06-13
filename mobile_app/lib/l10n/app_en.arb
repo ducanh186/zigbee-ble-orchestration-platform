@@ -322,6 +322,7 @@
   "targetTypeLabel": "Target type",
   "directLightLabel": "Direct light",
   "sceneLabel": "Scene",
+  "activateLabel": "Activate",
   "noScenesAvailable": "No scenes available",
   "sceneUnavailableMessage": "Scenes are unavailable. Select a direct light.",
   "invalidCronMessage": "Enter a valid five-field cron expression"
