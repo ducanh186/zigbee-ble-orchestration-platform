@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,7 @@ import 'package:zigbee_smart_building/domain/models/smart_device.dart';
 import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/auth_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
+import 'package:zigbee_smart_building/l10n/app_localizations.dart';
 import 'package:zigbee_smart_building/main.dart';
 import 'package:zigbee_smart_building/ui/core/localization/locale_controller.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
@@ -211,6 +213,24 @@ void main() {
     expect(find.text('Lab Light 01'), findsOneWidget);
   });
 
+  testWidgets('environment readings are visible to parent viewer and member', (
+    tester,
+  ) async {
+    for (final role in ['parent', 'viewer', 'member']) {
+      await pumpDashboard(tester, useMockApi: true, role: role);
+
+      await tester.scrollUntilVisible(
+        find.text('ENVIRONMENT'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('28.5°C'), findsOneWidget, reason: 'role=$role');
+      expect(find.text('48%'), findsOneWidget, reason: 'role=$role');
+    }
+  });
+
   testWidgets('automation tab shows rule list and opens create sheet', (
     tester,
   ) async {
@@ -321,6 +341,70 @@ void main() {
     ]);
   });
 
+  testWidgets('automation create sheet saves a temperature threshold rule', (
+    tester,
+  ) async {
+    final automationRepository = _WidgetAutomationRepository();
+    await pumpDashboard(
+      tester,
+      useMockApi: true,
+      automationRepository: automationRepository,
+    );
+
+    await tester.tap(find.text('Automation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New rule').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('rule-name-field')),
+      'High temperature turns on lab light',
+    );
+    await tester.ensureVisible(find.text('DHT11 Sensor'));
+    await tester.tap(find.text('DHT11 Sensor'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('environment-metric-dropdown')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('environment-operator-dropdown')),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('environment-threshold-field')),
+      '30',
+    );
+
+    await tester.ensureVisible(find.text('Lab Light 01').last);
+    await tester.tap(find.text('Lab Light 01').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save rule'));
+    await tester.tap(find.text('Save rule'));
+    await tester.pumpAndSettle();
+
+    expect(automationRepository.createdDrafts, hasLength(1));
+    final draft = automationRepository.createdDrafts.single;
+    expect(
+      draft.trigger,
+      isA<SensorThresholdAutomationTrigger>()
+          .having(
+            (trigger) => trigger.metric,
+            'metric',
+            EnvironmentMetric.temperature,
+          )
+          .having(
+            (trigger) => trigger.operator,
+            'operator',
+            ThresholdOperator.gte,
+          )
+          .having((trigger) => trigger.threshold, 'threshold', 30),
+    );
+    expect(draft.actions.single.deviceId, 'light-01');
+    expect(draft.actions.single.command, AutomationActionCommand.on);
+  });
+
   testWidgets('automation rule delete button opens confirmation dialog', (
     tester,
   ) async {
@@ -360,14 +444,21 @@ void main() {
 
     expect(find.text('Device detail'), findsOneWidget);
     expect(find.text('Lab Motion'), findsOneWidget);
-    expect(find.text('OCCUPIED'), findsWidgets);
-    expect(
-      find.text('OCCUPANCY TIMELINE', skipOffstage: false),
-      findsOneWidget,
+    expect(find.text('Occupied'), findsWidgets);
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -600),
     );
-    expect(find.text('Latest occupancy', skipOffstage: false), findsOneWidget);
-    expect(find.text('RECENT EVENTS', skipOffstage: false), findsOneWidget);
-    expect(find.text('occupancy_changed', skipOffstage: false), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('OCCUPANCY TIMELINE'), findsOneWidget);
+    expect(find.text('Latest occupancy'), findsOneWidget);
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -600),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('RECENT EVENTS'), findsOneWidget);
+    expect(find.text('occupancy_changed'), findsOneWidget);
     expect(repository.requestedDeviceIds, contains('pir-01'));
   });
 
@@ -384,14 +475,13 @@ void main() {
     final repository = _DeviceEventsRepository();
     await pumpDashboard(tester, useMockApi: true, repository: repository);
 
-    await tester.tap(
-      find
-          .ancestor(
-            of: find.text('Lab Light 01'),
-            matching: find.byType(InkWell),
-          )
-          .first,
+    await tester.scrollUntilVisible(
+      find.text('Lab Light 01'),
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Light 01'));
     await tester.pumpAndSettle();
 
     expect(find.text('Device detail'), findsOneWidget);
@@ -404,14 +494,13 @@ void main() {
     final repository = _ImmediateRenameRepository();
     await pumpDashboard(tester, useMockApi: true, repository: repository);
 
-    await tester.tap(
-      find
-          .ancestor(
-            of: find.text('Lab Light 01'),
-            matching: find.byType(InkWell),
-          )
-          .first,
+    await tester.scrollUntilVisible(
+      find.text('Lab Light 01'),
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lab Light 01'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Rename device'));
@@ -597,7 +686,7 @@ void main() {
 
     await tester.tap(find.text('Language'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tiếng Việt'));
+    await tester.tap(find.text('Vietnamese'));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byType(CustomScrollView).last,
@@ -763,6 +852,13 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: AppTheme.theme(AppThemeMode.light),
         home: const Scaffold(
           body: GatewayStatusCard(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// Monospace `WHEN ... THEN ...` block. Reads the rule like a sentence using
@@ -13,12 +14,13 @@ class RuleBodyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context);
     final trigger = rule.trigger;
     final triggerDeviceId = switch (trigger) {
       ScheduleAutomationTrigger() => 'schedule',
       _ => trigger.deviceId,
     };
-    final triggerEvent = _eventText(trigger);
+    final triggerEvent = _eventText(trigger, l10n);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -43,9 +45,22 @@ class RuleBodyBlock extends StatelessWidget {
     );
   }
 
-  String _eventText(AutomationTrigger trigger) {
+  String _eventText(AutomationTrigger trigger, AppLocalizations? l10n) {
     if (trigger case ScheduleAutomationTrigger(:final cron)) {
       return cron;
+    }
+    if (trigger is SensorThresholdAutomationTrigger) {
+      final metric = trigger.metric == EnvironmentMetric.temperature
+          ? (l10n?.temperatureLabel ?? 'Temperature')
+          : (l10n?.humidityLabel ?? 'Humidity');
+      final operator = trigger.operator == ThresholdOperator.gte ? '>=' : '<=';
+      final threshold = trigger.threshold == trigger.threshold.roundToDouble()
+          ? trigger.threshold.toStringAsFixed(0)
+          : trigger.threshold.toStringAsFixed(1);
+      final unit = trigger.metric == EnvironmentMetric.temperature
+          ? (l10n?.degreesCelsiusUnit ?? '°C')
+          : (l10n?.percentUnit ?? '%');
+      return '$metric $operator $threshold$unit';
     }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {

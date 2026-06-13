@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/localized_error_message.dart';
 import '../theme/app_theme.dart';
 
 class ErrorBanner extends StatelessWidget {
@@ -11,6 +13,7 @@ class ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -24,11 +27,11 @@ class ErrorBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              message,
+              localizedErrorMessage(l10n, message),
               style: TextStyle(color: palette.textPrimary, fontSize: 13),
             ),
           ),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
+          TextButton(onPressed: onRetry, child: Text(l10n.retryLabel)),
         ],
       ),
     );

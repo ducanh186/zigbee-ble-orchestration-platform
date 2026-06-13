@@ -158,7 +158,7 @@ void main() {
     expect(viewModel.session, isNull);
     expect(viewModel.errorMessage, isNotNull);
     // Surface a friendly message; never leak raw HTTP / exception text.
-    expect(viewModel.errorMessage, contains('Dang nhap that bai'));
+    expect(viewModel.errorMessage, contains('Login failed'));
     expect(viewModel.errorMessage, isNot(contains('invalid credentials')));
     expect(viewModel.errorMessage, isNot(contains('API 401')));
   });

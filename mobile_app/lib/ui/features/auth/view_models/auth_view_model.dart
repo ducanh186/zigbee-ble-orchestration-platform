@@ -79,7 +79,7 @@ class AuthViewModel extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Dang nhap that bai',
+        context: 'Login failed',
       );
     } finally {
       notifyListeners();
@@ -124,7 +124,7 @@ class AuthViewModel extends ChangeNotifier {
           : AuthStatus.authenticated;
       _errorMessage = friendlyErrorMessage(
         error,
-        context: 'Doi mat khau that bai',
+        context: 'Password change failed',
       );
     } finally {
       notifyListeners();

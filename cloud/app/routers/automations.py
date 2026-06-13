@@ -120,20 +120,31 @@ async def _validate_rule_template(
                 f"actions exceed MVP cap of {MAX_ACTIONS_PER_AUTOMATION} per automation"
             ),
         )
-    trigger_kind = trigger.get("type", "device_event")
-    if trigger_kind == "schedule":
+    trigger_type = trigger.get("type", "device_event")
+
+    if trigger_type == "schedule":
+        # Schedule triggers fire on a cron expression, not a device event, so
+        # there is no trigger device or event to validate.
         trigger_device_type = None
         event = None
     else:
         trigger_device_id = _require_string(trigger, "device_id")
         trigger_device_type = _require_string(trigger, "device_type")
-        event = _require_string(trigger, "event")
 
-        if trigger_device_type not in {"switch", "motion"}:
-            raise HTTPException(
-                status_code=422,
-                detail="Unsupported trigger device_type",
-            )
+        if trigger_type == "sensor_threshold":
+            if trigger_device_type != "environment":
+                raise HTTPException(
+                    status_code=422,
+                    detail="Sensor threshold trigger device_type must be environment",
+                )
+            event = ""
+        else:
+            event = _require_string(trigger, "event")
+            if trigger_device_type not in {"switch", "motion"}:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Unsupported trigger device_type",
+                )
 
         await _require_device(
             db,
@@ -143,10 +154,11 @@ async def _validate_rule_template(
             current_user,
         )
 
-        # Normalize event in-place so the caller's `trigger` dict — which is what
-        # gets persisted to DB and published on MQTT — carries the canonical value.
-        trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
-        event = trigger["event"]
+        if trigger_type == "device_event":
+            # Normalize event in-place so the caller's `trigger` dict — which is what
+            # gets persisted to DB and published on MQTT — carries the canonical value.
+            trigger["event"] = _normalize_trigger_event(trigger_device_type, event)
+            event = trigger["event"]
 
     action_commands: list[str] = []
     for action in actions:
@@ -160,7 +172,7 @@ async def _validate_rule_template(
         await _require_device(db, action_device_id, "light", "Action", current_user)
         action_commands.append(command)
 
-    if trigger_kind == "schedule":
+    if trigger_type in {"schedule", "sensor_threshold"}:
         return
 
     if trigger_device_type == "switch":

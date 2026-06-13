@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
 import '../../../../domain/models/cloud_status.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/status_badge.dart';
@@ -14,7 +15,8 @@ class GatewayStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final presentation = _GatewayStatusPresentation.from(status);
+    final l10n = AppLocalizations.of(context)!;
+    final presentation = _GatewayStatusPresentation.from(status, l10n);
 
     return AppCard(
       child: Row(
@@ -69,34 +71,39 @@ class _GatewayStatusPresentation {
     required this.tone,
   });
 
-  factory _GatewayStatusPresentation.from(CloudStatus status) {
-    final logTime = status.occurredAt == null ? '' : 'Last report: ${status.occurredAt}';
+  factory _GatewayStatusPresentation.from(
+    CloudStatus status,
+    AppLocalizations l10n,
+  ) {
+    final logTime = status.occurredAt == null
+        ? ''
+        : l10n.gatewayLastReport(status.occurredAt!);
     final eventType = status.eventType == null ? '' : ' (${status.eventType})';
     final latestReport = logTime.isEmpty && eventType.isEmpty
-        ? 'Latest cloud event received'
+        ? l10n.gatewayLatestEvent
         : '$logTime$eventType';
 
     return switch (status.state) {
       CloudConnectionState.online => _GatewayStatusPresentation(
-        title: 'Home hub online',
+        title: l10n.gatewayOnlineTitle,
         subtitle: latestReport,
         badgeLabel: 'LOG',
         tone: BadgeTone.success,
       ),
       CloudConnectionState.offline => _GatewayStatusPresentation(
-        title: 'Home hub offline',
+        title: l10n.gatewayOfflineTitle,
         subtitle: status.detail ?? latestReport,
         badgeLabel: 'OFF',
         tone: BadgeTone.error,
       ),
       CloudConnectionState.unknown => _GatewayStatusPresentation(
-        title: 'Home hub status unknown',
-        subtitle: status.detail ?? 'No home hub status log found',
+        title: l10n.gatewayUnknownTitle,
+        subtitle: status.detail ?? l10n.gatewayNoStatus,
         badgeLabel: 'CHECK',
         tone: BadgeTone.warning,
       ),
       CloudConnectionState.mock => _GatewayStatusPresentation(
-        title: 'Mock home hub log',
+        title: l10n.gatewayMockTitle,
         subtitle: latestReport,
         badgeLabel: 'MOCK',
         tone: BadgeTone.neutral,

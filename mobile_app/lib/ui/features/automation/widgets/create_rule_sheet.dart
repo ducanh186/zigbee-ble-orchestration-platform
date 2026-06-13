@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import '../../../../domain/models/automation_rule.dart';
 import '../../../../domain/models/smart_device.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../view_models/automation_view_model.dart';
 import 'automation_visuals.dart';
 import 'device_picker_row.dart';
+import 'environment_condition_section.dart';
 import 'rule_preview.dart';
 import 'scene_target_section.dart';
 import 'schedule_trigger_section.dart';
@@ -40,6 +42,9 @@ class CreateRuleSheet extends StatefulWidget {
 
 class _CreateRuleSheetState extends State<CreateRuleSheet> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _thresholdController = TextEditingController(
+    text: '30',
+  );
   AutomationRuleTemplate? _template;
   bool _isTemplateExpanded = false;
   bool _enabled = true;
@@ -47,6 +52,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   AutomationDeviceType? _triggerDeviceType;
   AutomationTriggerEvent? _triggerEvent;
   Map<String, Object?> _triggerState = const {};
+  EnvironmentMetric _environmentMetric = EnvironmentMetric.temperature;
+  ThresholdOperator _thresholdOperator = ThresholdOperator.gte;
   AutomationActionCommand? _actionCommand;
   Set<String> _targetIds = {};
   Map<String, AutomationActionCommand> _targetActionCommands = {};
@@ -58,11 +65,13 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   void initState() {
     super.initState();
     _nameController.addListener(() => setState(() {}));
+    _thresholdController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _thresholdController.dispose();
     super.dispose();
   }
 
@@ -108,9 +117,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SectionTitle(title: 'Create rule'),
+                          SectionTitle(title: l10n.createRuleTitle),
                           const SizedBox(height: 12),
-                          _FieldLabel(label: 'Rule name', required: true),
+                          _FieldLabel(
+                            label: l10n.ruleNameLabel,
+                            required: true,
+                          ),
                           const SizedBox(height: 6),
                           _NameField(controller: _nameController),
                           const SizedBox(height: 16),
@@ -157,7 +169,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             ),
                           ] else ...[
                             _FieldLabel(
-                              label: 'Trigger device',
+                              label: l10n.triggerDeviceLabel,
                               required: true,
                             ),
                             const SizedBox(height: 6),
@@ -169,11 +181,37 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                               onDeviceChanged: _setTriggerDevice,
                               onStateChanged: _setTriggerState,
                             ),
+                            if (_triggerDeviceType ==
+                                AutomationDeviceType.environment) ...[
+                              const SizedBox(height: 16),
+                              _FieldLabel(
+                                label: l10n.sensorConditionLabel,
+                                required: true,
+                              ),
+                              const SizedBox(height: 6),
+                              EnvironmentConditionSection(
+                                metric: _environmentMetric,
+                                operator: _thresholdOperator,
+                                thresholdController: _thresholdController,
+                                onMetricChanged: (metric) {
+                                  setState(() {
+                                    _environmentMetric = metric;
+                                    _template = null;
+                                  });
+                                },
+                                onOperatorChanged: (operator) {
+                                  setState(() {
+                                    _thresholdOperator = operator;
+                                    _template = null;
+                                  });
+                                },
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             _FieldLabel(
-                              label: 'Target lights',
+                              label: l10n.targetLightsLabel,
                               required: true,
-                              hint: '${_targetIds.length} selected',
+                              hint: l10n.selectedCount(_targetIds.length),
                             ),
                             const SizedBox(height: 6),
                             _TargetSection(
@@ -186,10 +224,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Enabled',
-                            hint: 'active immediately after save',
-                          ),
+                          _FieldLabel(label: l10n.enabledLabel),
                           const SizedBox(height: 6),
                           _EnabledRow(
                             enabled: _enabled,
@@ -199,7 +234,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                           if (_triggerEvent != null &&
                               _previewActionCommand != null) ...[
                             const SizedBox(height: 16),
-                            _FieldLabel(label: 'Preview'),
+                            _FieldLabel(label: l10n.previewLabel),
                             const SizedBox(height: 6),
                             RulePreview(
                               triggerEvent: _triggerEvent!,
@@ -212,7 +247,10 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                           if (automation.errorMessage != null) ...[
                             const SizedBox(height: 16),
                             Text(
-                              automation.errorMessage!,
+                              localizedErrorMessage(
+                                l10n,
+                                automation.errorMessage!,
+                              ),
                               style: TextStyle(
                                 color: palette.error,
                                 fontSize: 12,
@@ -258,12 +296,27 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
           _scheduleSelection!.isValid &&
           _scheduleTarget != null;
     }
+    final hasValidTrigger =
+        _triggerDeviceType == AutomationDeviceType.environment
+        ? _parsedThreshold != null
+        : _triggerEvent != null;
     return _nameController.text.trim().isNotEmpty &&
         _triggerId != null &&
         _triggerDeviceType != null &&
-        _triggerEvent != null &&
+        hasValidTrigger &&
         _targetIds.isNotEmpty &&
         _targetIds.every(_targetActionCommands.containsKey);
+  }
+
+  double? get _parsedThreshold {
+    final threshold = double.tryParse(_thresholdController.text.trim());
+    if (threshold == null) {
+      return null;
+    }
+    final range = _environmentMetric == EnvironmentMetric.temperature
+        ? (-20.0, 80.0)
+        : (0.0, 100.0);
+    return threshold >= range.$1 && threshold <= range.$2 ? threshold : null;
   }
 
   void _setTemplate(AutomationRuleTemplate template) {
@@ -329,6 +382,9 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   void _setTriggerState(Map<String, Object?> state) {
     final triggerDeviceType = _triggerDeviceType;
     if (triggerDeviceType == null) {
+      return;
+    }
+    if (triggerDeviceType == AutomationDeviceType.environment) {
       return;
     }
     setState(() {
@@ -418,13 +474,16 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
 
   bool _isTriggerDevice(SmartDevice device) {
     return device.deviceType == AutomationDeviceType.switchDevice.wireValue ||
-        device.deviceType == AutomationDeviceType.motion.wireValue;
+        device.deviceType == AutomationDeviceType.motion.wireValue ||
+        device.deviceType == AutomationDeviceType.environment.wireValue;
   }
 
   AutomationDeviceType _automationTypeFor(SmartDevice device) {
-    return device.deviceType == AutomationDeviceType.switchDevice.wireValue
-        ? AutomationDeviceType.switchDevice
-        : AutomationDeviceType.motion;
+    return switch (device.deviceType) {
+      'switch' => AutomationDeviceType.switchDevice,
+      'environment' => AutomationDeviceType.environment,
+      _ => AutomationDeviceType.motion,
+    };
   }
 
   void _applyDefaultsForTriggerType(AutomationDeviceType type) {
@@ -432,6 +491,14 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       _triggerEvent = AutomationTriggerEvent.switchToggle;
       _triggerState = const {};
       _actionCommand = AutomationActionCommand.toggle;
+      _syncMissingTargetActions();
+      return;
+    }
+
+    if (type == AutomationDeviceType.environment) {
+      _triggerEvent = null;
+      _triggerState = const {};
+      _actionCommand = AutomationActionCommand.on;
       _syncMissingTargetActions();
       return;
     }
@@ -517,27 +584,53 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       final triggerEvent = _triggerEvent;
       if (triggerId == null ||
           triggerDeviceType == null ||
-          triggerEvent == null ||
           _targetIds.isEmpty ||
           !_targetIds.every(_targetActionCommands.containsKey)) {
         return;
       }
       final targetLightIds = _targetIds.toList(growable: false);
-      draft = AutomationRuleDraft(
-        name: _nameController.text.trim(),
-        enabled: _enabled,
-        template: template,
-        triggerDeviceId: triggerId,
-        triggerDeviceType: triggerDeviceType,
-        triggerEvent: triggerEvent,
-        triggerState: _triggerState,
-        actionCommand: _previewActionCommand,
-        targetLightIds: targetLightIds,
-        targetActionCommands: {
-          for (final targetId in targetLightIds)
-            targetId: _targetActionCommands[targetId]!,
-        },
-      );
+      if (triggerDeviceType == AutomationDeviceType.environment) {
+        final threshold = _parsedThreshold;
+        if (threshold == null) {
+          return;
+        }
+        draft = AutomationRuleDraft.typed(
+          name: _nameController.text.trim(),
+          enabled: _enabled,
+          trigger: SensorThresholdAutomationTrigger(
+            deviceId: triggerId,
+            metric: _environmentMetric,
+            operator: _thresholdOperator,
+            threshold: threshold,
+          ),
+          actions: [
+            for (final targetId in targetLightIds)
+              DeviceCommandAutomationAction(
+                deviceId: targetId,
+                command: _targetActionCommands[targetId]!,
+              ),
+          ],
+        );
+      } else {
+        if (triggerEvent == null) {
+          return;
+        }
+        draft = AutomationRuleDraft(
+          name: _nameController.text.trim(),
+          enabled: _enabled,
+          template: template,
+          triggerDeviceId: triggerId,
+          triggerDeviceType: triggerDeviceType,
+          triggerEvent: triggerEvent,
+          triggerState: _triggerState,
+          actionCommand: _previewActionCommand,
+          targetLightIds: targetLightIds,
+          targetActionCommands: {
+            for (final targetId in targetLightIds)
+              targetId: _targetActionCommands[targetId]!,
+          },
+        );
+      }
     }
 
     final beforeIds = automation.rules.map((rule) => rule.id).toSet();
@@ -587,6 +680,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
       child: Row(
@@ -596,7 +690,7 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'New rule',
+                  l10n.newRuleTitle,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -605,7 +699,7 @@ class _Header extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'When something happens, do something.',
+                  l10n.newRuleSubtitle,
                   style: TextStyle(fontSize: 12, color: palette.textSecondary),
                 ),
               ],
@@ -615,7 +709,7 @@ class _Header extends StatelessWidget {
             icon: const Icon(Icons.close, size: 20),
             color: palette.textPrimary,
             onPressed: onClose,
-            tooltip: 'Close',
+            tooltip: l10n.closeTooltip,
           ),
         ],
       ),
@@ -631,11 +725,13 @@ class _NameField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     return TextField(
+      key: const Key('rule-name-field'),
       controller: controller,
       textInputAction: TextInputAction.next,
       decoration: InputDecoration(
-        hintText: 'e.g. Motion turns on lab lights',
+        hintText: l10n.ruleNameHint,
         hintStyle: TextStyle(color: palette.textSecondary),
         filled: true,
         fillColor: palette.surface,
@@ -676,6 +772,7 @@ class _QuickTemplateSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -683,15 +780,15 @@ class _QuickTemplateSection extends StatelessWidget {
           children: [
             Expanded(
               child: _FieldLabel(
-                label: 'Quick template',
+                label: l10n.quickTemplateLabel,
                 hint: selected?.label,
               ),
             ),
             IconButton(
               key: const Key('quick-template-toggle'),
               tooltip: isExpanded
-                  ? 'Collapse quick template'
-                  : 'Expand quick template',
+                  ? l10n.collapseQuickTemplateTooltip
+                  : l10n.expandQuickTemplateTooltip,
               onPressed: onToggleExpanded,
               icon: Icon(
                 isExpanded ? Icons.expand_less : Icons.expand_more,
@@ -761,6 +858,7 @@ class _TriggerSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     if (triggers.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -778,7 +876,7 @@ class _TriggerSection extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'No switch or motion devices available',
+                l10n.noTriggerDevicesMessage,
                 style: TextStyle(color: palette.warning, fontSize: 12),
               ),
             ),
@@ -800,7 +898,8 @@ class _TriggerSection extends StatelessWidget {
                   onChanged: (selected) =>
                       onDeviceChanged(selected ? device : null),
                 ),
-                if (selectedId == device.id) ...[
+                if (selectedId == device.id &&
+                    triggerDeviceType != AutomationDeviceType.environment) ...[
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -840,6 +939,7 @@ class _TargetSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     if (lights.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -857,7 +957,7 @@ class _TargetSection extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'No light devices available',
+                l10n.noLightDevicesMessage,
                 style: TextStyle(color: palette.warning, fontSize: 12),
               ),
             ),
@@ -914,11 +1014,12 @@ class _TriggerStateSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final type = triggerDeviceType;
     if (type == null) {
       return _DashedHint(
         palette: palette,
-        label: 'Choose a trigger device first',
+        label: l10n.chooseTriggerDeviceMessage,
       );
     }
 
@@ -926,7 +1027,7 @@ class _TriggerStateSection extends StatelessWidget {
       return _StateButtonRow(
         children: [
           _StateButton(
-            label: 'Toggle',
+            label: l10n.toggleLabel,
             icon: Icons.toggle_off,
             selected: true,
             onTap: () => onChanged(const {}),
@@ -941,13 +1042,13 @@ class _TriggerStateSection extends StatelessWidget {
     return _StateButtonRow(
       children: [
         _StateButton(
-          label: 'Occupied',
+          label: l10n.occupiedLabel,
           icon: Icons.person_outline,
           selected: occupancy == 'occupied',
           onTap: () => onChanged(const {'occupancy': 'occupied'}),
         ),
         _StateButton(
-          label: 'Unoccupied',
+          label: l10n.unoccupiedLabel,
           icon: Icons.person_off_outlined,
           selected: occupancy == 'unoccupied',
           onTap: () => onChanged(const {'occupancy': 'unoccupied'}),
@@ -969,23 +1070,24 @@ class _TargetActionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final command = actionCommand;
+    final l10n = AppLocalizations.of(context)!;
 
     return _StateButtonRow(
       children: [
         _StateButton(
-          label: AutomationActionCommand.on.label,
+          label: l10n.turnOnLabel,
           icon: Icons.lightbulb_outline,
           selected: command == AutomationActionCommand.on,
           onTap: () => onChanged(AutomationActionCommand.on),
         ),
         _StateButton(
-          label: AutomationActionCommand.off.label,
+          label: l10n.turnOffLabel,
           icon: Icons.lightbulb,
           selected: command == AutomationActionCommand.off,
           onTap: () => onChanged(AutomationActionCommand.off),
         ),
         _StateButton(
-          label: AutomationActionCommand.toggle.label,
+          label: l10n.toggleLabel,
           icon: Icons.swap_horiz,
           selected: command == AutomationActionCommand.toggle,
           onTap: () => onChanged(AutomationActionCommand.toggle),
@@ -1095,6 +1197,7 @@ class _EnabledRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1108,9 +1211,7 @@ class _EnabledRow extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              enabled
-                  ? 'On — rule is active'
-                  : 'Off — rule saved but not running',
+              enabled ? l10n.ruleEnabledLabel : l10n.ruleDisabledLabel,
               style: TextStyle(fontSize: 13, color: palette.textPrimary),
             ),
           ),
@@ -1179,6 +1280,7 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
       decoration: BoxDecoration(
@@ -1197,7 +1299,7 @@ class _Footer extends StatelessWidget {
               ),
               foregroundColor: palette.textPrimary,
             ),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancelLabel),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1210,7 +1312,7 @@ class _Footer extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check, size: 16),
-              label: const Text('Save rule'),
+              label: Text(l10n.saveRuleLabel),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

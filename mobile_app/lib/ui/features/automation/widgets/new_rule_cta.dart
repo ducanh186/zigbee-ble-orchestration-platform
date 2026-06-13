@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// Dashed "+ New rule" banner that sits above the rule list and opens the
@@ -13,6 +14,7 @@ class NewRuleCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
 
     return Material(
       color: palette.surface,
@@ -46,7 +48,7 @@ class NewRuleCta extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'New rule',
+                      l10n.newRuleTitle,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -55,7 +57,7 @@ class NewRuleCta extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'When something happens, do something',
+                      l10n.newRuleSubtitle,
                       style: TextStyle(
                         fontSize: 12,
                         color: palette.textSecondary,

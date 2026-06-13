@@ -10,6 +10,84 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 
 @pytest.mark.asyncio
+async def test_environment_reports_merge_partial_measurements():
+    from cloud.app.database import Base
+    from cloud.app.models import DeviceState
+    from cloud.app.mqtt_client import MQTTService
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    db_session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+    tasks: list[asyncio.Task] = []
+    service._run_async = lambda coro_func: tasks.append(
+        asyncio.create_task(coro_func())
+    )
+    device_id = "0000000000000052"
+    topic = (
+        "sb/v1/hust/lab01/gw-ubuntu-01/devices/"
+        f"environment/{device_id}/reported"
+    )
+
+    service._handle_reported(
+        topic,
+        {
+            "ts": 1776064500000,
+            "payload": {
+                "device_id": device_id,
+                "device_type": "environment",
+                "state": {
+                    "temperature_c": 28.5,
+                    "sensor": "dht11",
+                    "reachable": True,
+                },
+            },
+        },
+    )
+    await tasks.pop(0)
+    service._handle_reported(
+        topic,
+        {
+            "ts": 1776064560000,
+            "payload": {
+                "device_id": device_id,
+                "device_type": "environment",
+                "state": {
+                    "humidity_percent": 48,
+                    "sensor": "dht11",
+                    "reachable": True,
+                },
+            },
+        },
+    )
+    await tasks.pop(0)
+
+    async with db_session_factory() as session:
+        states = (
+            await session.execute(
+                select(DeviceState)
+                .where(DeviceState.device_id == device_id)
+                .order_by(DeviceState.reported_at)
+            )
+        ).scalars().all()
+
+    assert states[-1].state == {
+        "temperature_c": 28.5,
+        "humidity_percent": 48.0,
+        "sensor": "dht11",
+        "reachable": True,
+    }
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_handle_motion_event_auto_registers_and_persists():
     from cloud.app.database import Base
     from cloud.app.models import Device, DeviceState, Event

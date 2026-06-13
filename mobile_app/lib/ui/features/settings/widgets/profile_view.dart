@@ -39,7 +39,7 @@ class _ProfileViewState extends State<ProfileView> {
           title: Text(l10n.profileTitle),
           pinned: true,
           leading: IconButton(
-            tooltip: 'Back',
+            tooltip: l10n.backLabel,
             onPressed: widget.onBack,
             icon: const Icon(Icons.arrow_back),
           ),
@@ -114,35 +114,35 @@ class _ProfileViewState extends State<ProfileView> {
                   children: [
                     _ProfileRow(
                       icon: Icons.person_outline,
-                      label: 'Username',
+                      label: l10n.profileUsernameLabel,
                       value: _displayValue(session?.username),
                       mono: true,
                     ),
                     Divider(color: palette.border, height: 1),
                     _ProfileRow(
                       icon: Icons.badge_outlined,
-                      label: 'User ID',
+                      label: l10n.profileUserIdLabel,
                       value: _displayValue(session?.userId),
                       mono: true,
                     ),
                     Divider(color: palette.border, height: 1),
                     _ProfileRow(
                       icon: Icons.verified_user_outlined,
-                      label: 'Role',
+                      label: l10n.profileRoleLabel,
                       value: role,
                       mono: true,
                     ),
                     Divider(color: palette.border, height: 1),
                     _ProfileRow(
                       icon: Icons.home_work_outlined,
-                      label: 'Home ID',
+                      label: l10n.profileHomeIdLabel,
                       value: _displayValue(session?.homeId),
                       mono: true,
                     ),
                     Divider(color: palette.border, height: 1),
                     _ProfileRow(
                       icon: Icons.access_time,
-                      label: 'Expires at',
+                      label: l10n.profileExpiresAtLabel,
                       value: _formatUtc(session?.expiresAt),
                       mono: true,
                     ),
@@ -178,14 +178,14 @@ class _ProfileViewState extends State<ProfileView> {
                         children: [
                           _ProfileRow(
                             icon: Icons.key_outlined,
-                            label: '...',
+                            label: l10n.profileActions,
                             value: l10n.profileChangePassword,
                             actionable: true,
                           ),
                           Divider(color: palette.border, height: 1),
                           _ProfileRow(
                             icon: Icons.copy_outlined,
-                            label: 'API',
+                            label: l10n.profileApiLabel,
                             value: l10n.profileCopyToken,
                             actionable: true,
                           ),

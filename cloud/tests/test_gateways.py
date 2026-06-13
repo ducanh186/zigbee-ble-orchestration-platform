@@ -1,9 +1,12 @@
 """Tests for the gateway commissioning router (open / close)."""
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from cloud.app.config import settings
+from cloud.app.models import Event
 from cloud.tests.auth_helpers import create_auth_user, login_headers
 
 
@@ -32,6 +35,77 @@ async def _parent_headers(client, db_session_factory) -> dict[str, str]:
         home_id="home-1",
     )
     return await login_headers(client, "parent", "parent-pass")
+
+
+async def _viewer_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-1",
+        username="viewer",
+        role="viewer",
+        password="viewer-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "viewer", "viewer-pass")
+
+
+@pytest.mark.asyncio
+async def test_gateway_status_is_visible_to_authenticated_roles(
+    client, db_session_factory
+):
+    async with db_session_factory() as session:
+        session.add_all(
+            [
+                Event(
+                    device_id=None,
+                    event_type="gateway_online",
+                    payload={"value": "online", "gateway_id": GW, "source": "gateway"},
+                    occurred_at=datetime(2026, 6, 13, 7, 0),
+                ),
+                Event(
+                    device_id=None,
+                    event_type="gateway_online",
+                    payload={"value": "offline", "gateway_id": GW, "source": "gateway"},
+                    occurred_at=datetime(2026, 6, 13, 8, 0),
+                ),
+            ]
+        )
+        await session.commit()
+
+    no_token = await client.get(f"/api/gateways/{GW}/status")
+    assert no_token.status_code == 401
+
+    headers_by_role = [
+        await _admin_headers(client, db_session_factory),
+        await _parent_headers(client, db_session_factory),
+        await _viewer_headers(client, db_session_factory),
+    ]
+    for headers in headers_by_role:
+        response = await client.get(f"/api/gateways/{GW}/status", headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "gateway_id": GW,
+            "status": "offline",
+            "event_type": "gateway_online",
+            "occurred_at": "08:00 06/13/2026",
+        }
+
+
+@pytest.mark.asyncio
+async def test_gateway_status_is_unknown_without_gateway_event(
+    client, db_session_factory
+):
+    headers = await _viewer_headers(client, db_session_factory)
+
+    response = await client.get(f"/api/gateways/{GW}/status", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "gateway_id": GW,
+        "status": "unknown",
+        "event_type": None,
+        "occurred_at": None,
+    }
 
 
 @pytest.mark.asyncio

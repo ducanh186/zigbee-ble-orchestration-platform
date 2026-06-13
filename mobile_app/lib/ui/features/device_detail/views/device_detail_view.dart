@@ -5,6 +5,8 @@ import '../../../../domain/models/command_status.dart';
 import '../../../../domain/models/device_power.dart';
 import '../../../../domain/models/event_log.dart';
 import '../../../../domain/models/smart_device.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
@@ -58,29 +60,30 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
   Widget build(BuildContext context) {
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
+        final l10n = AppLocalizations.of(context)!;
         final current = viewModel.deviceById(widget.device.id) ?? widget.device;
         final recentEvents = viewModel.eventsForDevice(current.id);
 
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('Device detail'),
+              title: Text(l10n.deviceDetailTitle),
               pinned: true,
               leading: IconButton(
-                tooltip: 'Back',
+                tooltip: l10n.backLabel,
                 icon: const Icon(Icons.arrow_back),
                 onPressed: widget.onBack,
               ),
               actions: [
                 IconButton(
-                  tooltip: 'Rename device',
+                  tooltip: l10n.renameDeviceLabel,
                   onPressed: viewModel.isRenamingDevice
                       ? null
                       : () => _renameDevice(context, viewModel, current),
                   icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
-                  tooltip: 'Refresh',
+                  tooltip: l10n.refreshTooltip,
                   onPressed: () => _refresh(viewModel, current.id),
                   icon: const Icon(Icons.refresh),
                 ),
@@ -103,7 +106,7 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
                     _OccupancyTimeline(events: recentEvents),
                   ],
                   const SizedBox(height: 18),
-                  const SectionTitle(title: 'Recent events'),
+                  SectionTitle(title: l10n.recentEventsTitle),
                   const SizedBox(height: 8),
                   _RecentEvents(
                     events: recentEvents,
@@ -169,23 +172,24 @@ class _RenameDeviceDialogState extends State<_RenameDeviceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: const Text('Rename device'),
+      title: Text(l10n.renameDeviceLabel),
       content: TextField(
         controller: _controller,
         autofocus: true,
-        decoration: const InputDecoration(labelText: 'Display name'),
+        decoration: InputDecoration(labelText: l10n.displayNameLabel),
         textInputAction: TextInputAction.done,
         onSubmitted: (value) => Navigator.of(context).pop(value),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelLabel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Save'),
+          child: Text(l10n.saveLabel),
         ),
       ],
     );
@@ -201,6 +205,7 @@ class _DeviceHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final isOn = device.power == DevicePower.on;
     final canCommand =
         device.isLight &&
@@ -251,7 +256,9 @@ class _DeviceHeroCard extends StatelessWidget {
               device.isLight
                   ? StatusBadge.forPower(device.power)
                   : StatusBadge(
-                      label: device.isOnline ? 'ONLINE' : 'OFFLINE',
+                      label: device.isOnline
+                          ? l10n.onlineLabel.toUpperCase()
+                          : l10n.offlineLabel.toUpperCase(),
                       tone: device.isOnline
                           ? BadgeTone.success
                           : BadgeTone.warning,
@@ -281,7 +288,7 @@ class _DeviceHeroCard extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.power_settings_new),
-                    label: const Text('ON'),
+                    label: Text(l10n.turnOnLabel.toUpperCase()),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -291,7 +298,7 @@ class _DeviceHeroCard extends StatelessWidget {
                         ? () => viewModel.setLightPower(device, DevicePower.off)
                         : null,
                     icon: const Icon(Icons.power_settings_new),
-                    label: const Text('OFF'),
+                    label: Text(l10n.turnOffLabel.toUpperCase()),
                   ),
                 ),
               ],
@@ -322,22 +329,26 @@ class _DeviceInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AppCard(
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          _InfoRow(label: 'Type', value: device.deviceType),
+          _InfoRow(label: l10n.deviceTypeLabel, value: device.deviceType),
           _InfoRow(
-            label: 'Status',
-            value: device.isOnline ? 'online' : 'offline',
+            label: l10n.statusLabel,
+            value: device.isOnline ? l10n.onlineLabel : l10n.offlineLabel,
           ),
-          _InfoRow(label: 'Room', value: device.roomLabel),
+          _InfoRow(label: l10n.roomLabel, value: device.roomLabel),
           if (device.isMotion)
-            _InfoRow(label: 'Occupancy', value: device.occupancy.label),
+            _InfoRow(
+              label: l10n.occupancyLabel,
+              value: _localizedOccupancy(device.occupancy, l10n),
+            ),
           if (device.eui64 != null)
             _InfoRow(label: 'EUI64', value: device.eui64!),
           if (device.reportedAt != null)
-            _InfoRow(label: 'Reported', value: device.reportedAt!),
+            _InfoRow(label: l10n.reportedLabel, value: device.reportedAt!),
         ],
       ),
     );
@@ -351,8 +362,9 @@ class _OccupancyBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return StatusBadge(
-      label: status.label,
+      label: _localizedOccupancy(status, l10n),
       tone: switch (status) {
         OccupancyState.occupied => BadgeTone.success,
         OccupancyState.unoccupied => BadgeTone.neutral,
@@ -369,6 +381,7 @@ class _OccupancyTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final occupancyEvents = events.where(_isOccupancyEvent).toList();
     final latest = occupancyEvents.isEmpty ? null : occupancyEvents.first;
 
@@ -377,20 +390,22 @@ class _OccupancyTimeline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(title: 'Occupancy timeline'),
+          SectionTitle(title: l10n.occupancyTimelineTitle),
           const SizedBox(height: 8),
-          const Text(
-            'Latest occupancy',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          Text(
+            l10n.latestOccupancyLabel,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           Text(
-            latest == null ? 'No event yet' : _occupancyLabel(latest),
+            latest == null
+                ? l10n.noEventYetMessage
+                : _occupancyLabel(latest, l10n),
             style: TextStyle(color: context.palette.textSecondary),
           ),
           const SizedBox(height: 10),
           if (occupancyEvents.isEmpty)
             Text(
-              'No occupancy event for this sensor.',
+              l10n.noOccupancyEventMessage,
               style: TextStyle(color: context.palette.textSecondary),
             )
           else
@@ -417,7 +432,7 @@ class _OccupancyTimeline extends StatelessWidget {
                       size: 16,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(_occupancyLabel(event))),
+                    Expanded(child: Text(_occupancyLabel(event, l10n))),
                   ],
                 ),
               ),
@@ -431,10 +446,10 @@ class _OccupancyTimeline extends StatelessWidget {
     return combined.contains('occup');
   }
 
-  static String _occupancyLabel(EventLog event) {
+  static String _occupancyLabel(EventLog event, AppLocalizations l10n) {
     final status = OccupancyState.fromValue(event.message);
     if (status != OccupancyState.unknown) {
-      return status.label;
+      return _localizedOccupancy(status, l10n);
     }
     return event.message;
   }
@@ -484,16 +499,17 @@ class _LastCommandCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final command = viewModel.lastCommand;
     final status = command?.status ?? CommandStatus.idle;
     final message = switch (status) {
-      CommandStatus.accepted => 'Sent to Cloud API',
-      CommandStatus.queued => 'Queued by home hub',
-      CommandStatus.sent => 'Waiting for device reply',
-      CommandStatus.executed => 'Acknowledged by home hub',
-      CommandStatus.failed => command?.reason ?? 'Command failed',
-      CommandStatus.timeout => 'No reply within polling window',
-      CommandStatus.idle => 'No active command',
+      CommandStatus.accepted => l10n.commandSentMessage,
+      CommandStatus.queued => l10n.commandQueuedMessage,
+      CommandStatus.sent => l10n.commandWaitingMessage,
+      CommandStatus.executed => l10n.commandAcknowledgedMessage,
+      CommandStatus.failed => command?.reason ?? l10n.commandFailedMessage,
+      CommandStatus.timeout => l10n.commandTimeoutMessage,
+      CommandStatus.idle => l10n.noActiveCommandMessage,
     };
 
     return AppCard(
@@ -501,7 +517,7 @@ class _LastCommandCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(title: 'Last command'),
+          SectionTitle(title: l10n.lastCommandTitle),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -510,7 +526,7 @@ class _LastCommandCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      command?.id ?? 'none',
+                      command?.id ?? l10n.noneLabel,
                       style: const TextStyle(
                         fontFamily: 'JetBrains Mono',
                         fontSize: 13,
@@ -539,7 +555,7 @@ class _LastCommandCard extends StatelessWidget {
                   onPressed: viewModel.retryLastCommand,
                   icon: const Icon(Icons.refresh),
                   label: Text(
-                    'Retry ${viewModel.lastTarget?.label ?? ''}'.trim(),
+                    l10n.retryTargetLabel(viewModel.lastTarget?.label ?? ''),
                   ),
                 ),
               ),
@@ -563,6 +579,7 @@ class _RecentEvents extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (isLoading) {
       return const AppCard(
         child: Center(
@@ -575,10 +592,10 @@ class _RecentEvents extends StatelessWidget {
       );
     }
     if (errorMessage != null) {
-      return AppCard(child: Text(errorMessage!));
+      return AppCard(child: Text(localizedErrorMessage(l10n, errorMessage!)));
     }
     if (events.isEmpty) {
-      return const AppCard(child: Text('No recent event for this device.'));
+      return AppCard(child: Text(l10n.noRecentEventMessage));
     }
 
     return AppCard(
@@ -602,7 +619,8 @@ class _EventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final message = _compactMessage(event);
+    final l10n = AppLocalizations.of(context)!;
+    final message = _compactMessage(event, l10n);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -656,24 +674,32 @@ class _EventRow extends StatelessWidget {
     );
   }
 
-  String _compactMessage(EventLog event) {
+  String _compactMessage(EventLog event, AppLocalizations l10n) {
     if (event.eventType == 'device_registry') {
-      return 'Device registry updated';
+      return l10n.deviceRegistryUpdatedMessage;
     }
     if (event.eventType == 'gateway_health') {
-      return 'Home hub health updated';
+      return l10n.gatewayHealthUpdatedMessage;
     }
     if (event.message.length > 80) {
-      return _humanize(event.eventType);
+      return _humanize(event.eventType, l10n);
     }
     return event.message;
   }
 
-  String _humanize(String value) {
+  String _humanize(String value, AppLocalizations l10n) {
     final normalized = value.replaceAll('_', ' ').trim();
     if (normalized.isEmpty) {
-      return 'Event updated';
+      return l10n.eventUpdatedMessage;
     }
     return normalized[0].toUpperCase() + normalized.substring(1);
   }
+}
+
+String _localizedOccupancy(OccupancyState status, AppLocalizations l10n) {
+  return switch (status) {
+    OccupancyState.occupied => l10n.occupancyOccupiedLabel,
+    OccupancyState.unoccupied => l10n.occupancyUnoccupiedLabel,
+    OccupancyState.unknown => l10n.occupancyUnknownLabel,
+  };
 }

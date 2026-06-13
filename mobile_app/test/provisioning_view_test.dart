@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:zigbee_smart_building/domain/models/provisioning_session.dart';
 import 'package:zigbee_smart_building/domain/repositories/provisioning_repository.dart';
+import 'package:zigbee_smart_building/l10n/app_localizations.dart';
 import 'package:zigbee_smart_building/ui/core/theme/app_theme.dart';
 import 'package:zigbee_smart_building/ui/features/provisioning/views/provisioning_view.dart';
 
@@ -101,7 +103,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('eui64 must be 16 hex characters'),
+        find.text('The data is invalid. Check the input fields.'),
         findsOneWidget,
       );
       await _scrollUntilVisible(
@@ -281,6 +283,13 @@ Widget _wrap(Widget child, {ProvisioningRepository? repository}) {
   return Provider<ProvisioningRepository>.value(
     value: repository ?? _FakeProvisioningRepository(),
     child: MaterialApp(
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: AppTheme.theme(AppThemeMode.light),
       home: Scaffold(body: child),
     ),
