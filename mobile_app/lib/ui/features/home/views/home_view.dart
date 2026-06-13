@@ -80,10 +80,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.temperatureC,
                             unit: '°C',
                             label: l10n.temperatureLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -93,10 +89,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.humidityPercent,
                             unit: '%',
                             label: l10n.humidityLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                       ],

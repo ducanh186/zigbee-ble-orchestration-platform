@@ -334,13 +334,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ruleNameHint => 'e.g. Motion turns on lab lights';
 
   @override
-  String get quickTemplateLabel => 'Quick template';
+  String get ruleKindLabel => 'Rule type';
 
   @override
-  String get expandQuickTemplateTooltip => 'Expand quick template';
+  String get ruleKindDeviceTrigger => 'Device trigger';
 
   @override
-  String get collapseQuickTemplateTooltip => 'Collapse quick template';
+  String get ruleKindSchedule => 'Schedule';
 
   @override
   String get triggerDeviceLabel => 'Trigger device';
@@ -793,9 +793,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get humidityLabel => 'Humidity';
 
   @override
-  String get zigbeeLocalLabel => 'Zigbee local';
-
-  @override
   String get sensorConditionLabel => 'Condition';
 
   @override
@@ -827,6 +824,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduleTriggerLabel => 'Schedule';
+
+  @override
+  String get scheduleActionLabel => 'Action';
 
   @override
   String get scheduleModeHourly => 'Hourly';
