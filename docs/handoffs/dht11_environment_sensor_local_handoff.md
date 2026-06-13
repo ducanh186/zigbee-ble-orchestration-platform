@@ -201,19 +201,97 @@ while the sensor was absent.
 
 ## 10. MQTT / Gateway payload observed
 
-None — by design. The gateway decoder is log-only (`ENV:` console lines and
-`@LOG {"tag":"ENV",…}` entries in `/tmp/z3gw.log`). No `sb/v1/...` topic
-carries temperature/humidity yet, and no MQTT contract was changed.
+- **Registry:** `devices/environment/0000000000000053/registry` (retained) once
+  classified — see §10A.
+- **Automation:** `automations/{id}/reported` (sync ack) and
+  `automations/{id}/event` (`rule_fired` with the `threshold_crossed` trigger)
+  on each fire — see §10A.
+- **No continuous temp/humidity telemetry topic yet** (log-only `ENV:` lines);
+  that stream is left for the cloud teammate (§11.2, §12).
+
+## 10A. Environment → Light automation (DHT11 drives the light)
+
+**Light behavior is now an intended feature, not a side effect.** The DHT11
+firmware itself still emits ZERO On/Off and creates no binding — it only
+reports 0x0402/0x0405. The bulb is driven entirely by a **gateway automation
+rule**, edge-triggered on temperature/humidity thresholds, exactly like the
+occupancy→light path. Users create/edit these rules from app/dashboard.
+
+**Rule shape** (MQTT `automations/{id}/desired`, retained — same envelope as
+occupancy, new `environment` trigger):
+
+```json
+{
+  "op": "upsert", "version": 1, "name": "Bat den khi nong", "enabled": true,
+  "trigger": {
+    "device_type": "environment",
+    "device_id": "0000000000000053",
+    "event": "threshold_crossed",
+    "metric": "temperature",      // temperature | humidity
+    "comparator": "gte",          // gte (>=) | lte (<=)
+    "threshold": 2800             // centi-unit: 2800 = 28.00C, 6500 = 65.00%RH
+  },
+  "actions": [
+    { "device_type": "light", "device_id": "000000000000004F", "command": "on" }
+  ]
+}
+```
+
+**Semantics:** fires once on the transition into "condition met" (edge-trigger),
+not every report, plus the existing 500 ms per-rule cooldown. Use two rules with
+offset thresholds (e.g. on ≥28.0 °C, off ≤27.0 °C) for hysteresis. `comparator`
+(not `op`) names the operator inside `trigger` to avoid colliding with the
+envelope's `"op":"upsert"`.
+
+**Why the light turned on during earlier testing (the original Phase-6
+question):** it was NOT the DHT11 device. On a shared demo network, light
+`…004F` (node 0xEB7B) + pre-existing switch/cloud automation rules drive the
+On/Off cluster. The DHT11 sensor (node 0xA09A) is architecturally incapable of
+sending On/Off. With this feature, the *intended* way for the sensor to affect
+the light is the environment rule above — observable as `LIGHT auto_action_sent`
++ `AUTO fired ... "trigger":"threshold_crossed"` in the gateway log.
+
+### Occupancy vs DHT11 comparison
+
+| Item | Occupancy firmware | DHT11 env sensor | Status |
+|---|---|---|---|
+| Sensor driver | `pir_sensor.c` (digital poll 200 ms) | `dht11.c` (1-wire, DWT µs timing, hard timeouts) | replaced |
+| ZCL cluster | 0x0406 Occupancy | 0x0402 Temp + 0x0405 Humidity | replaced |
+| Report path | manual Report Attrs to bindings | manual Report Attrs unicast to coordinator | reused pattern |
+| Net / join / buttons / QR | `net_mgr` / `buttons` / `display_qr` | identical | reused |
+| Gateway classify | `motion` | `environment` (new) | added |
+| Automation trigger | `occupancy_changed` | `threshold_crossed` (metric/comparator/threshold) | added |
+| Light control | rule action on/off/toggle | rule action on/off | reused |
+| Device emits On/Off? | no | no | unchanged (rule decides) |
+
+### Demo checklist (verified 2026-06-13, kit 440121812 / EUI …0053, light …004F)
+
+| # | Test | Result | Evidence |
+|---|---|---|---|
+| 1 | Firmware build | PASS | `Z3_DHT11_Sensor.s37` 780,996 B, zero warnings |
+| 2 | Device boot + sensor read | PASS | `DHT11 init: PD8`; `DHT11 read OK: temp=…` on VCOM |
+| 3 | Zigbee join | PASS | IC-derived join node 0xA09A; classify `type:"environment"` |
+| 4 | Temp/humidity report at gateway | PASS | `ENV: temp=28.00C` / `ENV: humidity=45.00%` + `@LOG ENV report` |
+| 5 | No unintended occupancy behavior | PASS | device sends only 0x0402/0x0405; no 0x0406, no On/Off |
+| 6 | Light driven by rule (intended) | PASS | rule `gte 2750`→`AUTO fired`→`auto_action_sent on`→light `@DATA state:"on"`; rule `lte 2800`→light off |
+
+Raw log: `testing_tools/evidence/dht11_env_automation_2026-06-13.md`.
+(Physical heating wasn't possible in the autonomous run, so demo thresholds were
+set around ambient ~27.8 °C to exercise both crossings with real sensor reports;
+the rule logic and light actuation are genuinely end-to-end.)
 
 ## 11. Known limitations
 
-1. **Gateway classification gap**: `device_discovery.c` classifies by cluster
-   (0x0406→motion, 0x0006→switch/light). 0x0402/0x0405 are unknown to it, so
-   the device registers as `unknown` and `appMqttPublishDeviceRegistry` will
-   announce it with that type. The QR payload says `device_type:"environment"`
-   but gateway/cloud don't know that type yet.
-2. **No MQTT telemetry**: temp/humidity never leaves the gateway host (log
-   only).
+1. ~~Gateway classification gap~~ **RESOLVED (2026-06-13):** `device_discovery.c`
+   now classifies 0x0402/0x0405 → `environment`; registry publishes
+   `devices/environment/<eui>/registry`. Note: re-classification of an
+   already-joined device needs a fresh join (PB0 leave/rejoin) OR the
+   `gateway.rediscover_device` MQTT command — a plain reset keeps the cached
+   type. **Cloud must accept device_type `environment`.**
+2. **No continuous MQTT telemetry**: temp/humidity feeds the gateway automation
+   engine and is logged, but is NOT yet published as a
+   `devices/environment/<eui>/telemetry` stream for the cloud. Rule events DO
+   publish (`automations/{id}/event`). Continuous telemetry is future work.
 3. **ZAP source-of-truth drift**: `autogen/zap-config.h` was hand-edited
    (clusters swapped); `config/zcl/zcl_config.zap` still describes the
    occupancy endpoint. Regenerating from the .zap (Studio/slc) would silently
