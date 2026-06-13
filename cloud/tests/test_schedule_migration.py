@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+from sqlalchemy import insert
+from sqlalchemy.dialects.postgresql.asyncpg import PGDialect_asyncpg
+
 from cloud.app.models import Automation
 
 
@@ -11,6 +14,29 @@ def test_automation_model_has_schedule_columns():
     assert columns["trigger_type"].nullable is False
     assert columns["trigger_type"].server_default.arg == "event"
     assert columns["schedule_cron"].nullable is True
+
+
+def test_automation_insert_uses_postgres_trigger_type_enum():
+    statement = insert(Automation).values(
+        id="auto_test",
+        name="Test",
+        enabled=True,
+        tenant_id="tenant",
+        site_id="site",
+        gateway_id="gateway",
+        version=1,
+        trigger_type="event",
+        schedule_cron=None,
+        trigger={},
+        actions=[],
+        sync_status="pending",
+        last_run_status="never_run",
+        last_error=None,
+    )
+
+    compiled = str(statement.compile(dialect=PGDialect_asyncpg()))
+
+    assert "$8::automation_trigger_type" in compiled
 
 
 def test_schedule_migration_defines_event_and_schedule_values():
