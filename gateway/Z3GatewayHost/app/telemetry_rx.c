@@ -281,6 +281,39 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
                                                   sizeof(euiStr));
         }
 
+        // Telemetry-driven fallback registration for the environment sensor,
+        // mirroring the light path: if THIS EUI is not yet in the registry,
+        // auto-register it as "sensor"/kind 2 so device.set_room and registry
+        // snapshots work without waiting for a ZDO rediscovery. Same guards:
+        // skip while discovery is active or if the nodeId is already known.
+        if (strcmp(euiStr, "unknown") != 0) {
+          device_resolved_t envResolved;
+          if (!deviceRegistryResolve(euiStr, &envResolved)) {
+            if (deviceDiscoveryInProgress(sender)) {
+              appLogLog("REG", "auto_skip_discovery",
+                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                "\"reason\":\"zdo_discovery_active\"",
+                euiStr, (unsigned)sender);
+            } else if (deviceRegistryResolveByNodeId(sender, &envResolved)) {
+              appLogLog("REG", "auto_skip_dup_node",
+                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                "\"reason\":\"node_already_registered\","
+                "\"existing_type\":\"%s\"",
+                euiStr, (unsigned)sender, envResolved.device_type);
+            } else {
+              deviceRegistryUpsert(euiStr, sender, 1, "sensor");
+              deviceRegistrySetSensorKind(euiStr, 2);
+              appMqttClearRetainedRegistry(euiStr, "sensor");
+              appMqttPublishDeviceRegistry(sender, euiStr, "sensor", 2);
+              appLogLog("REG", "auto_paired",
+                "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
+                "\"trigger\":\"attr_report\",\"type\":\"sensor\","
+                "\"sensor_kind\":2",
+                euiStr, (unsigned)sender);
+            }
+          }
+        }
+
         int32_t whole = centi / 100;
         int32_t frac = centi % 100;
         if (frac < 0) frac = -frac;
