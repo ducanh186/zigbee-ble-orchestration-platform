@@ -17,6 +17,8 @@ typedef struct {
   EmberNodeId nodeId;
   uint8_t     endpoint;
   char        device_type[16];
+  uint8_t     sensor_kind;   // 0 unless device_type=="sensor"
+  char        room_id[40];   // cloud room_id; "" if unassigned
 } reg_slot_t;
 
 static reg_slot_t g_slots[DEVICE_REGISTRY_MAX];
@@ -100,6 +102,33 @@ bool deviceRegistryUpdateNodeId(const char *eui64Str, EmberNodeId nodeId)
   return true;
 }
 
+bool deviceRegistrySetSensorKind(const char *eui64Str, uint8_t sensor_kind)
+{
+  reg_slot_t *s = findByEuiStr(eui64Str);
+  if (!s) return false;
+  s->sensor_kind = sensor_kind;
+  appLogLog("REG", "sensor_kind",
+            "\"eui64\":\"%s\",\"sensor_kind\":%u",
+            eui64Str, (unsigned)sensor_kind);
+  return true;
+}
+
+bool deviceRegistrySetRoom(const char *eui64Str, const char *room_id)
+{
+  reg_slot_t *s = findByEuiStr(eui64Str);
+  if (!s) return false;
+  if (room_id) {
+    strncpy(s->room_id, room_id, sizeof(s->room_id) - 1);
+    s->room_id[sizeof(s->room_id) - 1] = '\0';
+  } else {
+    s->room_id[0] = '\0';
+  }
+  appLogLog("REG", "set_room",
+            "\"eui64\":\"%s\",\"room_id\":\"%s\"",
+            eui64Str, s->room_id);
+  return true;
+}
+
 bool deviceRegistryResolve(const char *device_id, device_resolved_t *out)
 {
   if (!out || !device_id) return false;
@@ -116,6 +145,7 @@ bool deviceRegistryResolve(const char *device_id, device_resolved_t *out)
   out->nodeId   = s->nodeId;
   out->endpoint = s->endpoint;
   strncpy(out->device_type, s->device_type, sizeof(out->device_type) - 1);
+  out->sensor_kind = s->sensor_kind;
   return true;
 }
 
@@ -129,6 +159,7 @@ bool deviceRegistryResolveByNodeId(EmberNodeId nodeId, device_resolved_t *out)
       out->endpoint = g_slots[i].endpoint;
       strncpy(out->device_type, g_slots[i].device_type,
               sizeof(out->device_type) - 1);
+      out->sensor_kind = g_slots[i].sensor_kind;
       return true;
     }
   }
