@@ -160,7 +160,7 @@ class _DeviceTypeFilters extends StatelessWidget {
     final filters = const [
       _DeviceFilter('all', 'All', Icons.grid_view_rounded),
       _DeviceFilter('light', 'Light', Icons.lightbulb_outline),
-      _DeviceFilter('motion', 'Motion', Icons.sensors),
+      _DeviceFilter('motion', 'Sensors', Icons.sensors),
       _DeviceFilter('switch', 'Switch', Icons.toggle_off),
     ];
 

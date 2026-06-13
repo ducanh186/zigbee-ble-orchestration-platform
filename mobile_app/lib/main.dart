@@ -34,7 +34,7 @@ import 'ui/features/shell/views/smart_building_shell.dart';
 const _useMockApi = bool.fromEnvironment('USE_MOCK_API', defaultValue: false);
 const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://98.83.4.87:8000',
+  defaultValue: 'https://dashboard.iot-building.app',
 );
 // Demo builds may override this with `--dart-define=HIDE_LOGIN=true`.
 const _hideLogin = bool.fromEnvironment('HIDE_LOGIN', defaultValue: false);

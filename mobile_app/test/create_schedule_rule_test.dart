@@ -39,7 +39,10 @@ void main() {
     await tester.tap(find.byKey(const Key('quick-template-toggle')));
     await tester.pump();
     await _tapVisible(tester, find.text('Schedule on'));
-    await _tapVisible(tester, find.text('Every weekday 07:00'));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-mode-weekdays')),
+    );
     await _tapVisible(tester, find.text('Lab Light'));
     await tester.tap(find.text('Save rule'));
     await tester.pump();
@@ -62,16 +65,20 @@ void main() {
     await tester.tap(find.byKey(const Key('quick-template-toggle')));
     await tester.pump();
     await _tapVisible(tester, find.text('Schedule on'));
-    await _tapVisible(tester, find.text('Every weekday 07:00'));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-mode-weekdays')),
+    );
     await _tapVisible(tester, find.text('Lab Light'));
 
     await _tapVisible(tester, find.text('Schedule off'));
 
-    final weekdayChip = find.ancestor(
-      of: find.text('Every weekday 07:00'),
-      matching: find.byType(ChoiceChip),
+    // Switching templates rebuilds the schedule section with a fresh key, so
+    // the mode resets to the default (Daily) and Weekdays is no longer chosen.
+    final weekdaysChip = tester.widget<ChoiceChip>(
+      find.byKey(const ValueKey('schedule-mode-weekdays')),
     );
-    expect(tester.widget<ChoiceChip>(weekdayChip).selected, isFalse);
+    expect(weekdaysChip.selected, isFalse);
     expect(find.byIcon(Icons.check_circle), findsNothing);
   });
 
@@ -84,7 +91,10 @@ void main() {
     await tester.tap(find.byKey(const Key('quick-template-toggle')));
     await tester.pump();
     await _tapVisible(tester, find.text('Schedule on'));
-    await _tapVisible(tester, find.text('Custom cron'));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-mode-custom')),
+    );
     await tester.enterText(find.byKey(const Key('raw-cron-field')), 'bad cron');
     await tester.pump();
     await _tapVisible(tester, find.text('Lab Light'));
@@ -111,14 +121,18 @@ void main() {
     await tester.tap(find.byKey(const Key('quick-template-toggle')));
     await tester.pump();
     await _tapVisible(tester, find.text('Schedule off'));
-    await _tapVisible(tester, find.text('Every Sunday 22:00'));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-mode-weekly')),
+    );
+    await _tapVisible(tester, find.byKey(const ValueKey('schedule-weekday-0')));
     await _tapVisible(tester, find.text('Scene'));
     await _tapVisible(tester, find.text('Lab all off'));
     await tester.tap(find.text('Save rule'));
     await tester.pump();
 
     final draft = repository.created.single;
-    expect(draft.scheduleCron, '0 22 * * 0');
+    expect(draft.scheduleCron, '0 7 * * 0');
     expect(draft.actions.single, isA<SceneActivateAutomationAction>());
   });
 }

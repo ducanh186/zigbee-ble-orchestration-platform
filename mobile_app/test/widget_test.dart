@@ -240,13 +240,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // List screen: title, dashed CTA, mock rule + section header. The mock
-    // rule's template label ("Motion becomes occupied") shows as the card
+    // rule's template label ("Sensor becomes occupied") shows as the card
     // subtitle.
     expect(find.text('Automation Rules'), findsWidgets);
     expect(find.text('New rule'), findsWidgets);
     expect(find.text('Motion turns on lab lights'), findsOneWidget);
     expect(find.text('RULES'), findsOneWidget);
-    expect(find.text('Motion becomes occupied'), findsOneWidget);
+    expect(find.text('Sensor becomes occupied'), findsOneWidget);
     // Save button only exists inside the sheet.
     expect(find.text('Save rule'), findsNothing);
 
@@ -612,7 +612,7 @@ void main() {
     expect(find.text('Search devices'), findsOneWidget);
     expect(find.text('All'), findsOneWidget);
     expect(find.text('Light'), findsOneWidget);
-    expect(find.text('Motion'), findsOneWidget);
+    expect(find.text('Sensors'), findsOneWidget);
     expect(find.text('Lab Light 01'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'hallway');
