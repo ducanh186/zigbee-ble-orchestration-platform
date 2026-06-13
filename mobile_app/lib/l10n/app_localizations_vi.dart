@@ -845,6 +845,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get sceneLabel => 'Scene';
 
   @override
+  String get activateLabel => 'Kích hoạt';
+
+  @override
   String get noScenesAvailable => 'Không có scene khả dụng';
 
   @override

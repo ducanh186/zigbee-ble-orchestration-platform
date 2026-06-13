@@ -15,8 +15,12 @@ class RuleBodyBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
-    final triggerEvent = _eventText(rule.trigger, l10n);
-    final actionVerb = _actionVerb(rule.actions, l10n);
+    final trigger = rule.trigger;
+    final triggerDeviceId = switch (trigger) {
+      ScheduleAutomationTrigger() => l10n.scheduleTriggerLabel,
+      _ => trigger.deviceId,
+    };
+    final triggerEvent = _eventText(trigger, l10n);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -31,32 +35,17 @@ class RuleBodyBlock extends StatelessWidget {
           _Line(
             label: l10n.whenLabel,
             labelColor: palette.primary,
-            deviceId: rule.trigger.deviceId,
+            deviceId: triggerDeviceId,
             detail: triggerEvent,
           ),
           const SizedBox(height: 4),
           _ThenLine(
             label: l10n.thenLabel,
             actions: rule.actions,
-            verb: actionVerb,
           ),
         ],
       ),
     );
-  }
-
-  String _actionVerb(
-    List<AutomationAction> actions,
-    AppLocalizations l10n,
-  ) {
-    if (actions.isEmpty) {
-      return '';
-    }
-    return switch (actions.first.command) {
-      AutomationActionCommand.on => l10n.turnOnLabel,
-      AutomationActionCommand.off => l10n.turnOffLabel,
-      AutomationActionCommand.toggle => l10n.toggleLabel,
-    };
   }
 
   String _eventText(
@@ -75,6 +64,9 @@ class RuleBodyBlock extends StatelessWidget {
           ? l10n.degreesCelsiusUnit
           : l10n.percentUnit;
       return '$metric $operator $threshold$unit';
+    }
+    if (trigger case ScheduleAutomationTrigger(:final cron)) {
+      return cron;
     }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {
@@ -152,16 +144,15 @@ class _ThenLine extends StatelessWidget {
   const _ThenLine({
     required this.label,
     required this.actions,
-    required this.verb,
   });
 
   final String label;
   final List<AutomationAction> actions;
-  final String verb;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +179,7 @@ class _ThenLine extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        action.deviceId,
+                        _targetText(action),
                         style: TextStyle(
                           color: palette.textSecondary,
                           fontFamily: 'JetBrains Mono',
@@ -200,7 +191,7 @@ class _ThenLine extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      verb,
+                      _verbText(action, l10n),
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontFamily: 'JetBrains Mono',
@@ -216,5 +207,28 @@ class _ThenLine extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _targetText(AutomationAction action) {
+    return switch (action) {
+      DeviceCommandAutomationAction(:final deviceId) => deviceId,
+      SceneActivateAutomationAction(:final groupId, :final sceneId) =>
+        '$groupId / $sceneId',
+    };
+  }
+
+  String _verbText(
+    AutomationAction action,
+    AppLocalizations? l10n,
+  ) {
+    return switch (action) {
+      DeviceCommandAutomationAction(command: AutomationActionCommand.on) =>
+        l10n?.turnOnLabel ?? 'on',
+      DeviceCommandAutomationAction(command: AutomationActionCommand.off) =>
+        l10n?.turnOffLabel ?? 'off',
+      DeviceCommandAutomationAction(command: AutomationActionCommand.toggle) =>
+        l10n?.toggleLabel ?? 'toggle',
+      SceneActivateAutomationAction() => l10n?.activateLabel ?? 'activate',
+    };
   }
 }

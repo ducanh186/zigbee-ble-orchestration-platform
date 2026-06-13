@@ -850,6 +850,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sceneLabel => 'Scene';
 
   @override
+  String get activateLabel => 'Activate';
+
+  @override
   String get noScenesAvailable => 'No scenes available';
 
   @override

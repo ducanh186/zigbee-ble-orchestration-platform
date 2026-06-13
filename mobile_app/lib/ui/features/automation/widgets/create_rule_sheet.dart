@@ -13,6 +13,8 @@ import 'automation_visuals.dart';
 import 'device_picker_row.dart';
 import 'environment_condition_section.dart';
 import 'rule_preview.dart';
+import 'scene_target_section.dart';
+import 'schedule_trigger_section.dart';
 import 'template_card.dart';
 
 /// Modal bottom-sheet form for creating a rule. Mirrors the design's
@@ -55,6 +57,9 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   AutomationActionCommand? _actionCommand;
   Set<String> _targetIds = {};
   Map<String, AutomationActionCommand> _targetActionCommands = {};
+  ScheduleSelection? _scheduleSelection;
+  ScheduleTargetSelection? _scheduleTarget;
+  String? _scheduleValidationMessage;
 
   @override
   void initState() {
@@ -73,8 +78,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final mediaQuery = MediaQuery.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final mediaQuery = MediaQuery.of(context);
 
     return Consumer2<AutomationViewModel, DeviceDashboardViewModel>(
       builder: (context, automation, dashboard, _) {
@@ -130,60 +135,94 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             onChanged: _setTemplate,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: l10n.triggerDeviceLabel,
-                            required: true,
-                          ),
-                          const SizedBox(height: 6),
-                          _TriggerSection(
-                            triggers: triggers,
-                            selectedId: _triggerId,
-                            triggerDeviceType: _triggerDeviceType,
-                            selectedState: _triggerState,
-                            onDeviceChanged: _setTriggerDevice,
-                            onStateChanged: _setTriggerState,
-                          ),
-                          if (_triggerDeviceType ==
-                              AutomationDeviceType.environment) ...[
-                            const SizedBox(height: 16),
+                          if (_isScheduleTemplate) ...[
                             _FieldLabel(
-                              label: l10n.sensorConditionLabel,
+                              label: l10n.scheduleTriggerLabel,
                               required: true,
                             ),
                             const SizedBox(height: 6),
-                            EnvironmentConditionSection(
-                              metric: _environmentMetric,
-                              operator: _thresholdOperator,
-                              thresholdController: _thresholdController,
-                              onMetricChanged: (metric) {
-                                setState(() {
-                                  _environmentMetric = metric;
-                                  _template = null;
-                                });
-                              },
-                              onOperatorChanged: (operator) {
-                                setState(() {
-                                  _thresholdOperator = operator;
-                                  _template = null;
-                                });
-                              },
+                            ScheduleTriggerSection(
+                              key: ValueKey(
+                                'schedule-trigger-${_template!.name}',
+                              ),
+                              onChanged: (value) =>
+                                  setState(() => _scheduleSelection = value),
+                              onValidationChanged: (message) => setState(
+                                () => _scheduleValidationMessage = message,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _FieldLabel(
+                              label: l10n.targetTypeLabel,
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            SceneTargetSection(
+                              key: ValueKey(
+                                'schedule-target-${_template!.name}',
+                              ),
+                              availability: automation.sceneAvailability,
+                              lights: lights,
+                              scenes: automation.scenes,
+                              onChanged: (value) =>
+                                  setState(() => _scheduleTarget = value),
+                            ),
+                          ] else ...[
+                            _FieldLabel(
+                              label: l10n.triggerDeviceLabel,
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            _TriggerSection(
+                              triggers: triggers,
+                              selectedId: _triggerId,
+                              triggerDeviceType: _triggerDeviceType,
+                              selectedState: _triggerState,
+                              onDeviceChanged: _setTriggerDevice,
+                              onStateChanged: _setTriggerState,
+                            ),
+                            if (_triggerDeviceType ==
+                                AutomationDeviceType.environment) ...[
+                              const SizedBox(height: 16),
+                              _FieldLabel(
+                                label: l10n.sensorConditionLabel,
+                                required: true,
+                              ),
+                              const SizedBox(height: 6),
+                              EnvironmentConditionSection(
+                                metric: _environmentMetric,
+                                operator: _thresholdOperator,
+                                thresholdController: _thresholdController,
+                                onMetricChanged: (metric) {
+                                  setState(() {
+                                    _environmentMetric = metric;
+                                    _template = null;
+                                  });
+                                },
+                                onOperatorChanged: (operator) {
+                                  setState(() {
+                                    _thresholdOperator = operator;
+                                    _template = null;
+                                  });
+                                },
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            _FieldLabel(
+                              label: l10n.targetLightsLabel,
+                              required: true,
+                              hint: l10n.selectedCount(_targetIds.length),
+                            ),
+                            const SizedBox(height: 6),
+                            _TargetSection(
+                              lights: lights,
+                              selectedIds: _targetIds,
+                              allowsMultipleTargets: _allowsMultipleTargets,
+                              actionCommands: _targetActionCommands,
+                              onToggle: _toggleTarget,
+                              onActionChanged: _setActionCommand,
                             ),
                           ],
-                          const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: l10n.targetLightsLabel,
-                            required: true,
-                            hint: l10n.selectedCount(_targetIds.length),
-                          ),
-                          const SizedBox(height: 6),
-                          _TargetSection(
-                            lights: lights,
-                            selectedIds: _targetIds,
-                            allowsMultipleTargets: _allowsMultipleTargets,
-                            actionCommands: _targetActionCommands,
-                            onToggle: _toggleTarget,
-                            onActionChanged: _setActionCommand,
-                          ),
                           const SizedBox(height: 16),
                           _FieldLabel(label: l10n.enabledLabel),
                           const SizedBox(height: 6),
@@ -218,6 +257,18 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                               ),
                             ),
                           ],
+                          if (_scheduleValidationMessage != null) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              _scheduleValidationMessage!,
+                              key: const Key('form-validation-message'),
+                              style: TextStyle(
+                                color: palette.error,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -239,6 +290,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   bool _canSave() {
+    if (_isScheduleTemplate) {
+      return _nameController.text.trim().isNotEmpty &&
+          _scheduleSelection != null &&
+          _scheduleSelection!.isValid &&
+          _scheduleTarget != null;
+    }
     final hasValidTrigger =
         _triggerDeviceType == AutomationDeviceType.environment
         ? _parsedThreshold != null
@@ -266,6 +323,22 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     setState(() {
       final previousTriggerType = _triggerDeviceType;
       _template = template;
+      if (template.isSchedule) {
+        _triggerId = null;
+        _triggerDeviceType = null;
+        _triggerEvent = null;
+        _triggerState = const {};
+        _actionCommand = template.actionCommand;
+        _targetIds = {};
+        _targetActionCommands = {};
+        _scheduleSelection = null;
+        _scheduleTarget = null;
+        _scheduleValidationMessage = null;
+        return;
+      }
+      _scheduleSelection = null;
+      _scheduleTarget = null;
+      _scheduleValidationMessage = null;
       _triggerDeviceType = template.triggerDeviceType;
       _triggerEvent = template.triggerEvent;
       _triggerState = template.triggerState;
@@ -385,6 +458,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     return _template != AutomationRuleTemplate.switchTogglesOneLight;
   }
 
+  bool get _isScheduleTemplate => _template?.isSchedule ?? false;
+
   SmartDevice? _findDevice(List<SmartDevice> devices, String? deviceId) {
     if (deviceId == null) {
       return null;
@@ -478,58 +553,85 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
 
   Future<void> _onSave(AutomationViewModel automation) async {
     final template = _template;
-    final triggerId = _triggerId;
-    final triggerDeviceType = _triggerDeviceType;
-    final triggerEvent = _triggerEvent;
-    if (triggerId == null ||
-        triggerDeviceType == null ||
-        _targetIds.isEmpty ||
-        !_targetIds.every(_targetActionCommands.containsKey)) {
-      return;
-    }
-    final targetLightIds = _targetIds.toList(growable: false);
-    final AutomationRuleDraft draft;
-    if (triggerDeviceType == AutomationDeviceType.environment) {
-      final threshold = _parsedThreshold;
-      if (threshold == null) {
+    late final AutomationRuleDraft draft;
+    if (template?.isSchedule ?? false) {
+      final schedule = _scheduleSelection;
+      final target = _scheduleTarget;
+      if (schedule == null || !schedule.isValid || target == null) {
         return;
       }
+      final action = switch (target) {
+        DirectLightTarget direct => DeviceCommandAutomationAction(
+          deviceId: direct.deviceId,
+          command: template!.actionCommand,
+        ),
+        SceneTarget scene => SceneActivateAutomationAction(
+          groupId: scene.groupId,
+          sceneId: scene.sceneId,
+        ),
+      };
       draft = AutomationRuleDraft.typed(
         name: _nameController.text.trim(),
         enabled: _enabled,
-        trigger: SensorThresholdAutomationTrigger(
-          deviceId: triggerId,
-          metric: _environmentMetric,
-          operator: _thresholdOperator,
-          threshold: threshold,
-        ),
-        actions: [
-          for (final targetId in targetLightIds)
-            DeviceCommandAutomationAction(
-              deviceId: targetId,
-              command: _targetActionCommands[targetId]!,
-            ),
-        ],
+        template: template,
+        trigger: ScheduleAutomationTrigger(cron: schedule.cron),
+        scheduleCron: schedule.cron,
+        actions: [action],
       );
     } else {
-      if (triggerEvent == null) {
+      final triggerId = _triggerId;
+      final triggerDeviceType = _triggerDeviceType;
+      final triggerEvent = _triggerEvent;
+      if (triggerId == null ||
+          triggerDeviceType == null ||
+          _targetIds.isEmpty ||
+          !_targetIds.every(_targetActionCommands.containsKey)) {
         return;
       }
-      draft = AutomationRuleDraft(
-        name: _nameController.text.trim(),
-        enabled: _enabled,
-        template: template,
-        triggerDeviceId: triggerId,
-        triggerDeviceType: triggerDeviceType,
-        triggerEvent: triggerEvent,
-        triggerState: _triggerState,
-        actionCommand: _previewActionCommand,
-        targetLightIds: targetLightIds,
-        targetActionCommands: {
-          for (final targetId in targetLightIds)
-            targetId: _targetActionCommands[targetId]!,
-        },
-      );
+      final targetLightIds = _targetIds.toList(growable: false);
+      if (triggerDeviceType == AutomationDeviceType.environment) {
+        final threshold = _parsedThreshold;
+        if (threshold == null) {
+          return;
+        }
+        draft = AutomationRuleDraft.typed(
+          name: _nameController.text.trim(),
+          enabled: _enabled,
+          template: template,
+          trigger: SensorThresholdAutomationTrigger(
+            deviceId: triggerId,
+            metric: _environmentMetric,
+            operator: _thresholdOperator,
+            threshold: threshold,
+          ),
+          actions: [
+            for (final targetId in targetLightIds)
+              DeviceCommandAutomationAction(
+                deviceId: targetId,
+                command: _targetActionCommands[targetId]!,
+              ),
+          ],
+        );
+      } else {
+        if (triggerEvent == null) {
+          return;
+        }
+        draft = AutomationRuleDraft(
+          name: _nameController.text.trim(),
+          enabled: _enabled,
+          template: template,
+          triggerDeviceId: triggerId,
+          triggerDeviceType: triggerDeviceType,
+          triggerEvent: triggerEvent,
+          triggerState: _triggerState,
+          actionCommand: _previewActionCommand,
+          targetLightIds: targetLightIds,
+          targetActionCommands: {
+            for (final targetId in targetLightIds)
+              targetId: _targetActionCommands[targetId]!,
+          },
+        );
+      }
     }
 
     final beforeIds = automation.rules.map((rule) => rule.id).toSet();

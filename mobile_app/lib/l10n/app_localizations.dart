@@ -1706,6 +1706,12 @@ abstract class AppLocalizations {
   /// **'Scene'**
   String get sceneLabel;
 
+  /// No description provided for @activateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activateLabel;
+
   /// No description provided for @noScenesAvailable.
   ///
   /// In en, this message translates to:
