@@ -34,7 +34,11 @@ typedef enum {
   AUTO_DEV_SWITCH,
   AUTO_DEV_MOTION,
   AUTO_DEV_LIGHT,
+  AUTO_DEV_ENVIRONMENT,
 } AutomationDeviceType_t;
+
+typedef enum { AUTO_METRIC_TEMPERATURE = 0, AUTO_METRIC_HUMIDITY } AutomationMetric_t;
+typedef enum { AUTO_CMP_GTE = 0, AUTO_CMP_LTE } AutomationComparator_t;
 
 typedef struct {
   AutomationDeviceType_t device_type;
@@ -53,6 +57,11 @@ typedef struct {
   char                    trig_device_id[DEVICE_ID_MAX];
   char                    trig_event[EVENT_NAME_MAX]; // switch_toggle | occupancy_changed
   char                    trig_occupancy[OCCUPANCY_MAX]; // occupied|unoccupied|""
+  // Environment threshold trigger (trig_device_type == AUTO_DEV_ENVIRONMENT)
+  AutomationMetric_t      trig_metric;       // temperature | humidity
+  AutomationComparator_t  trig_comparator;   // gte | lte
+  int32_t                 trig_threshold;    // centi-unit
+  bool                    cond_met;          // runtime edge-trigger state
   // Actions
   uint8_t                 action_count;
   AutomationAction_t      actions[AUTOMATION_MAX_ACTIONS];
@@ -213,6 +222,7 @@ static AutomationDeviceType_t parseDeviceType(const char *s)
   if (strcmp(s, "switch") == 0) return AUTO_DEV_SWITCH;
   if (strcmp(s, "motion") == 0) return AUTO_DEV_MOTION;
   if (strcmp(s, "light")  == 0) return AUTO_DEV_LIGHT;
+  if (strcmp(s, "environment") == 0) return AUTO_DEV_ENVIRONMENT;
   return AUTO_DEV_UNKNOWN;
 }
 
@@ -221,6 +231,7 @@ static bool isAllowedTriggerEvent(const char *evt, AutomationDeviceType_t dt)
   if (!evt) return false;
   if (dt == AUTO_DEV_SWITCH) return strcmp(evt, "switch_toggle") == 0;
   if (dt == AUTO_DEV_MOTION) return strcmp(evt, "occupancy_changed") == 0;
+  if (dt == AUTO_DEV_ENVIRONMENT) return strcmp(evt, "threshold_crossed") == 0;
   return false;
 }
 
@@ -230,6 +241,22 @@ static bool isAllowedCommand(const char *cmd)
   return (strcmp(cmd, "on") == 0
        || strcmp(cmd, "off") == 0
        || strcmp(cmd, "toggle") == 0);
+}
+
+static bool parseMetric(const char *s, AutomationMetric_t *out)
+{
+  if (!s) return false;
+  if (strcmp(s, "temperature") == 0) { *out = AUTO_METRIC_TEMPERATURE; return true; }
+  if (strcmp(s, "humidity")    == 0) { *out = AUTO_METRIC_HUMIDITY;    return true; }
+  return false;
+}
+
+static bool parseComparator(const char *s, AutomationComparator_t *out)
+{
+  if (!s) return false;
+  if (strcmp(s, "gte") == 0) { *out = AUTO_CMP_GTE; return true; }
+  if (strcmp(s, "lte") == 0) { *out = AUTO_CMP_LTE; return true; }
+  return false;
 }
 
 //---------------------------------------------------------------------------
@@ -459,7 +486,9 @@ static bool appendActionJson(char *out, size_t cap, size_t *off,
 static void fireRule(int slot,
                      const char *trigger_event,
                      const char *trigger_device_id,
-                     const char *occupancy_or_null)
+                     const char *occupancy_or_null,
+                     const char *metric_or_null,
+                     int32_t value_centi)
 {
   AutomationRule_t *r = &s_rules[slot];
   uint32_t now = msTick();
@@ -521,7 +550,11 @@ static void fireRule(int slot,
 
   // Trigger section
   char triggerBuf[160];
-  if (occupancy_or_null && *occupancy_or_null) {
+  if (metric_or_null && *metric_or_null) {
+    snprintf(triggerBuf, sizeof(triggerBuf),
+      "\"device_id\":\"%s\",\"event\":\"%s\",\"metric\":\"%s\",\"value\":%ld",
+      trigger_device_id, trigger_event, metric_or_null, (long)value_centi);
+  } else if (occupancy_or_null && *occupancy_or_null) {
     snprintf(triggerBuf, sizeof(triggerBuf),
       "\"device_id\":\"%s\",\"event\":\"%s\",\"occupancy\":\"%s\"",
       trigger_device_id, trigger_event, occupancy_or_null);
@@ -598,7 +631,7 @@ void automationRuleOnSwitchToggle(const char *switch_device_id)
                 "\"id\":\"%s\",\"trigger\":\"switch_toggle\"", r->id);
       continue;
     }
-    fireRule(i, "switch_toggle", switch_device_id, NULL);
+    fireRule(i, "switch_toggle", switch_device_id, NULL, NULL, 0);
   }
 }
 
@@ -620,7 +653,41 @@ void automationRuleOnMotionOccupancyChanged(const char *motion_device_id,
                 "\"id\":\"%s\",\"trigger\":\"occupancy_changed\"", r->id);
       continue;
     }
-    fireRule(i, "occupancy_changed", motion_device_id, occupancy);
+    fireRule(i, "occupancy_changed", motion_device_id, occupancy, NULL, 0);
+  }
+}
+
+void automationRuleOnEnvironmentReport(const char *device_id,
+                                       const char *metric,
+                                       int32_t value_centi)
+{
+  if (!device_id || !*device_id || !metric || !*metric) return;
+
+  AutomationMetric_t m;
+  if (!parseMetric(metric, &m)) return;
+
+  for (int i = 0; i < AUTOMATION_MAX_RULES; i++) {
+    AutomationRule_t *r = &s_rules[i];
+    if (!r->inUse || !r->enabled) continue;
+    if (r->trig_device_type != AUTO_DEV_ENVIRONMENT) continue;
+    if (strcmp(r->trig_event, "threshold_crossed") != 0) continue;
+    if (strcmp(r->trig_device_id, device_id) != 0) continue;
+    if (r->trig_metric != m) continue;
+
+    bool met = (r->trig_comparator == AUTO_CMP_GTE)
+                 ? (value_centi >= r->trig_threshold)
+                 : (value_centi <= r->trig_threshold);
+    bool wasMet = r->cond_met;
+    r->cond_met = met;                 // always track latest (edge detect)
+
+    if (!met || wasMet) continue;      // fire only on transition into "met"
+
+    if (!cooldownOk(i)) {
+      appLogLog("AUTO", "cooldown",
+                "\"id\":\"%s\",\"trigger\":\"threshold_crossed\"", r->id);
+      continue;
+    }
+    fireRule(i, "threshold_crossed", device_id, NULL, metric, value_centi);
   }
 }
 
@@ -725,7 +792,8 @@ void automationRuleHandleMqttPayload(const char *topic, const char *body)
   findQuotedStringIn(trigBuf, "\"device_type\":", trig_dtype, sizeof(trig_dtype));
   parsed.trig_device_type = parseDeviceType(trig_dtype);
   if (parsed.trig_device_type != AUTO_DEV_SWITCH
-   && parsed.trig_device_type != AUTO_DEV_MOTION) {
+   && parsed.trig_device_type != AUTO_DEV_MOTION
+   && parsed.trig_device_type != AUTO_DEV_ENVIRONMENT) {
     publishReported(automation_id, versionU, "failed", "unsupported_trigger");
     return;
   }
@@ -753,6 +821,29 @@ void automationRuleHandleMqttPayload(const char *topic, const char *body)
       publishReported(automation_id, versionU, "failed", "unsupported_trigger");
       return;
     }
+  }
+
+  // Environment: metric + comparator + threshold (centi-unit) from trigBuf.
+  if (parsed.trig_device_type == AUTO_DEV_ENVIRONMENT) {
+    char metricStr[16] = {0};
+    char cmpStr[8] = {0};
+    if (!findQuotedStringIn(trigBuf, "\"metric\":", metricStr, sizeof(metricStr))
+     || !parseMetric(metricStr, &parsed.trig_metric)) {
+      publishReported(automation_id, versionU, "failed", "unsupported_trigger");
+      return;
+    }
+    if (!findQuotedStringIn(trigBuf, "\"comparator\":", cmpStr, sizeof(cmpStr))
+     || !parseComparator(cmpStr, &parsed.trig_comparator)) {
+      publishReported(automation_id, versionU, "failed", "unsupported_trigger");
+      return;
+    }
+    uint32_t thr = 0;
+    if (!findUintIn(trigBuf, "\"threshold\":", &thr)) {
+      publishReported(automation_id, versionU, "failed", "invalid_payload");
+      return;
+    }
+    parsed.trig_threshold = (int32_t)thr;
+    parsed.cond_met = false;   // first crossing should fire
   }
 
   // actions

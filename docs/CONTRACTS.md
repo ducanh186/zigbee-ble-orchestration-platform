@@ -79,6 +79,7 @@ Automation rules are stored in Cloud and synced to Gateway. Current validation i
 - Light actions use commands such as `on`, `off`, and `toggle`.
 - Switch triggers do not carry arbitrary state.
 - Motion triggers use an occupancy state.
+- Environment triggers use a `metric` (`temperature` or `humidity`), a `comparator` (`gte` or `lte`), and an integer centi-unit `threshold` (e.g. `2800` = 28.00 °C, `6500` = 65.00 %RH). The trigger `event` is `threshold_crossed` and fires edge-triggered (once per crossing into the matched condition).
 - MVP caps are enforced for maximum automations per gateway and maximum actions per automation.
 
 The Cloud-published value is canonical. Avoid compatibility aliases unless the issue or acceptance test explicitly requires one.
@@ -90,6 +91,7 @@ Capabilities should describe what a device can do, not what a screen happens to 
 - Light: on/off and toggle behavior.
 - Switch: button or interaction events.
 - Motion or occupancy sensor: occupancy event/state.
+- Environment sensor: temperature and humidity measured value (ZCL 0x0402 / 0x0405).
 - Gateway: commissioning, rediscovery, health, logs, provisioning, and OTA coordination.
 
 When adding a new capability, update Cloud schemas, Mobile repositories/UI, Gateway translation, firmware behavior, and tests in the same scoped change.

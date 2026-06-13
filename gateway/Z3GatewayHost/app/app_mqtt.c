@@ -668,6 +668,7 @@ static const char *inferredClustersJson(const char *deviceType)
   if (strcmp(deviceType, "light")  == 0) return "[\"0x0006\",\"0x0008\"]";
   if (strcmp(deviceType, "switch") == 0) return "[\"0x0006\",\"0x0001\"]";
   if (strcmp(deviceType, "motion") == 0) return "[\"0x0406\"]";
+  if (strcmp(deviceType, "environment") == 0) return "[\"0x0402\",\"0x0405\"]";
   if (strcmp(deviceType, "lock")   == 0) return "[\"0x0101\"]";
   return "[]";
 }
@@ -715,7 +716,7 @@ void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
   // Keep this list aligned with inferredClustersJson() - any device_type
   // the gateway can ever publish must appear here so we never leak a stale
   // retained slot.
-  static const char *types[] = {"light", "switch", "motion", "unknown"};
+  static const char *types[] = {"light", "switch", "motion", "environment", "unknown"};
   for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
     if (keepType && strcmp(keepType, types[i]) == 0) continue;
 

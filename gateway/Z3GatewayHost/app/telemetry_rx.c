@@ -237,11 +237,10 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
   }
 
   // --- Temperature Measurement (0x0402) / Relative Humidity (0x0405) ---
-  // DHT11 environment sensor (Z3_DHT11_Sensor) reports MeasuredValue 0x0000
-  // in centi-units: 0x0402 int16s 0.01C, 0x0405 uint16 0.01%RH.
-  // Log-only for now: no MQTT publish and no registry/auto-pairing, so no
-  // contract change. Cloud/App integration picks this up later (see
-  // docs/handoff/dht11_environment_sensor_local_handoff.md).
+  // DHT11 environment sensor reports MeasuredValue 0x0000 in centi-units
+  // (0x0402 int16s 0.01C, 0x0405 uint16 0.01%RH). We log it and feed it into
+  // the automation engine (environment threshold rules). No telemetry MQTT
+  // publish yet — that is Cloud/App work (see docs/handoffs/).
   if (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID
       || clusterId == ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID) {
     bool isTemp = (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID);
@@ -287,6 +286,11 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
                     "\"humidity_pct_x100\":%d",
                     euiStr, (unsigned)sender, (int)centi);
         }
+
+        // Feed into the automation engine (environment threshold rules).
+        automationRuleOnEnvironmentReport(euiStr,
+                                          isTemp ? "temperature" : "humidity",
+                                          centi);
       } else {
         break;
       }
