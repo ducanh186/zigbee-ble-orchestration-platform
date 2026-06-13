@@ -12,10 +12,23 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <limits.h>
 
 // ===== Cached light level for enriching reported state =====
 // Updated when we receive Level Control cluster reports.
 static uint8_t s_lastLightLevel = 0;
+
+// ===== Per-node environment cache =====
+// Temperature (0x0402) and humidity (0x0405) arrive in separate reports; we
+// cache the latest of each per sender so the published reported state can
+// carry both fields. INT32_MIN = not yet observed (-> JSON null).
+#define ENV_CACHE_MAX 4
+static struct {
+  EmberNodeId nodeId;
+  bool        valid;
+  int32_t     tempCenti;
+  int32_t     humCenti;
+} s_envCache[ENV_CACHE_MAX];
 
 // ===== This is the correct callback for receiving attribute reports =====
 // The ZCL framework calls this BEFORE emberAfPreCommandReceivedCallback.
@@ -291,6 +304,29 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
         automationRuleOnEnvironmentReport(euiStr,
                                           isTemp ? "temperature" : "humidity",
                                           centi);
+
+        // Cache the latest temp+humidity per node and publish a combined
+        // retained reported state so the dashboard can show live values.
+        {
+          int slot = -1, freeSlot = -1;
+          for (int s = 0; s < ENV_CACHE_MAX; s++) {
+            if (s_envCache[s].valid && s_envCache[s].nodeId == sender) { slot = s; break; }
+            if (freeSlot < 0 && !s_envCache[s].valid) freeSlot = s;
+          }
+          if (slot < 0) {
+            slot = (freeSlot >= 0) ? freeSlot : 0;
+            s_envCache[slot].valid     = true;
+            s_envCache[slot].nodeId    = sender;
+            s_envCache[slot].tempCenti = INT32_MIN;
+            s_envCache[slot].humCenti  = INT32_MIN;
+          }
+          if (isTemp) s_envCache[slot].tempCenti = centi;
+          else        s_envCache[slot].humCenti  = centi;
+
+          appMqttPublishEnvironmentReported(sender, euiStr,
+                                            s_envCache[slot].tempCenti,
+                                            s_envCache[slot].humCenti);
+        }
       } else {
         break;
       }

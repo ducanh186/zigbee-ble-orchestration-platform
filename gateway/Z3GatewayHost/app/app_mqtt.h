@@ -125,6 +125,15 @@ void appMqttPublishMotionReported(uint16_t nodeId,
                                   const char *eui64Str,
                                   const char *occupancy);
 
+// Publish retained reported state for an environment (DHT11) sensor on
+// devices/environment/{eui}/reported. Values are ZCL centi-units; pass
+// INT32_MIN for a metric not yet observed (emitted as JSON null). Shape:
+// state:{temperature_c, humidity_percent, reachable}.
+void appMqttPublishEnvironmentReported(uint16_t nodeId,
+                                       const char *eui64Str,
+                                       int32_t temperature_centi,
+                                       int32_t humidity_centi);
+
 // Publish a command_reply message on topic commands/{command_id}/reply.
 // Payload always contains: command_id, device_id, status, reason (per MQTT_CONTRACT).
 // `device_id` may be NULL/empty (e.g. parse_fail before we extracted it);
