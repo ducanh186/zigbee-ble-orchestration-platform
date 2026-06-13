@@ -26,7 +26,7 @@ enum ProvisioningDeviceType {
   String get label => switch (this) {
     ProvisioningDeviceType.light => 'Light',
     ProvisioningDeviceType.switchDevice => 'Switch',
-    ProvisioningDeviceType.motion => 'Motion',
+    ProvisioningDeviceType.motion => 'Sensors',
   };
 }
 
@@ -86,6 +86,12 @@ class ProvisioningQrPayload {
   }
 
   factory ProvisioningQrPayload.fromJson(Map<String, Object?> json) {
+    if (json.containsKey('install_code')) {
+      throw const FormatException(
+        'Provisioning QR payload must not contain install_code',
+      );
+    }
+
     final version = json['version'];
     if (version is! int || version != _supportedQrVersion) {
       throw FormatException('Unsupported provisioning QR version: $version');

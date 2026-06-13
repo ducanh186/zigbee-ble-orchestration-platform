@@ -78,7 +78,7 @@
               <button class="segment active" data-device-filter="all" type="button">All</button>
               <button class="segment" data-device-filter="light" type="button">Light</button>
               <button class="segment" data-device-filter="switch" type="button">Switch</button>
-              <button class="segment" data-device-filter="motion" type="button">Motion</button>
+              <button class="segment" data-device-filter="motion" type="button">Sensors</button>
             </div>
           </div>
           <div id="deviceList" class="device-list"></div>
@@ -153,16 +153,8 @@
                 <select id="labelDeviceType">
                   <option value="light">Light</option>
                   <option value="switch">Switch</option>
-                  <option value="motion">Motion</option>
+                  <option value="motion">Sensors</option>
                 </select>
-              </label>
-              <label for="labelModelInput">
-                <span class="field-label">Model</span>
-                <input id="labelModelInput" type="text" autocomplete="off" spellcheck="false" />
-              </label>
-              <label for="labelInstallCodeInput">
-                <span class="field-label">Install Code</span>
-                <input id="labelInstallCodeInput" type="text" autocomplete="off" spellcheck="false" />
               </label>
             </div>
             <div class="label-result">
@@ -188,13 +180,13 @@
             <label for="autoTemplate">
               <span class="field-label">Template</span>
               <select id="autoTemplate">
-                <option value="motion_occupied">Motion becomes occupied → lights ON</option>
-                <option value="motion_unoccupied">Motion becomes unoccupied → lights OFF</option>
+                <option value="motion_occupied">Sensor becomes occupied → lights ON</option>
+                <option value="motion_unoccupied">Sensor becomes unoccupied → lights OFF</option>
                 <option value="switch_toggle">Switch toggles → lights TOGGLE</option>
               </select>
             </label>
             <label for="autoTriggerDevice">
-              <span class="field-label" id="autoTriggerLabel">Motion sensor</span>
+              <span class="field-label" id="autoTriggerLabel">Sensor</span>
               <select id="autoTriggerDevice"></select>
             </label>
             <div class="auto-actions-block">
