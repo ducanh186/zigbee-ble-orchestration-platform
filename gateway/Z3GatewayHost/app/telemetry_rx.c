@@ -92,7 +92,7 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
               } else {
                 deviceRegistryUpsert(euiStr, sender, 1, "light");
                 appMqttClearRetainedRegistry(euiStr, "light");
-                appMqttPublishDeviceRegistry(sender, euiStr, "light");
+                appMqttPublishDeviceRegistry(sender, euiStr, "light", 0);
                 appLogLog("REG", "auto_paired",
                   "\"eui64\":\"%s\",\"node_id\":\"0x%04X\","
                   "\"trigger\":\"attr_report\",\"type\":\"light\"",

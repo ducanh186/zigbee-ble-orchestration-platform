@@ -99,13 +99,20 @@ static void releaseSlot(dd_slot_t *s)
 // Per the agreed rule, we only commit to "light" when 0x0006 or 0x0008 is
 // in the input/server cluster list AND 0x0006 is NOT in the output/client
 // list.  Conflicts (server+client) become "unknown" - never silently "light".
-static const char *classifyType(const dd_slot_t *s)
+// Returns canonical device_type. For sensors, also writes the slot kind via
+// *kind_out (1=occupancy [reserved], 2=environment [active], 3=flame is a
+// reserved slot — IAS Zone 0x0500 detection deferred until hardware exists).
+// Non-sensor types set *kind_out = 0.
+static const char *classifyType(const dd_slot_t *s, uint8_t *kind_out)
 {
+  if (kind_out) *kind_out = 0;
   if (s->has_occupancy_server) {
-    return "motion";
+    if (kind_out) *kind_out = 1;          // occupancy (reserved slot)
+    return "sensor";
   }
   if (s->has_temp_server || s->has_humidity_server) {
-    return "environment";
+    if (kind_out) *kind_out = 2;          // environment (DHT11, active)
+    return "sensor";
   }
   if (s->has_onoff_client && s->has_onoff_server) {
     return "unknown";   // conflict; let mentor inspect
@@ -337,7 +344,8 @@ static void onServiceDiscovery(const EmberAfServiceDiscoveryResult *result)
 
 static void completeAndPublish(dd_slot_t *s, const char *metadataNote)
 {
-  const char *type = classifyType(s);
+  uint8_t sensor_kind = 0;
+  const char *type = classifyType(s, &sensor_kind);
 
   // Detect "conflict" specifically so we can log it loudly.
   if (s->has_onoff_server && s->has_onoff_client) {
@@ -365,6 +373,9 @@ static void completeAndPublish(dd_slot_t *s, const char *metadataNote)
   // Persist to registry FIRST so any concurrent ZCL traffic resolves
   // the right type.
   deviceRegistryUpsert(s->eui64BeStr, s->nodeId, s->control_ep, type);
+  // Always write the kind (0 for non-sensors) so a slot re-classified from
+  // sensor -> light/switch does not keep a stale sensor_kind.
+  deviceRegistrySetSensorKind(s->eui64BeStr, sensor_kind);
 
   // Clear stale retained registry slots on broker before publishing the
   // authoritative one (avoids cloud restoring a wrong device_type after
@@ -372,7 +383,7 @@ static void completeAndPublish(dd_slot_t *s, const char *metadataNote)
   appMqttClearRetainedRegistry(s->eui64BeStr, type);
 
   // Publish authoritative registry.
-  appMqttPublishDeviceRegistry(s->nodeId, s->eui64BeStr, type);
+  appMqttPublishDeviceRegistry(s->nodeId, s->eui64BeStr, type, sensor_kind);
 
   releaseSlot(s);
 }

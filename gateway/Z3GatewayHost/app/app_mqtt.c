@@ -671,11 +671,13 @@ static const char *inferredClustersJson(const char *deviceType)
   if (strcmp(deviceType, "motion") == 0) return "[\"0x0406\"]";
   if (strcmp(deviceType, "environment") == 0) return "[\"0x0402\",\"0x0405\"]";
   if (strcmp(deviceType, "lock")   == 0) return "[\"0x0101\"]";
+  if (strcmp(deviceType, "sensor") == 0) return "[\"0x0402\",\"0x0405\"]";
   return "[]";
 }
 
 void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
-                                  const char *deviceType)
+                                  const char *deviceType,
+                                  uint8_t sensor_kind)
 {
   if (!sMosq || !eui64Str || !deviceType) return;
 
@@ -686,6 +688,7 @@ void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
   snprintf(inner, sizeof(inner),
     "\"device_id\":\"%s\","
     "\"device_type\":\"%s\","
+    "\"sensor_kind\":%u,"
     "\"eui64\":\"%s\","
     "\"nwk_addr\":\"0x%04X\","
     "\"endpoint\":1,"
@@ -695,7 +698,7 @@ void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
     "\"model\":null,"
     "\"joined_at\":%" PRIu64 ","
     "\"metadata_source\":\"gateway_mvp_inferred\"",
-    eui64Str, deviceType, eui64Str, (unsigned)nodeId,
+    eui64Str, deviceType, (unsigned)sensor_kind, eui64Str, (unsigned)nodeId,
     inferredClustersJson(deviceType),
     joinedAt);
 
@@ -717,7 +720,8 @@ void appMqttClearRetainedRegistry(const char *eui64Str, const char *keepType)
   // Keep this list aligned with inferredClustersJson() - any device_type
   // the gateway can ever publish must appear here so we never leak a stale
   // retained slot.
-  static const char *types[] = {"light", "switch", "motion", "environment", "unknown"};
+  static const char *types[] = {"light", "switch", "motion", "environment",
+                                "sensor", "unknown"};
   for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
     if (keepType && strcmp(keepType, types[i]) == 0) continue;
 

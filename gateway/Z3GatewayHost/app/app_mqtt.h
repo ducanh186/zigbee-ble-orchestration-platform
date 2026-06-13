@@ -58,7 +58,8 @@ void appMqttPublishDeviceEvent(uint16_t nodeId, const char *eui64Str,
 // clusters/endpoints are MVP-inferred by device_type; metadata_source is set
 // to "gateway_mvp_inferred" so cloud can mark these as provisional.
 void appMqttPublishDeviceRegistry(uint16_t nodeId, const char *eui64Str,
-                                  const char *deviceType);
+                                  const char *deviceType,
+                                  uint8_t sensor_kind);
 
 // Clear retained registry snapshots for `eui64Str` under EVERY known
 // device_type EXCEPT `keepType`.  Implemented by publishing an empty payload
