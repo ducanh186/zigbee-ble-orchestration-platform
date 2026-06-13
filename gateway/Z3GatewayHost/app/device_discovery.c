@@ -47,6 +47,8 @@ typedef struct {
   bool has_onoff_client;
   bool has_level_server;
   bool has_occupancy_server;
+  bool has_temp_server;
+  bool has_humidity_server;
 
   // Best-effort identity hints (last EP that gave us non-zero values)
   uint16_t profileId;
@@ -101,6 +103,9 @@ static const char *classifyType(const dd_slot_t *s)
 {
   if (s->has_occupancy_server) {
     return "motion";
+  }
+  if (s->has_temp_server || s->has_humidity_server) {
+    return "environment";
   }
   if (s->has_onoff_client && s->has_onoff_server) {
     return "unknown";   // conflict; let mentor inspect
@@ -220,6 +225,8 @@ static void absorbClusters(dd_slot_t *s, const EmberAfClusterList *cl)
     }
     if (c == ZCL_LEVEL_CONTROL_CLUSTER_ID) s->has_level_server     = true;
     if (c == ZCL_OCCUPANCY_SENSING_CLUSTER_ID) s->has_occupancy_server = true;
+    if (c == ZCL_TEMP_MEASUREMENT_CLUSTER_ID) s->has_temp_server = true;
+    if (c == ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID) s->has_humidity_server = true;
   }
   for (uint8_t i = 0; i < cl->outClusterCount; i++) {
     uint16_t c = cl->outClusterList[i];

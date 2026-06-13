@@ -124,6 +124,25 @@ def _high_temperature_rule() -> dict:
 
 
 @pytest.mark.asyncio
+async def test_create_sensor_threshold_automation(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    response = await client.post(
+        "/api/automations",
+        json=_high_temperature_rule(),
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["trigger"] == _high_temperature_rule()["trigger"]
+    assert created["actions"] == _high_temperature_rule()["actions"]
+
+
+@pytest.mark.asyncio
 async def test_create_schedule_rule_persists_cron(
     client, db_session_factory, fake_mqtt
 ):
@@ -179,25 +198,6 @@ async def test_create_schedule_rule_accepts_scene_action(
 
     assert response.status_code == 201, response.text
     assert response.json()["actions"] == rule["actions"]
-
-
-@pytest.mark.asyncio
-async def test_create_sensor_threshold_automation(
-    client, db_session_factory, fake_mqtt
-):
-    await _seed_automation_devices(db_session_factory)
-    headers = await _parent_headers(client, db_session_factory)
-
-    response = await client.post(
-        "/api/automations",
-        json=_high_temperature_rule(),
-        headers=headers,
-    )
-
-    assert response.status_code == 201, response.text
-    created = response.json()
-    assert created["trigger"] == _high_temperature_rule()["trigger"]
-    assert created["actions"] == _high_temperature_rule()["actions"]
 
 
 @pytest.mark.asyncio

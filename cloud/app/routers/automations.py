@@ -125,6 +125,8 @@ async def _validate_rule_template(
     event: str | None = None
 
     if trigger_type == "schedule":
+        # Schedule triggers fire on a cron expression, not a device event, so
+        # there is no trigger device or event to validate.
         pass
     else:
         trigger_device_id = _require_string(trigger, "device_id")
