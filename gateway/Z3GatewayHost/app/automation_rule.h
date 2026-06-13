@@ -62,6 +62,17 @@ void automationRuleOnSwitchToggle(const char *switch_device_id);
 void automationRuleOnMotionOccupancyChanged(const char *motion_device_id,
                                             const char *occupancy);
 
+// Phase 5: environment threshold trigger hook.
+// Called from telemetry_rx.c on each DHT11 measured-value report. `metric`
+// is "temperature" or "humidity"; `value_centi` is the ZCL MeasuredValue in
+// centi-units (2850 = 28.50C, 6500 = 65.00%RH). Iterates the rule table; for
+// every enabled environment rule matching device_id+metric, fires
+// (edge-triggered: only on the transition into "threshold met") when the
+// value crosses the threshold per comparator.
+void automationRuleOnEnvironmentReport(const char *device_id,
+                                       const char *metric,
+                                       int32_t value_centi);
+
 #ifdef __cplusplus
 }
 #endif
