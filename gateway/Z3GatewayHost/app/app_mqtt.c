@@ -925,7 +925,9 @@ void appMqttPublishEnvironmentReported(uint16_t nodeId,
   char inner[320];
   snprintf(inner, sizeof(inner),
     "\"device_id\":\"%s\","
-    "\"device_type\":\"environment\","
+    "\"device_type\":\"sensor\","
+    "\"sensor_kind\":2,"
+    "\"sensor\":\"environment\","
     "\"eui64\":\"%s\","
     "\"nwk_addr\":\"0x%04X\","
     "\"state\":{\"temperature_c\":%s,\"humidity_percent\":%s,"
@@ -937,7 +939,7 @@ void appMqttPublishEnvironmentReported(uint16_t nodeId,
 
   char topicSuffix[120];
   snprintf(topicSuffix, sizeof(topicSuffix),
-           "devices/environment/%s/reported", eui64Str);
+           "devices/sensor/%s/reported", eui64Str);
 
   // QoS 1, retain=true so the dashboard reflects current state on connect.
   appMqttPublish(topicSuffix, envelope, 1, true);
