@@ -28,7 +28,7 @@ const state = {
 const AUTOMATION_TEMPLATES = {
   motion_occupied: {
     triggerType: "motion",
-    triggerLabel: "Motion sensor",
+    triggerLabel: "Sensor",
     actionCommand: "on",
     buildTrigger: (deviceId) => ({
       event: "occupancy_changed",
@@ -39,7 +39,7 @@ const AUTOMATION_TEMPLATES = {
   },
   motion_unoccupied: {
     triggerType: "motion",
-    triggerLabel: "Motion sensor",
+    triggerLabel: "Sensor",
     actionCommand: "off",
     buildTrigger: (deviceId) => ({
       event: "occupancy_changed",
@@ -89,8 +89,6 @@ const els = {
   closeJoinBtn: byId("closeJoinBtn"),
   labelEui64Input: byId("labelEui64Input"),
   labelDeviceType: byId("labelDeviceType"),
-  labelModelInput: byId("labelModelInput"),
-  labelInstallCodeInput: byId("labelInstallCodeInput"),
   generateLabelBtn: byId("generateLabelBtn"),
   labelQrPreview: byId("labelQrPreview"),
   labelPayload: byId("labelPayload"),
@@ -644,7 +642,7 @@ function summarizeRule(rule) {
   const acts = rule.actions || [];
   const triggerStr = trig.device_type === "switch"
     ? `Switch ${shortId(trig.device_id)} toggles`
-    : `Motion ${shortId(trig.device_id)} ${(trig.state || {}).occupancy || ""}`.trim();
+    : `Sensor ${shortId(trig.device_id)} ${(trig.state || {}).occupancy || ""}`.trim();
   const actsStr = acts
     .map((a) => `${a.command} ${shortId(a.device_id)}`)
     .join(", ");
@@ -780,10 +778,6 @@ async function generateProvisioningLabel() {
     eui64: els.labelEui64Input.value.trim(),
     device_type: els.labelDeviceType.value,
   };
-  const model = els.labelModelInput.value.trim();
-  const installCode = els.labelInstallCodeInput.value.trim();
-  if (model) body.model = model;
-  if (installCode) body.install_code = installCode;
 
   try {
     const label = await fetchJson("/api/provisioning/labels", {
@@ -792,7 +786,6 @@ async function generateProvisioningLabel() {
     });
     els.labelQrPreview.innerHTML = label.qr_svg;
     els.labelPayload.textContent = label.payload_json;
-    els.labelInstallCodeInput.value = label.payload.install_code;
     toast("Provisioning QR label generated");
   } catch (error) {
     els.labelQrPreview.innerHTML = "";
