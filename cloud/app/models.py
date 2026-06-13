@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -179,7 +180,7 @@ class Automation(Base):
     gateway_id = Column(String, nullable=False)
     version = Column(Integer, nullable=False, default=1, server_default="1")
     trigger_type = Column(
-        String,
+        Enum("event", "schedule", name="automation_trigger_type"),
         nullable=False,
         default="event",
         server_default="event",

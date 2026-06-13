@@ -829,13 +829,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scheduleTriggerLabel => 'Schedule';
 
   @override
-  String get cronPresetWeekdaySeven => 'Every weekday 07:00';
+  String get scheduleModeHourly => 'Hourly';
 
   @override
-  String get cronPresetSundayTwentyTwo => 'Every Sunday 22:00';
+  String get scheduleModeDaily => 'Daily';
 
   @override
-  String get cronPresetEverySixHours => 'Every 6 hours';
+  String get scheduleModeWeekdays => 'Weekdays';
+
+  @override
+  String get scheduleModeWeekly => 'Weekly';
+
+  @override
+  String get scheduleModeCustom => 'Custom';
+
+  @override
+  String get scheduleTimeLabel => 'At';
+
+  @override
+  String get scheduleMinuteLabel => 'At minute';
+
+  @override
+  String get scheduleSummaryPrefix => 'Runs';
 
   @override
   String get rawCronLabel => 'Custom cron';

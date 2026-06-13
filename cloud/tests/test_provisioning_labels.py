@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 
@@ -60,3 +62,16 @@ async def test_label_api_generates_contract_payload_and_svg(client, db_session_f
     assert "install_code" not in data["qr_svg"]
     assert VALID_INSTALL_CODE not in data["payload_json"]
     assert VALID_INSTALL_CODE not in data["qr_svg"]
+
+
+def test_webdev_label_form_never_handles_install_code():
+    repo_root = Path(__file__).resolve().parents[2]
+    app_js = (repo_root / "cloud" / "webdev" / "app.js").read_text("utf-8")
+    index_html = (repo_root / "cloud" / "webdev" / "index.html").read_text("utf-8")
+
+    assert "labelModelInput" not in app_js
+    assert "labelInstallCodeInput" not in app_js
+    assert "body.model" not in app_js
+    assert "body.install_code" not in app_js
+    assert 'id="labelModelInput"' not in index_html
+    assert 'id="labelInstallCodeInput"' not in index_html

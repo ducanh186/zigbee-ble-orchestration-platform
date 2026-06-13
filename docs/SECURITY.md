@@ -31,6 +31,12 @@ Database examples still contain local demo values such as `sb_user` and `sb_pass
 
 QR payloads do not carry install codes. Cloud resolves the factory device record, sends the install code to Gateway in `gateway.prepare_join`, and Gateway opens a short secure join window for that EUI64. `factory_devices` and `provisioning_sessions` store install-code material, which is sensitive because it can authorize a Zigbee join. Minimize retention, limit who can create labels or sessions, avoid logging install codes, and clear or mask stale values when the product no longer needs them.
 
+Manufacturing stations should use the paired
+`deploy/manufacturing-register.ps1` and `deploy/manufacturing-register.sh`
+tools. The admin access token comes from
+`SB_MANUFACTURING_ACCESS_TOKEN`; generated `payload.json` and `label.svg`
+contain public identity only.
+
 The expected negative evidence is that joins do not fall back to the Zigbee default global key. Gateway security config requires install-code joins and disables well-known-key rejoins.
 
 ### Local Secret Files Are Not Documentation

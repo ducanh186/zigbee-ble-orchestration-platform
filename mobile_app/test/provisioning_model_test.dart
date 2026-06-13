@@ -67,6 +67,20 @@ void main() {
         throwsA(isA<FormatException>()),
       );
     });
+
+    test('rejects QR payloads that contain an install code', () {
+      expect(
+        () => ProvisioningQrPayload.parseJson(
+          jsonEncode({
+            'version': 1,
+            'eui64': 'A8D417FEFF570B00',
+            'device_type': 'light',
+            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
+          }),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
   });
 
   group('Provisioning API models', () {

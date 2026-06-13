@@ -12,7 +12,7 @@ The Cloud API is mounted from `cloud/app/main.py`. `/health` is public. Other AP
 | Devices | `/api/devices/`, `/api/devices/{id}`, `/api/devices/{id}/state` | Device list and reads are filtered by user visibility. |
 | Commands | `/api/devices/{id}/command`, `/api/commands/{id}` | Commands are scoped to the user's home before publishing to MQTT. |
 | Gateways | `/api/gateways/{id}/commissioning/open`, `/api/gateways/{id}/commissioning/close`, `/api/devices/{id}/rediscover` | Gateway operations publish gateway or device commands. |
-| Provisioning | `/api/provisioning/labels`, `/api/provisioning/sessions` | Labels are admin-only. Sessions are visible to the owning home scope. |
+| Provisioning | `/api/provisioning/factory-devices`, `/api/provisioning/labels`, `/api/provisioning/sessions` | Factory records hold Install Codes server-side. Labels are admin-only and public. Sessions are visible to the owning home scope. |
 | Automations | `/api/automations` and `/api/automations/{id}` | Rules are stored in Cloud and synced to Gateway through MQTT. |
 | Automation events | `/api/automation-events` | Reads automation runtime events from Cloud storage. |
 
@@ -61,10 +61,15 @@ Gateway replies update command status. Do not rename command statuses without up
 Provisioning uses a factory-device record plus a session:
 
 - `eui64`: device identity.
-- `install_code`: install code from factory label or QR payload.
+- `install_code`: secret uploaded to the Cloud factory-device record during manufacturing. It is never part of the QR payload.
 - `device_type`: supported device type.
 - `room_id`: target room after join.
 - `gateway.prepare_join`: MQTT command that asks the gateway to open joining.
+
+The public QR contract is `version`, `eui64`, and `device_type`. Mobile scans
+that public identity, Cloud resolves the matching factory record, and only then
+does Cloud include `install_code` in the protected `gateway.prepare_join`
+command.
 
 Session states are terminal when they are `joined`, `failed`, `expired`, or `cancelled`. Non-terminal sessions should not be duplicated for the same device.
 

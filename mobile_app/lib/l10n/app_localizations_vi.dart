@@ -824,13 +824,28 @@ class AppLocalizationsVi extends AppLocalizations {
   String get scheduleTriggerLabel => 'Lịch';
 
   @override
-  String get cronPresetWeekdaySeven => 'Mỗi ngày trong tuần lúc 07:00';
+  String get scheduleModeHourly => 'Hằng giờ';
 
   @override
-  String get cronPresetSundayTwentyTwo => 'Mỗi Chủ nhật lúc 22:00';
+  String get scheduleModeDaily => 'Hằng ngày';
 
   @override
-  String get cronPresetEverySixHours => 'Mỗi 6 giờ';
+  String get scheduleModeWeekdays => 'Ngày trong tuần';
+
+  @override
+  String get scheduleModeWeekly => 'Hằng tuần';
+
+  @override
+  String get scheduleModeCustom => 'Tùy chỉnh';
+
+  @override
+  String get scheduleTimeLabel => 'Lúc';
+
+  @override
+  String get scheduleMinuteLabel => 'Vào phút';
+
+  @override
+  String get scheduleSummaryPrefix => 'Chạy';
 
   @override
   String get rawCronLabel => 'Cron tùy chỉnh';

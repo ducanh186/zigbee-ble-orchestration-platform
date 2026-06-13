@@ -1664,23 +1664,53 @@ abstract class AppLocalizations {
   /// **'Schedule'**
   String get scheduleTriggerLabel;
 
-  /// No description provided for @cronPresetWeekdaySeven.
+  /// No description provided for @scheduleModeHourly.
   ///
   /// In en, this message translates to:
-  /// **'Every weekday 07:00'**
-  String get cronPresetWeekdaySeven;
+  /// **'Hourly'**
+  String get scheduleModeHourly;
 
-  /// No description provided for @cronPresetSundayTwentyTwo.
+  /// No description provided for @scheduleModeDaily.
   ///
   /// In en, this message translates to:
-  /// **'Every Sunday 22:00'**
-  String get cronPresetSundayTwentyTwo;
+  /// **'Daily'**
+  String get scheduleModeDaily;
 
-  /// No description provided for @cronPresetEverySixHours.
+  /// No description provided for @scheduleModeWeekdays.
   ///
   /// In en, this message translates to:
-  /// **'Every 6 hours'**
-  String get cronPresetEverySixHours;
+  /// **'Weekdays'**
+  String get scheduleModeWeekdays;
+
+  /// No description provided for @scheduleModeWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get scheduleModeWeekly;
+
+  /// No description provided for @scheduleModeCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get scheduleModeCustom;
+
+  /// No description provided for @scheduleTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'At'**
+  String get scheduleTimeLabel;
+
+  /// No description provided for @scheduleMinuteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'At minute'**
+  String get scheduleMinuteLabel;
+
+  /// No description provided for @scheduleSummaryPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs'**
+  String get scheduleSummaryPrefix;
 
   /// No description provided for @rawCronLabel.
   ///

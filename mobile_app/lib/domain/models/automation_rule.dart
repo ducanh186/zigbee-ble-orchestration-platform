@@ -24,7 +24,7 @@ enum AutomationDeviceType {
   String get label => switch (this) {
     AutomationDeviceType.light => 'Light',
     AutomationDeviceType.switchDevice => 'Switch',
-    AutomationDeviceType.motion => 'Motion',
+    AutomationDeviceType.motion => 'Sensors',
     AutomationDeviceType.environment => 'Environment',
   };
 }
@@ -156,9 +156,9 @@ enum AutomationRuleTemplate {
     AutomationRuleTemplate.switchTogglesOneLight => 'Switch toggles one light',
     AutomationRuleTemplate.switchTogglesLights => 'Switch toggles lights',
     AutomationRuleTemplate.motionOccupiedTurnsOnLights =>
-      'Motion becomes occupied',
+      'Sensor becomes occupied',
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
-      'Motion becomes unoccupied',
+      'Sensor becomes unoccupied',
     AutomationRuleTemplate.scheduleOn => 'Schedule on',
     AutomationRuleTemplate.scheduleOff => 'Schedule off',
   };
