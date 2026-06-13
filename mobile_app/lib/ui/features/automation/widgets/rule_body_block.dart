@@ -13,8 +13,12 @@ class RuleBodyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final triggerEvent = _eventText(rule.trigger);
-    final actionVerb = _actionVerb(rule.actions);
+    final trigger = rule.trigger;
+    final triggerDeviceId = switch (trigger) {
+      ScheduleAutomationTrigger() => 'schedule',
+      _ => trigger.deviceId,
+    };
+    final triggerEvent = _eventText(trigger);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -29,28 +33,20 @@ class RuleBodyBlock extends StatelessWidget {
           _Line(
             label: 'WHEN',
             labelColor: palette.primary,
-            deviceId: rule.trigger.deviceId,
+            deviceId: triggerDeviceId,
             detail: triggerEvent,
           ),
           const SizedBox(height: 4),
-          _ThenLine(actions: rule.actions, verb: actionVerb),
+          _ThenLine(actions: rule.actions),
         ],
       ),
     );
   }
 
-  String _actionVerb(List<AutomationAction> actions) {
-    if (actions.isEmpty) {
-      return '';
-    }
-    return switch (actions.first.command) {
-      AutomationActionCommand.on => 'on',
-      AutomationActionCommand.off => 'off',
-      AutomationActionCommand.toggle => 'toggle',
-    };
-  }
-
   String _eventText(AutomationTrigger trigger) {
+    if (trigger case ScheduleAutomationTrigger(:final cron)) {
+      return cron;
+    }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {
       return occupancy == null
@@ -124,10 +120,9 @@ class _Line extends StatelessWidget {
 }
 
 class _ThenLine extends StatelessWidget {
-  const _ThenLine({required this.actions, required this.verb});
+  const _ThenLine({required this.actions});
 
   final List<AutomationAction> actions;
-  final String verb;
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +153,7 @@ class _ThenLine extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        action.deviceId,
+                        _targetText(action),
                         style: TextStyle(
                           color: palette.textSecondary,
                           fontFamily: 'JetBrains Mono',
@@ -170,7 +165,7 @@ class _ThenLine extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      verb,
+                      _verbText(action),
                       style: TextStyle(
                         color: palette.textPrimary,
                         fontFamily: 'JetBrains Mono',
@@ -186,5 +181,20 @@ class _ThenLine extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _targetText(AutomationAction action) {
+    return switch (action) {
+      DeviceCommandAutomationAction(:final deviceId) => deviceId,
+      SceneActivateAutomationAction(:final groupId, :final sceneId) =>
+        '$groupId / $sceneId',
+    };
+  }
+
+  String _verbText(AutomationAction action) {
+    return switch (action) {
+      DeviceCommandAutomationAction(:final command) => command.wireValue,
+      SceneActivateAutomationAction() => 'activate',
+    };
   }
 }

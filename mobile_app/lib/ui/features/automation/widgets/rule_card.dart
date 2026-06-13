@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import 'automation_visuals.dart';
 import 'rule_body_block.dart';
@@ -28,8 +29,12 @@ class RuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final scheduleLabel =
+        AppLocalizations.of(context)?.scheduleTriggerLabel ?? 'Schedule';
     final opacity = rule.enabled ? 1.0 : 0.72;
     final showMutationControls = onDelete != null || onEnabledChanged != null;
+    final isSchedule =
+        rule.trigger.triggerType == AutomationTriggerType.schedule;
 
     return Opacity(
       opacity: opacity,
@@ -64,7 +69,9 @@ class RuleCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    AutomationVisuals.templateIcon(template),
+                    isSchedule
+                        ? Icons.schedule
+                        : AutomationVisuals.templateIcon(template),
                     size: 18,
                     color: palette.primary,
                   ),
@@ -85,7 +92,7 @@ class RuleCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        template.label,
+                        isSchedule ? scheduleLabel : template.label,
                         style: TextStyle(
                           fontSize: 11,
                           color: palette.textSecondary,

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../domain/models/automation_rule.dart';
 import '../../../../domain/models/smart_device.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
@@ -10,6 +11,8 @@ import '../view_models/automation_view_model.dart';
 import 'automation_visuals.dart';
 import 'device_picker_row.dart';
 import 'rule_preview.dart';
+import 'scene_target_section.dart';
+import 'schedule_trigger_section.dart';
 import 'template_card.dart';
 
 /// Modal bottom-sheet form for creating a rule. Mirrors the design's
@@ -47,6 +50,9 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   AutomationActionCommand? _actionCommand;
   Set<String> _targetIds = {};
   Map<String, AutomationActionCommand> _targetActionCommands = {};
+  ScheduleSelection? _scheduleSelection;
+  ScheduleTargetSelection? _scheduleTarget;
+  String? _scheduleValidationMessage;
 
   @override
   void initState() {
@@ -63,6 +69,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final mediaQuery = MediaQuery.of(context);
 
     return Consumer2<AutomationViewModel, DeviceDashboardViewModel>(
@@ -116,31 +123,68 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             onChanged: _setTemplate,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(label: 'Trigger device', required: true),
-                          const SizedBox(height: 6),
-                          _TriggerSection(
-                            triggers: triggers,
-                            selectedId: _triggerId,
-                            triggerDeviceType: _triggerDeviceType,
-                            selectedState: _triggerState,
-                            onDeviceChanged: _setTriggerDevice,
-                            onStateChanged: _setTriggerState,
-                          ),
-                          const SizedBox(height: 16),
-                          _FieldLabel(
-                            label: 'Target lights',
-                            required: true,
-                            hint: '${_targetIds.length} selected',
-                          ),
-                          const SizedBox(height: 6),
-                          _TargetSection(
-                            lights: lights,
-                            selectedIds: _targetIds,
-                            allowsMultipleTargets: _allowsMultipleTargets,
-                            actionCommands: _targetActionCommands,
-                            onToggle: _toggleTarget,
-                            onActionChanged: _setActionCommand,
-                          ),
+                          if (_isScheduleTemplate) ...[
+                            _FieldLabel(
+                              label: l10n.scheduleTriggerLabel,
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            ScheduleTriggerSection(
+                              key: ValueKey(
+                                'schedule-trigger-${_template!.name}',
+                              ),
+                              onChanged: (value) =>
+                                  setState(() => _scheduleSelection = value),
+                              onValidationChanged: (message) => setState(
+                                () => _scheduleValidationMessage = message,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _FieldLabel(
+                              label: l10n.targetTypeLabel,
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            SceneTargetSection(
+                              key: ValueKey(
+                                'schedule-target-${_template!.name}',
+                              ),
+                              availability: automation.sceneAvailability,
+                              lights: lights,
+                              scenes: automation.scenes,
+                              onChanged: (value) =>
+                                  setState(() => _scheduleTarget = value),
+                            ),
+                          ] else ...[
+                            _FieldLabel(
+                              label: 'Trigger device',
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            _TriggerSection(
+                              triggers: triggers,
+                              selectedId: _triggerId,
+                              triggerDeviceType: _triggerDeviceType,
+                              selectedState: _triggerState,
+                              onDeviceChanged: _setTriggerDevice,
+                              onStateChanged: _setTriggerState,
+                            ),
+                            const SizedBox(height: 16),
+                            _FieldLabel(
+                              label: 'Target lights',
+                              required: true,
+                              hint: '${_targetIds.length} selected',
+                            ),
+                            const SizedBox(height: 6),
+                            _TargetSection(
+                              lights: lights,
+                              selectedIds: _targetIds,
+                              allowsMultipleTargets: _allowsMultipleTargets,
+                              actionCommands: _targetActionCommands,
+                              onToggle: _toggleTarget,
+                              onActionChanged: _setActionCommand,
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           _FieldLabel(
                             label: 'Enabled',
@@ -175,6 +219,18 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                               ),
                             ),
                           ],
+                          if (_scheduleValidationMessage != null) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              _scheduleValidationMessage!,
+                              key: const Key('form-validation-message'),
+                              style: TextStyle(
+                                color: palette.error,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -196,6 +252,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   bool _canSave() {
+    if (_isScheduleTemplate) {
+      return _nameController.text.trim().isNotEmpty &&
+          _scheduleSelection != null &&
+          _scheduleSelection!.isValid &&
+          _scheduleTarget != null;
+    }
     return _nameController.text.trim().isNotEmpty &&
         _triggerId != null &&
         _triggerDeviceType != null &&
@@ -208,6 +270,22 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     setState(() {
       final previousTriggerType = _triggerDeviceType;
       _template = template;
+      if (template.isSchedule) {
+        _triggerId = null;
+        _triggerDeviceType = null;
+        _triggerEvent = null;
+        _triggerState = const {};
+        _actionCommand = template.actionCommand;
+        _targetIds = {};
+        _targetActionCommands = {};
+        _scheduleSelection = null;
+        _scheduleTarget = null;
+        _scheduleValidationMessage = null;
+        return;
+      }
+      _scheduleSelection = null;
+      _scheduleTarget = null;
+      _scheduleValidationMessage = null;
       _triggerDeviceType = template.triggerDeviceType;
       _triggerEvent = template.triggerEvent;
       _triggerState = template.triggerState;
@@ -324,6 +402,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     return _template != AutomationRuleTemplate.switchTogglesOneLight;
   }
 
+  bool get _isScheduleTemplate => _template?.isSchedule ?? false;
+
   SmartDevice? _findDevice(List<SmartDevice> devices, String? deviceId) {
     if (deviceId == null) {
       return null;
@@ -406,32 +486,59 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
 
   Future<void> _onSave(AutomationViewModel automation) async {
     final template = _template;
-    final triggerId = _triggerId;
-    final triggerDeviceType = _triggerDeviceType;
-    final triggerEvent = _triggerEvent;
-    if (triggerId == null ||
-        triggerDeviceType == null ||
-        triggerEvent == null ||
-        _targetIds.isEmpty ||
-        !_targetIds.every(_targetActionCommands.containsKey)) {
-      return;
+    late final AutomationRuleDraft draft;
+    if (template?.isSchedule ?? false) {
+      final schedule = _scheduleSelection;
+      final target = _scheduleTarget;
+      if (schedule == null || target == null) {
+        return;
+      }
+      final action = switch (target) {
+        DirectLightTarget direct => DeviceCommandAutomationAction(
+          deviceId: direct.deviceId,
+          command: template!.actionCommand,
+        ),
+        SceneTarget scene => SceneActivateAutomationAction(
+          groupId: scene.groupId,
+          sceneId: scene.sceneId,
+        ),
+      };
+      draft = AutomationRuleDraft.typed(
+        name: _nameController.text.trim(),
+        enabled: _enabled,
+        template: template,
+        trigger: ScheduleAutomationTrigger(cron: schedule.cron),
+        scheduleCron: schedule.cron,
+        actions: [action],
+      );
+    } else {
+      final triggerId = _triggerId;
+      final triggerDeviceType = _triggerDeviceType;
+      final triggerEvent = _triggerEvent;
+      if (triggerId == null ||
+          triggerDeviceType == null ||
+          triggerEvent == null ||
+          _targetIds.isEmpty ||
+          !_targetIds.every(_targetActionCommands.containsKey)) {
+        return;
+      }
+      final targetLightIds = _targetIds.toList(growable: false);
+      draft = AutomationRuleDraft(
+        name: _nameController.text.trim(),
+        enabled: _enabled,
+        template: template,
+        triggerDeviceId: triggerId,
+        triggerDeviceType: triggerDeviceType,
+        triggerEvent: triggerEvent,
+        triggerState: _triggerState,
+        actionCommand: _previewActionCommand,
+        targetLightIds: targetLightIds,
+        targetActionCommands: {
+          for (final targetId in targetLightIds)
+            targetId: _targetActionCommands[targetId]!,
+        },
+      );
     }
-    final targetLightIds = _targetIds.toList(growable: false);
-    final draft = AutomationRuleDraft(
-      name: _nameController.text.trim(),
-      enabled: _enabled,
-      template: template,
-      triggerDeviceId: triggerId,
-      triggerDeviceType: triggerDeviceType,
-      triggerEvent: triggerEvent,
-      triggerState: _triggerState,
-      actionCommand: _previewActionCommand,
-      targetLightIds: targetLightIds,
-      targetActionCommands: {
-        for (final targetId in targetLightIds)
-          targetId: _targetActionCommands[targetId]!,
-      },
-    );
 
     final beforeIds = automation.rules.map((rule) => rule.id).toSet();
     await automation.createRule(draft);
