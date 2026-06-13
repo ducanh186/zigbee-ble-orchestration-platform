@@ -266,4 +266,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logsNoEvents => 'No event log yet.';
+
+  @override
+  String get environmentTitle => 'Environment';
+
+  @override
+  String get temperatureLabel => 'Temperature';
+
+  @override
+  String get humidityLabel => 'Humidity';
+
+  @override
+  String get zigbeeLocalLabel => 'Zigbee local';
+
+  @override
+  String get sensorConditionLabel => 'Condition';
+
+  @override
+  String get metricLabel => 'Metric';
+
+  @override
+  String get operatorLabel => 'Operator';
+
+  @override
+  String get thresholdLabel => 'Threshold';
+
+  @override
+  String get greaterThanOrEqualLabel => 'Greater than or equal';
+
+  @override
+  String get lessThanOrEqualLabel => 'Less than or equal';
+
+  @override
+  String get degreesCelsiusUnit => '°C';
+
+  @override
+  String get percentUnit => '%';
+
+  @override
+  String get scheduleOnTemplate => 'Schedule on';
+
+  @override
+  String get scheduleOffTemplate => 'Schedule off';
+
+  @override
+  String get scheduleTriggerLabel => 'Schedule';
+
+  @override
+  String get cronPresetWeekdaySeven => 'Every weekday 07:00';
+
+  @override
+  String get cronPresetSundayTwentyTwo => 'Every Sunday 22:00';
+
+  @override
+  String get cronPresetEverySixHours => 'Every 6 hours';
+
+  @override
+  String get rawCronLabel => 'Custom cron';
+
+  @override
+  String get targetTypeLabel => 'Target type';
+
+  @override
+  String get directLightLabel => 'Direct light';
+
+  @override
+  String get sceneLabel => 'Scene';
+
+  @override
+  String get noScenesAvailable => 'No scenes available';
+
+  @override
+  String get sceneUnavailableMessage =>
+      'Scenes are unavailable. Select a direct light.';
+
+  @override
+  String get invalidCronMessage => 'Enter a valid five-field cron expression';
 }

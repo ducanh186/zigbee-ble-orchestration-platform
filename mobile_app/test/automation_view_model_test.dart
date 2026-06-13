@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zigbee_smart_building/domain/models/automation_rule.dart';
+import 'package:zigbee_smart_building/domain/models/light_scene.dart';
 import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
+import 'package:zigbee_smart_building/domain/repositories/scene_repository.dart';
 import 'package:zigbee_smart_building/ui/features/automation/view_models/automation_view_model.dart';
 
 void main() {
@@ -16,6 +18,66 @@ void main() {
     expect(viewModel.rules.single.name, 'Motion turns on lab lights');
     expect(viewModel.errorMessage, isNull);
   });
+
+  test('loads scenes without blocking automation rules', () async {
+    final sceneRepository = _FakeSceneRepository(
+      scenes: const [
+        LightScene(
+          groupId: 'group-lab',
+          sceneId: 'scene-on',
+          label: 'Lab on',
+          deviceIds: ['light-01'],
+        ),
+      ],
+    );
+    final viewModel = AutomationViewModel(
+      repository: _FakeAutomationRepository(
+        initialRules: [_rule(syncStatus: AutomationSyncStatus.pending)],
+      ),
+      sceneRepository: sceneRepository,
+    );
+
+    await viewModel.load();
+
+    expect(viewModel.rules, hasLength(1));
+    expect(viewModel.scenes.single.label, 'Lab on');
+    expect(viewModel.sceneAvailability, SceneAvailability.available);
+    expect(viewModel.errorMessage, isNull);
+  });
+
+  test('scene endpoint failure preserves direct light flow', () async {
+    final viewModel = AutomationViewModel(
+      repository: _FakeAutomationRepository(),
+      sceneRepository: _FakeSceneRepository(
+        availability: SceneAvailability.unavailable,
+      ),
+    );
+
+    await viewModel.load();
+
+    expect(viewModel.scenes, isEmpty);
+    expect(viewModel.sceneAvailability, SceneAvailability.unavailable);
+    expect(viewModel.errorMessage, isNull);
+  });
+
+  test(
+    'unexpected scene failure keeps rules and surfaces friendly error',
+    () async {
+      final viewModel = AutomationViewModel(
+        repository: _FakeAutomationRepository(
+          initialRules: [_rule(syncStatus: AutomationSyncStatus.pending)],
+        ),
+        sceneRepository: _FakeSceneRepository(error: Exception('token leaked')),
+      );
+
+      await viewModel.load();
+
+      expect(viewModel.rules, hasLength(1));
+      expect(viewModel.sceneAvailability, SceneAvailability.unavailable);
+      expect(viewModel.errorMessage, contains('Khong tai duoc scenes'));
+      expect(viewModel.errorMessage, isNot(contains('token leaked')));
+    },
+  );
 
   test('createRule polls pending rule until sync status is final', () async {
     final repository = _FakeAutomationRepository(
@@ -140,14 +202,14 @@ AutomationRule _rule({
     id: id,
     name: 'Motion turns on lab lights',
     enabled: true,
-    trigger: const AutomationTrigger(
+    trigger: const EventAutomationTrigger(
       deviceId: 'pir-01',
       deviceType: AutomationDeviceType.motion,
       event: AutomationTriggerEvent.occupancyChanged,
       state: {'occupancy': 'occupied'},
     ),
     actions: const [
-      AutomationAction(
+      DeviceCommandAutomationAction(
         deviceId: 'light-01',
         deviceType: AutomationDeviceType.light,
         command: AutomationActionCommand.on,
@@ -226,5 +288,32 @@ class _FakeAutomationRepository implements AutomationRepository {
     }
     deletedRuleIds.add(ruleId);
     _rules.removeWhere((rule) => rule.id == ruleId);
+  }
+}
+
+class _FakeSceneRepository implements SceneRepository {
+  _FakeSceneRepository({
+    this.scenes = const [],
+    this.error,
+    SceneAvailability? availability,
+  }) : lastAvailability =
+           availability ??
+           (scenes.isEmpty
+               ? SceneAvailability.empty
+               : SceneAvailability.available);
+
+  final List<LightScene> scenes;
+  final Object? error;
+
+  @override
+  SceneAvailability lastAvailability;
+
+  @override
+  Future<List<LightScene>> fetchScenes() async {
+    if (error != null) {
+      lastAvailability = SceneAvailability.unavailable;
+      throw error!;
+    }
+    return scenes;
   }
 }

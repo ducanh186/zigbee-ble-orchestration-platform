@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import 'automation_visuals.dart';
 
@@ -21,6 +22,12 @@ class TemplateCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
+    final label = switch (template) {
+      AutomationRuleTemplate.scheduleOn => l10n.scheduleOnTemplate,
+      AutomationRuleTemplate.scheduleOff => l10n.scheduleOffTemplate,
+      _ => template.label,
+    };
 
     return Material(
       color: selected ? palette.primaryTint : palette.surface,
@@ -45,9 +52,7 @@ class TemplateCard extends StatelessWidget {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: selected
-                          ? palette.primary
-                          : palette.primaryTint,
+                      color: selected ? palette.primary : palette.primaryTint,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -59,7 +64,7 @@ class TemplateCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      template.label,
+                      label,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

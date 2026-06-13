@@ -3,12 +3,13 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    TypeAdapter,
     field_serializer,
     field_validator,
     model_validator,
@@ -316,11 +317,106 @@ class CommandOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class DeviceEventTrigger(BaseModel):
+    type: Literal["device_event"] = "device_event"
+    device_id: str = Field(min_length=1)
+    device_type: Literal["motion", "switch"]
+    event: Literal["occupancy_changed", "switch_toggle", "toggle"]
+    state: dict[str, Any] = Field(default_factory=dict)
+
+
+class SensorThresholdTrigger(BaseModel):
+    type: Literal["sensor_threshold"]
+    device_id: str = Field(min_length=1)
+    device_type: Literal["environment"]
+    metric: Literal["temperature_c", "humidity_percent"]
+    operator: Literal["gte", "lte"]
+    threshold: float
+
+    @model_validator(mode="after")
+    def validate_threshold_range(self):
+        minimum, maximum = (
+            (-20.0, 80.0)
+            if self.metric == "temperature_c"
+            else (0.0, 100.0)
+        )
+        if not minimum <= self.threshold <= maximum:
+            raise ValueError(
+                f"{self.metric} threshold must be between "
+                f"{minimum:g} and {maximum:g}"
+            )
+        return self
+
+
+class ScheduleTrigger(BaseModel):
+    type: Literal["schedule"]
+
+
+AutomationTrigger = Annotated[
+    DeviceEventTrigger | SensorThresholdTrigger | ScheduleTrigger,
+    Field(discriminator="type"),
+]
+
+
+class DeviceCommandAction(BaseModel):
+    type: Literal["device_command"] = "device_command"
+    device_id: str = Field(min_length=1)
+    device_type: str = Field(min_length=1)
+    command: Literal["on", "off", "toggle"]
+
+
+class SceneActivateAction(BaseModel):
+    type: Literal["scene_activate"]
+    group_id: str = Field(min_length=1)
+    scene_id: str = Field(min_length=1)
+
+
+AutomationAction = Annotated[
+    DeviceCommandAction | SceneActivateAction,
+    Field(discriminator="type"),
+]
+
+_AUTOMATION_TRIGGER_ADAPTER = TypeAdapter(AutomationTrigger)
+_AUTOMATION_ACTION_ADAPTER = TypeAdapter(AutomationAction)
+
+
+def _validated_trigger(value: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(value)
+    normalized.setdefault("type", "device_event")
+    return _AUTOMATION_TRIGGER_ADAPTER.validate_python(normalized).model_dump()
+
+
+def _validated_actions(
+    values: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    normalized_actions = []
+    for value in values:
+        normalized = dict(value)
+        normalized.setdefault("type", "device_command")
+        normalized_actions.append(
+            _AUTOMATION_ACTION_ADAPTER.validate_python(normalized).model_dump()
+        )
+    return normalized_actions
+
+
 class AutomationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     enabled: bool = True
     trigger: dict[str, Any]
     actions: list[dict[str, Any]] = Field(min_length=1)
+
+    @field_validator("trigger")
+    @classmethod
+    def validate_trigger(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return _validated_trigger(value)
+
+    @field_validator("actions")
+    @classmethod
+    def validate_actions(
+        cls,
+        values: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        return _validated_actions(values)
 
 
 class AutomationUpdate(BaseModel):
@@ -331,6 +427,22 @@ class AutomationUpdate(BaseModel):
     version: int | None = Field(default=None, ge=1)
     trigger: dict[str, Any] | None = None
     actions: list[dict[str, Any]] | None = Field(default=None, min_length=1)
+
+    @field_validator("trigger")
+    @classmethod
+    def validate_trigger(
+        cls,
+        value: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        return None if value is None else _validated_trigger(value)
+
+    @field_validator("actions")
+    @classmethod
+    def validate_actions(
+        cls,
+        values: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]] | None:
+        return None if values is None else _validated_actions(values)
 
 
 class AutomationOut(BaseModel):

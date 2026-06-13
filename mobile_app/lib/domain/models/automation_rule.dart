@@ -1,13 +1,15 @@
 enum AutomationDeviceType {
   light,
   switchDevice,
-  motion;
+  motion,
+  environment;
 
   static AutomationDeviceType fromJson(Object? value) {
     return switch (value) {
       'light' => AutomationDeviceType.light,
       'switch' => AutomationDeviceType.switchDevice,
       'motion' => AutomationDeviceType.motion,
+      'environment' => AutomationDeviceType.environment,
       _ => AutomationDeviceType.light,
     };
   }
@@ -16,12 +18,14 @@ enum AutomationDeviceType {
     AutomationDeviceType.light => 'light',
     AutomationDeviceType.switchDevice => 'switch',
     AutomationDeviceType.motion => 'motion',
+    AutomationDeviceType.environment => 'environment',
   };
 
   String get label => switch (this) {
     AutomationDeviceType.light => 'Light',
     AutomationDeviceType.switchDevice => 'Switch',
     AutomationDeviceType.motion => 'Motion',
+    AutomationDeviceType.environment => 'Environment',
   };
 }
 
@@ -144,7 +148,9 @@ enum AutomationRuleTemplate {
   switchTogglesOneLight,
   switchTogglesLights,
   motionOccupiedTurnsOnLights,
-  motionUnoccupiedTurnsOffLights;
+  motionUnoccupiedTurnsOffLights,
+  scheduleOn,
+  scheduleOff;
 
   String get label => switch (this) {
     AutomationRuleTemplate.switchTogglesOneLight => 'Switch toggles one light',
@@ -153,6 +159,8 @@ enum AutomationRuleTemplate {
       'Motion becomes occupied',
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       'Motion becomes unoccupied',
+    AutomationRuleTemplate.scheduleOn => 'Schedule on',
+    AutomationRuleTemplate.scheduleOff => 'Schedule off',
   };
 
   String get actionLabel => switch (this) {
@@ -162,6 +170,8 @@ enum AutomationRuleTemplate {
       'Turn selected lights on',
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       'Turn selected lights off',
+    AutomationRuleTemplate.scheduleOn => 'Turn selected light on',
+    AutomationRuleTemplate.scheduleOff => 'Turn selected light off',
   };
 
   AutomationDeviceType get triggerDeviceType => switch (this) {
@@ -171,6 +181,8 @@ enum AutomationRuleTemplate {
     AutomationRuleTemplate.motionOccupiedTurnsOnLights ||
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationDeviceType.motion,
+    AutomationRuleTemplate.scheduleOn || AutomationRuleTemplate.scheduleOff =>
+      throw StateError('Schedule templates do not use a trigger device'),
   };
 
   AutomationTriggerEvent get triggerEvent => switch (this) {
@@ -180,6 +192,8 @@ enum AutomationRuleTemplate {
     AutomationRuleTemplate.motionOccupiedTurnsOnLights ||
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationTriggerEvent.occupancyChanged,
+    AutomationRuleTemplate.scheduleOn || AutomationRuleTemplate.scheduleOff =>
+      throw StateError('Schedule templates do not use a trigger event'),
   };
 
   AutomationActionCommand get actionCommand => switch (this) {
@@ -190,6 +204,8 @@ enum AutomationRuleTemplate {
       AutomationActionCommand.on,
     AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
       AutomationActionCommand.off,
+    AutomationRuleTemplate.scheduleOn => AutomationActionCommand.on,
+    AutomationRuleTemplate.scheduleOff => AutomationActionCommand.off,
   };
 
   Map<String, Object?> get triggerState => switch (this) {
@@ -203,33 +219,204 @@ enum AutomationRuleTemplate {
   };
 
   bool get allowsMultipleTargets =>
-      this != AutomationRuleTemplate.switchTogglesOneLight;
+      this != AutomationRuleTemplate.switchTogglesOneLight && !isSchedule;
+
+  bool get isSchedule =>
+      this == AutomationRuleTemplate.scheduleOn ||
+      this == AutomationRuleTemplate.scheduleOff;
 }
 
-class AutomationTrigger {
-  const AutomationTrigger({
+enum AutomationTriggerType {
+  event,
+  schedule;
+
+  String get wireValue => switch (this) {
+    AutomationTriggerType.event => 'event',
+    AutomationTriggerType.schedule => 'schedule',
+  };
+}
+
+sealed class AutomationTrigger {
+  const AutomationTrigger();
+
+  AutomationTriggerType get triggerType;
+  Map<String, Object?> toJson();
+
+  String get deviceId => switch (this) {
+    EventAutomationTrigger trigger => trigger.deviceId,
+    SensorThresholdAutomationTrigger trigger => trigger.deviceId,
+    ScheduleAutomationTrigger() => '',
+  };
+
+  AutomationDeviceType get deviceType => switch (this) {
+    EventAutomationTrigger trigger => trigger.deviceType,
+    SensorThresholdAutomationTrigger() => AutomationDeviceType.environment,
+    ScheduleAutomationTrigger() => AutomationDeviceType.light,
+  };
+
+  AutomationTriggerEvent get event => switch (this) {
+    EventAutomationTrigger trigger => trigger.event,
+    SensorThresholdAutomationTrigger() ||
+    ScheduleAutomationTrigger() => AutomationTriggerEvent.occupancyChanged,
+  };
+
+  Map<String, Object?> get state => switch (this) {
+    EventAutomationTrigger trigger => trigger.state,
+    SensorThresholdAutomationTrigger() ||
+    ScheduleAutomationTrigger() => const {},
+  };
+}
+
+final class EventAutomationTrigger extends AutomationTrigger {
+  const EventAutomationTrigger({
     required this.deviceId,
     required this.deviceType,
     required this.event,
     this.state = const {},
   });
 
+  @override
   final String deviceId;
+  @override
   final AutomationDeviceType deviceType;
+  @override
   final AutomationTriggerEvent event;
+  @override
   final Map<String, Object?> state;
+
+  @override
+  AutomationTriggerType get triggerType => AutomationTriggerType.event;
+
+  @override
+  Map<String, Object?> toJson() {
+    return {
+      'type': 'device_event',
+      'device_id': deviceId,
+      'device_type': deviceType.wireValue,
+      'event': event.wireValue,
+      if (state.isNotEmpty) 'state': state,
+    };
+  }
 }
 
-class AutomationAction {
-  const AutomationAction({
+enum EnvironmentMetric {
+  temperature,
+  humidity;
+
+  String get wireValue => switch (this) {
+    EnvironmentMetric.temperature => 'temperature_c',
+    EnvironmentMetric.humidity => 'humidity_percent',
+  };
+}
+
+enum ThresholdOperator {
+  gte,
+  lte;
+
+  String get wireValue => switch (this) {
+    ThresholdOperator.gte => 'gte',
+    ThresholdOperator.lte => 'lte',
+  };
+}
+
+final class SensorThresholdAutomationTrigger extends AutomationTrigger {
+  const SensorThresholdAutomationTrigger({
     required this.deviceId,
-    required this.deviceType,
+    required this.metric,
+    required this.operator,
+    required this.threshold,
+  });
+
+  @override
+  final String deviceId;
+  final EnvironmentMetric metric;
+  final ThresholdOperator operator;
+  final double threshold;
+
+  @override
+  AutomationTriggerType get triggerType => AutomationTriggerType.event;
+
+  @override
+  Map<String, Object?> toJson() {
+    return {
+      'type': 'sensor_threshold',
+      'device_id': deviceId,
+      'device_type': AutomationDeviceType.environment.wireValue,
+      'metric': metric.wireValue,
+      'operator': operator.wireValue,
+      'threshold': threshold,
+    };
+  }
+}
+
+final class ScheduleAutomationTrigger extends AutomationTrigger {
+  const ScheduleAutomationTrigger({required this.cron});
+
+  final String cron;
+
+  @override
+  AutomationTriggerType get triggerType => AutomationTriggerType.schedule;
+
+  @override
+  Map<String, Object?> toJson() => const {'type': 'schedule'};
+}
+
+sealed class AutomationAction {
+  const AutomationAction();
+
+  Map<String, Object?> toJson();
+
+  String get deviceId => switch (this) {
+    DeviceCommandAutomationAction action => action.deviceId,
+    SceneActivateAutomationAction() => '',
+  };
+
+  AutomationDeviceType get deviceType => AutomationDeviceType.light;
+
+  AutomationActionCommand get command => switch (this) {
+    DeviceCommandAutomationAction action => action.command,
+    SceneActivateAutomationAction() => AutomationActionCommand.on,
+  };
+}
+
+final class DeviceCommandAutomationAction extends AutomationAction {
+  const DeviceCommandAutomationAction({
+    required this.deviceId,
+    this.deviceType = AutomationDeviceType.light,
     required this.command,
   });
 
+  @override
   final String deviceId;
+  @override
   final AutomationDeviceType deviceType;
+  @override
   final AutomationActionCommand command;
+
+  @override
+  Map<String, Object?> toJson() {
+    return {
+      'type': 'device_command',
+      'device_id': deviceId,
+      'device_type': deviceType.wireValue,
+      'command': command.wireValue,
+    };
+  }
+}
+
+final class SceneActivateAutomationAction extends AutomationAction {
+  const SceneActivateAutomationAction({
+    required this.groupId,
+    required this.sceneId,
+  });
+
+  final String groupId;
+  final String sceneId;
+
+  @override
+  Map<String, Object?> toJson() {
+    return {'type': 'scene_activate', 'group_id': groupId, 'scene_id': sceneId};
+  }
 }
 
 class AutomationRuleDraft {
@@ -244,14 +431,35 @@ class AutomationRuleDraft {
     required this.targetLightIds,
     this.targetActionCommands = const {},
     this.template,
-  }) : _triggerDeviceType = triggerDeviceType,
+  }) : _typedTrigger = null,
+       _typedActions = null,
+       scheduleCron = null,
+       _triggerDeviceType = triggerDeviceType,
        _triggerEvent = triggerEvent,
        _triggerState = triggerState,
        _actionCommand = actionCommand;
 
+  const AutomationRuleDraft.typed({
+    required this.name,
+    required this.enabled,
+    required AutomationTrigger trigger,
+    required List<AutomationAction> actions,
+    this.scheduleCron,
+    this.template,
+  }) : triggerDeviceId = '',
+       targetLightIds = const [],
+       targetActionCommands = const {},
+       _triggerDeviceType = null,
+       _triggerEvent = null,
+       _triggerState = const {},
+       _actionCommand = null,
+       _typedTrigger = trigger,
+       _typedActions = actions;
+
   final String name;
   final bool enabled;
   final AutomationRuleTemplate? template;
+  final String? scheduleCron;
   final String triggerDeviceId;
   final List<String> targetLightIds;
   final Map<String, AutomationActionCommand> targetActionCommands;
@@ -259,6 +467,8 @@ class AutomationRuleDraft {
   final AutomationTriggerEvent? _triggerEvent;
   final Map<String, Object?> _triggerState;
   final AutomationActionCommand? _actionCommand;
+  final AutomationTrigger? _typedTrigger;
+  final List<AutomationAction>? _typedActions;
 
   AutomationDeviceType get triggerDeviceType {
     return _triggerDeviceType ?? _templateOrThrow.triggerDeviceType;
@@ -287,24 +497,25 @@ class AutomationRuleDraft {
   }
 
   AutomationTrigger get trigger {
-    return AutomationTrigger(
-      deviceId: triggerDeviceId,
-      deviceType: triggerDeviceType,
-      event: triggerEvent,
-      state: triggerState,
-    );
+    return _typedTrigger ??
+        EventAutomationTrigger(
+          deviceId: triggerDeviceId,
+          deviceType: triggerDeviceType,
+          event: triggerEvent,
+          state: triggerState,
+        );
   }
 
   List<AutomationAction> get actions {
-    return targetLightIds
-        .map(
-          (deviceId) => AutomationAction(
-            deviceId: deviceId,
-            deviceType: AutomationDeviceType.light,
-            command: targetActionCommands[deviceId] ?? actionCommand,
-          ),
-        )
-        .toList(growable: false);
+    return _typedActions ??
+        targetLightIds
+            .map(
+              (deviceId) => DeviceCommandAutomationAction(
+                deviceId: deviceId,
+                command: targetActionCommands[deviceId] ?? actionCommand,
+              ),
+            )
+            .toList(growable: false);
   }
 }
 

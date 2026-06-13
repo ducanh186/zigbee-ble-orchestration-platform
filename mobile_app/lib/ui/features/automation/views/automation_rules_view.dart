@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
 import '../view_models/automation_view_model.dart';
+import '../widgets/automation_visuals.dart';
 import '../widgets/create_rule_sheet.dart';
 import '../widgets/empty_rules.dart';
 import '../widgets/new_rule_cta.dart';
@@ -109,7 +110,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: RuleCard(
                           rule: rule,
-                          template: _templateFor(rule),
+                          template: AutomationVisuals.templateForRule(rule),
                           highlight: rule.id == _justCreatedRuleId,
                           onEnabledChanged:
                               !widget.canMutate || automation.isSaving
@@ -176,29 +177,6 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
       setState(() => _justCreatedRuleId = null);
     }
     await automation.deleteRule(rule.id);
-  }
-
-  /// Best-effort mapping rule → template so the rule card can pick an icon
-  /// and a subtitle. Falls back to a switch-based template if the trigger
-  /// device type is unknown.
-  AutomationRuleTemplate _templateFor(AutomationRule rule) {
-    final firstAction = rule.actions.isEmpty
-        ? null
-        : rule.actions.first.command;
-    switch (rule.trigger.event) {
-      case AutomationTriggerEvent.occupancyChanged:
-        final occupancy = rule.trigger.state['occupancy'];
-        if (occupancy == 'unoccupied') {
-          return AutomationRuleTemplate.motionUnoccupiedTurnsOffLights;
-        }
-        return AutomationRuleTemplate.motionOccupiedTurnsOnLights;
-      case AutomationTriggerEvent.switchToggle:
-        if (rule.actions.length <= 1 ||
-            firstAction != AutomationActionCommand.toggle) {
-          return AutomationRuleTemplate.switchTogglesOneLight;
-        }
-        return AutomationRuleTemplate.switchTogglesLights;
-    }
   }
 }
 
