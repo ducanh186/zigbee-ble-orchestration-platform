@@ -236,6 +236,64 @@ bool emberAfReportAttributesCallback(EmberAfClusterId clusterId,
     return false;
   }
 
+  // --- Temperature Measurement (0x0402) / Relative Humidity (0x0405) ---
+  // DHT11 environment sensor (Z3_DHT11_Sensor) reports MeasuredValue 0x0000
+  // in centi-units: 0x0402 int16s 0.01C, 0x0405 uint16 0.01%RH.
+  // Log-only for now: no MQTT publish and no registry/auto-pairing, so no
+  // contract change. Cloud/App integration picks this up later (see
+  // docs/handoff/dht11_environment_sensor_local_handoff.md).
+  if (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID
+      || clusterId == ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID) {
+    bool isTemp = (clusterId == ZCL_TEMP_MEASUREMENT_CLUSTER_ID);
+    uint8_t wantType = isTemp ? ZCL_INT16S_ATTRIBUTE_TYPE
+                              : ZCL_INT16U_ATTRIBUTE_TYPE;
+
+    while (i + 3 <= bufLen) {
+      uint16_t attrId = u16le(&buffer[i]);
+      uint8_t type = buffer[i + 2];
+      i += 3;
+
+      if (attrId == 0x0000 && type == wantType) {
+        if (i + 2 > bufLen) break;
+        int32_t centi = isTemp ? (int32_t)(int16_t)u16le(&buffer[i])
+                               : (int32_t)u16le(&buffer[i]);
+        i += 2;
+
+        EmberNodeId sender = emberGetSender();
+        char euiStr[20] = "unknown";
+        EmberEUI64 eui;
+        if (emberLookupEui64ByNodeId(sender, eui) == EMBER_SUCCESS) {
+          eui64ToStringBigEndian(euiStr, sizeof(euiStr), eui);
+        } else {
+          (void)deviceRegistryGetEuiBeStrByNodeId(sender, euiStr,
+                                                  sizeof(euiStr));
+        }
+
+        int32_t whole = centi / 100;
+        int32_t frac = centi % 100;
+        if (frac < 0) frac = -frac;
+        if (isTemp) {
+          emberAfCorePrintln("ENV: temp=%d.%02dC from 0x%04X (%s)",
+                             (int)whole, (int)frac, (unsigned)sender, euiStr);
+          appLogLog("ENV", "report",
+                    "\"device_id\":\"%s\",\"node_id\":\"0x%04X\","
+                    "\"temperature_c_x100\":%d",
+                    euiStr, (unsigned)sender, (int)centi);
+        } else {
+          emberAfCorePrintln("ENV: humidity=%d.%02d%% from 0x%04X (%s)",
+                             (int)whole, (int)frac, (unsigned)sender, euiStr);
+          appLogLog("ENV", "report",
+                    "\"device_id\":\"%s\",\"node_id\":\"0x%04X\","
+                    "\"humidity_pct_x100\":%d",
+                    euiStr, (unsigned)sender, (int)centi);
+        }
+      } else {
+        break;
+      }
+    }
+    return false;
+  }
+
   // --- Power Configuration / Battery (0x0001) ---
   if (clusterId == ZCL_POWER_CONFIGURATION_CLUSTER_ID) {
     while (i + 3 <= bufLen) {
