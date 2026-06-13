@@ -25,3 +25,8 @@ def test_schedule_migration_defines_event_and_schedule_values():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.TRIGGER_TYPE_VALUES == ("event", "schedule")
+
+
+def test_cloud_image_exposes_package_root_to_alembic():
+    dockerfile = Path(__file__).parents[1] / "Dockerfile"
+    assert "ENV PYTHONPATH=/app" in dockerfile.read_text(encoding="utf-8")
