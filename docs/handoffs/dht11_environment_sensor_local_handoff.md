@@ -206,8 +206,11 @@ while the sensor was absent.
 - **Automation:** `automations/{id}/reported` (sync ack) and
   `automations/{id}/event` (`rule_fired` with the `threshold_crossed` trigger)
   on each fire — see §10A.
-- **No continuous temp/humidity telemetry topic yet** (log-only `ENV:` lines);
-  that stream is left for the cloud teammate (§11.2, §12).
+- **Reported state:** `devices/environment/<eui>/reported` (retained, QoS 1) on
+  every measured-value report, e.g.
+  `state:{"temperature_c":27.80,"humidity_percent":38.00,"reachable":true}`.
+  A metric not yet observed this session is emitted as `null` (temp and
+  humidity arrive in separate cluster reports). Verified live 2026-06-13.
 
 ## 10A. Environment → Light automation (DHT11 drives the light)
 
@@ -288,15 +291,20 @@ the rule logic and light actuation are genuinely end-to-end.)
    already-joined device needs a fresh join (PB0 leave/rejoin) OR the
    `gateway.rediscover_device` MQTT command — a plain reset keeps the cached
    type. **Cloud must accept device_type `environment`.**
-2. **No continuous MQTT telemetry**: temp/humidity feeds the gateway automation
-   engine and is logged, but is NOT yet published as a
-   `devices/environment/<eui>/telemetry` stream for the cloud. Rule events DO
-   publish (`automations/{id}/event`). Continuous telemetry is future work.
-3. **ZAP source-of-truth drift**: `autogen/zap-config.h` was hand-edited
-   (clusters swapped); `config/zcl/zcl_config.zap` still describes the
-   occupancy endpoint. Regenerating from the .zap (Studio/slc) would silently
-   revert the clusters — update the .zap first if regeneration is ever needed.
-   Header comment in `zap-config.h` flags this.
+2. ~~No continuous MQTT telemetry~~ **RESOLVED (2026-06-13):** every report now
+   publishes retained `devices/environment/<eui>/reported` with
+   `state:{temperature_c, humidity_percent, reachable}` (centi-precision
+   decimals; `null` for a metric not yet seen this session). A dedicated
+   high-rate `/telemetry` history stream (vs current-state `/reported`) is
+   still optional future work if the cloud wants time-series.
+3. ~~ZAP source-of-truth drift~~ **MITIGATED (2026-06-13):**
+   `config/zcl/zcl_config.zap` was hand-edited to match `zap-config.h`
+   (device 770; Temperature 1026 + Relative Humidity 1029 clusters; occupancy
+   removed). **CAVEAT:** this build flow has no ZAP/slc generator to validate
+   the edited `.zap`, and the build does NOT regenerate from it (hand-maintained
+   `zap-config.h` + Studio makefile). If you ever regenerate in Simplicity
+   Studio, diff the result against `zap-config.h` before trusting it. Flagged in
+   the `zap-config.h` header comment.
 4. **DHT11 decimal bytes**: genuine DHT11 sends integer-only values (decimal
    bytes 0) — effective resolution 1 °C / 1 %RH despite centi-unit encoding.
 5. **Bit-39 edge case**: if a clone module releases the bus without the final

@@ -3,10 +3,14 @@
 // Z3_DHT11_Sensor NOTE: this project was recycled from Z3_Occupancy_Sensor
 // without a Studio/ZAP regeneration pass, so this endpoint configuration was
 // hand-edited to swap the Occupancy Sensing server (0x0406) for Temperature
-// Measurement (0x0402) + Relative Humidity Measurement (0x0405) servers.
-// If the project is ever re-generated from config/zcl/zcl_config.zap, that
-// .zap file must be updated to match (it still describes the occupancy
-// endpoint) or this file will be regenerated wrong.
+// Measurement (0x0402) + Relative Humidity Measurement (0x0405) servers,
+// device id 0x0302.
+// config/zcl/zcl_config.zap has been hand-edited to match (device 770,
+// Temperature 1026 + Relative Humidity 1029 clusters). CAVEAT: that .zap edit
+// was NOT validated by the ZAP/slc generator in this build flow (the build
+// uses this hand-maintained header + the Studio makefile, not .zap regen). If
+// you regenerate from the .zap in Simplicity Studio, diff the result against
+// this file before trusting it.
 
 // The following is brought in by the endianness component, which all
 // applications must include
