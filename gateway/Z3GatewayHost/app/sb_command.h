@@ -33,6 +33,9 @@ typedef struct {
   char cluster_id[16];      // payload.target.cluster_id (string form, e.g. "0x0006")
   char command[32];         // payload.target.command (e.g. "on", "off")
 
+  // device.set_room only: payload.target.room_id (cloud room id string)
+  char room_id[40];
+
   // Gateway-targeted ops only
   // (parsed from payload.target.duration_sec; 0 means absent)
   int  duration_sec;
