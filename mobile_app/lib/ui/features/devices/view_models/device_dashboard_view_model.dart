@@ -95,19 +95,23 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _cloudStatus = await _repository.fetchCloudStatus();
-      final devices = await _repository.fetchDevices();
-      final events = await _repository.fetchEvents();
-      _devices = devices;
-      _events = events;
+      // Kick off the independent fetches together so the dashboard loads in
+      // one round-trip's worth of latency instead of four sequential ones.
+      // Rooms are optional metadata (a pre-v2 backend has no /api/rooms), so
+      // that future carries its own fallback and never fails the load.
+      final statusFuture = _repository.fetchCloudStatus();
+      final devicesFuture = _repository.fetchDevices();
+      final eventsFuture = _repository.fetchEvents();
+      final roomsFuture = _repository.fetchRooms().then<List<Room>>(
+        (rooms) => rooms,
+        onError: (_) => <Room>[],
+      );
+
+      _cloudStatus = await statusFuture;
+      _devices = await devicesFuture;
+      _events = await eventsFuture;
+      _rooms = await roomsFuture;
       _deviceEvents.clear();
-      // Rooms are optional metadata; a backend without /api/rooms (pre-v2)
-      // must not blank the dashboard, so failures here are swallowed.
-      try {
-        _rooms = await _repository.fetchRooms();
-      } catch (_) {
-        _rooms = const [];
-      }
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
       _errorMessage = friendlyErrorMessage(
@@ -145,6 +149,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       return;
     }
 
+    final previousPower = device.power;
     _lastTarget = target;
     _lastCommand = CommandResult(
       id: 'pending',
@@ -152,6 +157,9 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       status: CommandStatus.accepted,
     );
     _errorMessage = null;
+    // Optimistic: reflect the target immediately so the button feels instant.
+    // Reconciled (or reverted) once the cloud/gateway reply lands.
+    _applyPower(device.id, target);
     notifyListeners();
 
     try {
@@ -161,9 +169,10 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
       notifyListeners();
 
-      await _pollCommand(target);
-      await load();
+      // Reconcile only this device (no full reload).
+      await _pollCommand(device.id, target, previousPower);
     } catch (error) {
+      _applyPower(device.id, previousPower); // revert optimistic change
       _lastCommand = CommandResult(
         id: _lastCommand?.id ?? 'unknown',
         deviceId: device.id,
@@ -247,30 +256,45 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _pollCommand(DevicePower target) async {
+  // Short backoff so a confirmed command settles fast; the device is already
+  // showing the optimistic state, so this only reconciles / reverts.
+  static const _pollBackoffMs = [250, 400, 600, 800, 1000];
+
+  Future<void> _pollCommand(
+    String deviceId,
+    DevicePower target,
+    DevicePower previousPower,
+  ) async {
     final commandId = _lastCommand?.id;
     if (commandId == null || commandId == 'pending') {
+      // Optimistic state stands; nothing to reconcile.
       return;
     }
 
-    for (var attempt = 0; attempt < 8; attempt++) {
-      await Future<void>.delayed(const Duration(milliseconds: 700));
+    for (final delayMs in _pollBackoffMs) {
+      await Future<void>.delayed(Duration(milliseconds: delayMs));
       final command = await _repository.fetchCommand(commandId);
       _lastCommand = command;
 
       if (command.status == CommandStatus.executed) {
-        _applyPower(command.deviceId, target);
-      }
-
-      notifyListeners();
-      if (command.status.isTerminal) {
+        _applyPower(deviceId, target); // confirm
+        notifyListeners();
         return;
       }
+      if (command.status == CommandStatus.failed ||
+          command.status == CommandStatus.timeout) {
+        _applyPower(deviceId, previousPower); // revert
+        notifyListeners();
+        return;
+      }
+      notifyListeners();
     }
 
+    // No terminal reply within the window: revert the optimistic change.
+    _applyPower(deviceId, previousPower);
     _lastCommand = CommandResult(
       id: commandId,
-      deviceId: _lastCommand?.deviceId ?? '',
+      deviceId: deviceId,
       status: CommandStatus.timeout,
       reason: 'No reply within polling window',
     );

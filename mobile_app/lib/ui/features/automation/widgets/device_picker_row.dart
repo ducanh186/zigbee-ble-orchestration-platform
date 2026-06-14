@@ -76,10 +76,9 @@ class DevicePickerRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${device.id} · ${device.roomLabel}',
+                      device.roomLabel,
                       style: TextStyle(
                         fontSize: 11,
-                        fontFamily: 'JetBrains Mono',
                         color: palette.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,

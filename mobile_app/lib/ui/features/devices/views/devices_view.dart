@@ -251,10 +251,9 @@ class _DeviceRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${device.id} - $roomName',
+                  roomName,
                   style: TextStyle(
                     color: palette.textSecondary,
-                    fontFamily: 'JetBrains Mono',
                     fontSize: 12,
                   ),
                 ),

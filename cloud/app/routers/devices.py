@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.access_control import (
@@ -27,7 +27,12 @@ async def list_devices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all devices, optionally filtered by room_id."""
+    """List all devices, optionally filtered by room_id.
+
+    The latest reported state for each device is inlined into the response
+    (`state` + `reported_at`) so the app fetches everything in one round-trip
+    instead of an N+1 fan-out to `/devices/{id}/state`.
+    """
     stmt = select(Device).outerjoin(Room, Device.room_id == Room.id)
     clause = visible_device_clause(current_user)
     if clause is not None:
@@ -35,7 +40,39 @@ async def list_devices(
     if room_id is not None:
         stmt = stmt.where(Device.room_id == room_id)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    devices = result.scalars().all()
+
+    # One extra query for the latest DeviceState per device (window function),
+    # then merge in Python — keeps this O(1) round-trips, not O(devices).
+    device_ids = [d.id for d in devices]
+    state_map: dict[str, tuple[dict, object]] = {}
+    if device_ids:
+        ranked = (
+            select(
+                DeviceState.device_id,
+                DeviceState.state,
+                DeviceState.reported_at,
+                func.row_number()
+                .over(
+                    partition_by=DeviceState.device_id,
+                    order_by=DeviceState.reported_at.desc(),
+                )
+                .label("rn"),
+            )
+            .where(DeviceState.device_id.in_(device_ids))
+            .subquery()
+        )
+        latest = await db.execute(select(ranked).where(ranked.c.rn == 1))
+        for row in latest:
+            state_map[row.device_id] = (row.state, row.reported_at)
+
+    for device in devices:
+        latest_state = state_map.get(device.id)
+        # Attach as plain attributes so DeviceOut (from_attributes) picks them up.
+        device.state = latest_state[0] if latest_state else None
+        device.reported_at = latest_state[1] if latest_state else None
+
+    return devices
 
 
 @router.get("/{device_id}", response_model=DeviceOut)

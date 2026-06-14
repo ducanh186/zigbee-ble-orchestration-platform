@@ -23,9 +23,12 @@ void main() {
 
     expect(find.byIcon(Icons.schedule), findsOneWidget);
     expect(find.text('Schedule'), findsWidgets);
-    expect(find.text('0 7 * * 1-5'), findsOneWidget);
-    expect(find.text('light-1'), findsOneWidget);
-    expect(find.text('Turn on'), findsOneWidget);
+    // Cron is decoded to a flowing English sentence (device id falls back to
+    // itself here since no name map is provided).
+    expect(
+      find.text('Every weekday at 07:00, turn light-1 on.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('persisted scene schedule renders composite scene identity', (
@@ -42,9 +45,10 @@ void main() {
     await tester.pumpWidget(_buildCard(rule));
 
     expect(find.byIcon(Icons.schedule), findsOneWidget);
-    expect(find.text('0 22 * * 0'), findsOneWidget);
-    expect(find.text('group-lab / scene-all-off'), findsOneWidget);
-    expect(find.text('Activate'), findsOneWidget);
+    expect(
+      find.text('Every Sunday at 22:00, activate scene-all-off.'),
+      findsOneWidget,
+    );
   });
 }
 

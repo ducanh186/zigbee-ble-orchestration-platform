@@ -325,10 +325,9 @@ class _DeviceHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '${device.id} - ${viewModel.roomNameFor(device.roomId)}',
+            viewModel.roomNameFor(device.roomId),
             style: TextStyle(
               color: palette.textSecondary,
-              fontFamily: 'JetBrains Mono',
               fontSize: 12,
             ),
           ),
@@ -432,8 +431,6 @@ class _DeviceInfoCard extends StatelessWidget {
               label: l10n.occupancyLabel,
               value: _localizedOccupancy(device.occupancy, l10n),
             ),
-          if (device.eui64 != null)
-            _InfoRow(label: 'EUI64', value: device.eui64!),
           if (device.reportedAt != null)
             _InfoRow(label: l10n.reportedLabel, value: device.reportedAt!),
         ],

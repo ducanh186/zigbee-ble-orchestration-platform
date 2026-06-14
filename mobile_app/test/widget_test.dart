@@ -518,7 +518,8 @@ void main() {
     );
     expect(viewModel.deviceById('light-01')?.name, 'Desk lamp');
     expect(find.text('Desk lamp', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('light-01'), findsOneWidget);
+    // Soft label only — the raw device id / EUI64 is no longer surfaced.
+    expect(find.textContaining('light-01'), findsNothing);
   });
 
   testWidgets('settings shows compact parent-facing sections', (tester) async {
