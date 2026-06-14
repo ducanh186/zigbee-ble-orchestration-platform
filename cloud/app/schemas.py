@@ -172,6 +172,13 @@ def translate_command_for_gateway(
             LightCommandTarget(**target)  # raises on bad input
         return op, target
 
+    # --- room assignment: valid for any device type ---
+    if op == "device.set_room":
+        room_id = target.get("room_id")
+        if not room_id:
+            raise ValueError("device.set_room requires a non-empty 'room_id' in target")
+        return "device.set_room", {"room_id": room_id}
+
     # --- user-friendly translation ---
     if device_type == "light":
         friendly = UserFriendlyLightTarget(**target)

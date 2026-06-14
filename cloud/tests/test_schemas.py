@@ -363,3 +363,36 @@ class TestTranslateCommandForGateway:
     def test_unknown_type_rejects(self):
         with pytest.raises(ValueError, match="does not accept commands"):
             translate_command_for_gateway("motion", "set", {"power": "on"})
+
+    def test_set_room_sensor(self):
+        op, t = translate_command_for_gateway(
+            "sensor", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_light(self):
+        op, t = translate_command_for_gateway(
+            "light", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_switch(self):
+        op, t = translate_command_for_gateway(
+            "switch", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_missing_room_id_raises(self):
+        with pytest.raises(ValueError):
+            translate_command_for_gateway(
+                "sensor", "device.set_room", {}
+            )
+
+    def test_set_room_empty_room_id_raises(self):
+        with pytest.raises(ValueError):
+            translate_command_for_gateway(
+                "light", "device.set_room", {"room_id": ""}
+            )
