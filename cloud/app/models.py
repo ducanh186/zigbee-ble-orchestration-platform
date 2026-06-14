@@ -88,6 +88,7 @@ class Device(Base):
 
     id = Column(String, primary_key=True)  # logical device_id, e.g. "light-01"
     device_type = Column(String, nullable=False)
+    sensor_kind = Column(Integer, nullable=True)
     eui64 = Column(String, nullable=True)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     name = Column(String, nullable=True)
