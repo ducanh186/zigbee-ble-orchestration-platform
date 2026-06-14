@@ -362,6 +362,62 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
 
 
 @pytest.mark.asyncio
+async def test_delete_schedule_rule_hard_deletes_without_tombstone(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from cloud.app.models import AutomationEvent
+
+    created = (
+        await client.post(
+            "/api/automations", json=_schedule_on_rule(), headers=headers
+        )
+    ).json()
+    # Simulate at least one executed event so the FK has a child row. On
+    # PostgreSQL a bare delete of the parent would raise ForeignKeyViolation;
+    # the endpoint must clear children first.
+    async with db_session_factory() as session:
+        session.add(
+            AutomationEvent(
+                automation_id=created["id"],
+                event_type="automation_executed",
+                payload={"result": "ok"},
+                occurred_at=datetime.utcnow(),
+            )
+        )
+        await session.commit()
+    fake_mqtt.published.clear()
+    resp = await client.delete(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    # row gone
+    missing = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert missing.status_code == 404
+    # child audit rows cascade-deleted with the parent
+    async with db_session_factory() as session:
+        rows = (
+            await session.execute(
+                select(AutomationEvent).where(
+                    AutomationEvent.automation_id == created["id"]
+                )
+            )
+        ).scalars().all()
+        assert rows == []
+    # no tombstone published for a schedule rule
+    assert [
+        p for p in fake_mqtt.published if p.get("kind") == "automation_desired"
+    ] == []
+
+
+@pytest.mark.asyncio
 async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
     headers = await _parent_headers(client, db_session_factory)
@@ -1155,3 +1211,130 @@ async def test_reported_stale_version_ignored(db_session_factory):
         rule = await session.get(Automation, auto_id)
         # Still pending — ack was stale, ignored.
         assert rule.sync_status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_schedule_rule_synced_without_gateway_publish(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    response = await client.post(
+        "/api/automations", json=_schedule_on_rule(), headers=headers
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["sync_status"] == "synced"
+    desired = [
+        p for p in fake_mqtt.published
+        if p.get("kind") == "automation_desired"
+        and p.get("automation_id") == data["id"]
+    ]
+    assert desired == []
+
+
+@pytest.mark.asyncio
+async def test_event_rule_still_pending_and_published(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    response = await client.post(
+        "/api/automations", json=_motion_on_rule(), headers=headers
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["sync_status"] == "pending"
+    desired = [
+        p for p in fake_mqtt.published
+        if p.get("kind") == "automation_desired"
+        and p.get("automation_id") == data["id"]
+    ]
+    assert len(desired) == 1 and desired[0]["op"] == "upsert"
+
+
+@pytest.mark.asyncio
+async def test_enable_disable_schedule_keeps_synced_no_publish(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_schedule_on_rule(), headers=headers
+        )
+    ).json()
+    fake_mqtt.published.clear()
+    dis = await client.post(
+        f"/api/automations/{created['id']}/disable", headers=headers
+    )
+    en = await client.post(
+        f"/api/automations/{created['id']}/enable", headers=headers
+    )
+    assert dis.json()["sync_status"] == "synced"
+    assert en.json()["sync_status"] == "synced"
+    assert [p for p in fake_mqtt.published if p.get("kind") == "automation_desired"] == []
+
+
+@pytest.mark.asyncio
+async def test_update_event_to_schedule_publishes_tombstone(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_motion_on_rule(), headers=headers
+        )
+    ).json()
+    fake_mqtt.published.clear()
+    sched = _schedule_on_rule()
+    body = {
+        "trigger_type": "schedule",
+        "schedule_cron": sched["schedule_cron"],
+        "trigger": sched["trigger"],
+        "actions": sched["actions"],
+    }
+    resp = await client.put(
+        f"/api/automations/{created['id']}", json=body, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sync_status"] == "synced"
+    desired = [
+        p for p in fake_mqtt.published
+        if p.get("kind") == "automation_desired"
+        and p.get("automation_id") == created["id"]
+    ]
+    assert len(desired) == 1 and desired[0]["op"] == "delete"
+
+
+@pytest.mark.asyncio
+async def test_update_schedule_to_event_pending_and_upsert(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_schedule_on_rule(), headers=headers
+        )
+    ).json()
+    fake_mqtt.published.clear()
+    evt = _motion_on_rule()
+    body = {
+        "trigger_type": "event",
+        "schedule_cron": None,
+        "trigger": evt["trigger"],
+        "actions": evt["actions"],
+    }
+    resp = await client.put(
+        f"/api/automations/{created['id']}", json=body, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sync_status"] == "pending"
+    desired = [
+        p for p in fake_mqtt.published
+        if p.get("kind") == "automation_desired"
+        and p.get("automation_id") == created["id"]
+    ]
+    assert len(desired) == 1 and desired[0]["op"] == "upsert"
