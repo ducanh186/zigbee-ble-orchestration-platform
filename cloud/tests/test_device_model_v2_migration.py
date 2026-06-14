@@ -186,6 +186,47 @@ def test_cutover_automation_json_rewritten(sync_engine):
     assert acts_out[1]["device_type"] == "light"     # light unchanged
 
 
+def test_retype_does_not_mutate_input():
+    m = _load_migration()
+    obj = {"device_type": "environment", "nested": {"device_type": "motion"}}
+    result = m._retype(obj)
+    # input is untouched (pure transform)
+    assert obj == {"device_type": "environment", "nested": {"device_type": "motion"}}
+    # output is fully rewritten, including nested dicts
+    assert result == {"device_type": "sensor", "nested": {"device_type": "sensor"}}
+
+
+def test_cutover_is_idempotent(sync_engine):
+    m = _load_migration()
+    with sync_engine.begin() as conn:
+        _insert_device(conn, "env-01", "environment")
+        _insert_automation(
+            conn,
+            "rule-1",
+            {"type": "sensor_threshold", "device_type": "environment"},
+            [{"type": "device_command", "device_type": "motion"}],
+        )
+        m._cutover(conn)
+        m._cutover(conn)  # second run must be a no-op, not a re-corruption
+        dev = conn.execute(
+            text("SELECT device_type, sensor_kind FROM devices WHERE id='env-01'")
+        ).mappings().one()
+        trig = json.loads(
+            conn.execute(
+                text("SELECT trigger FROM automations WHERE id='rule-1'")
+            ).scalar()
+        )
+        acts = json.loads(
+            conn.execute(
+                text("SELECT actions FROM automations WHERE id='rule-1'")
+            ).scalar()
+        )
+    assert dev["device_type"] == "sensor"
+    assert dev["sensor_kind"] == 2
+    assert trig["device_type"] == "sensor"
+    assert acts[0]["device_type"] == "sensor"
+
+
 def test_cutover_all_types_together(sync_engine):
     """Control: all three device types in one run — verify isolation."""
     m = _load_migration()

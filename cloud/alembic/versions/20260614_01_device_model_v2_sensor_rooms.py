@@ -24,9 +24,12 @@ def _retype(obj):
     - everything else is left untouched.
     """
     if isinstance(obj, dict):
-        if obj.get("device_type") in ("environment", "motion"):
-            obj["device_type"] = "sensor"
-        return {k: _retype(v) for k, v in obj.items()}
+        # Pure transform: build a new dict (recursing into children) and rewrite
+        # the device_type on the copy. Never mutate the caller's object.
+        out = {k: _retype(v) for k, v in obj.items()}
+        if out.get("device_type") in ("environment", "motion"):
+            out["device_type"] = "sensor"
+        return out
     if isinstance(obj, list):
         return [_retype(v) for v in obj]
     return obj
@@ -68,8 +71,16 @@ def _cutover(bind):
     for r in rows:
         trig = r["trigger"]
         acts = r["actions"]
-        trig_obj = json.loads(trig) if isinstance(trig, str) else trig
-        acts_obj = json.loads(acts) if isinstance(acts, str) else acts
+        if trig is None and acts is None:
+            continue
+        # JSONB (Postgres) surfaces as dict/list; TEXT/JSON (sqlite) as str.
+        # Guard None defensively in case a legacy row predates the NOT NULL
+        # constraint.
+        trig_obj = json.loads(trig) if isinstance(trig, str) else (trig or {})
+        acts_obj = json.loads(acts) if isinstance(acts, str) else (acts or [])
+        # The JSON string binds into the JSONB column via Postgres' implicit
+        # text->jsonb cast (sync psycopg driver under Alembic); on sqlite the
+        # column is TEXT/JSON so the string stores directly. No double-encode.
         bind.execute(
             sa.text(
                 "UPDATE automations "

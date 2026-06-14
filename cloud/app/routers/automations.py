@@ -159,6 +159,9 @@ async def _validate_rule_template(
         # use "sensor" (a stale client still sending "motion"/"environment" is
         # correctly rejected here). Legacy literals stay accepted upstream only
         # to keep the deploy window safe (code ships before the migration runs).
+        # During that window the inverse can happen: a "sensor" trigger against a
+        # not-yet-migrated "environment"/"motion" row returns a transient 422
+        # here — expected until `alembic upgrade` completes, not a regression.
         await _require_device(
             db,
             trigger_device_id,
