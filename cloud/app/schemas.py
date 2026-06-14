@@ -225,6 +225,8 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "switch":
             return SwitchEventPayload(**inner).model_dump()
+        # motion/sensor events (incl. kind-1 occupancy reserved) have no
+        # kind-specific validation yet and pass through unchanged.
         return inner
     except Exception:
         return None

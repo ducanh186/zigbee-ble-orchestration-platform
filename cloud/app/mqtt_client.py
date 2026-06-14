@@ -350,6 +350,7 @@ class MQTTService:
                         id=device_id,
                         device_type=validated.get("device_type", device_type),
                         eui64=validated.get("eui64"),
+                        sensor_kind=validated.get("sensor_kind"),
                         name=device_id,
                         is_online=True,
                         last_seen_at=last_seen,
@@ -360,6 +361,8 @@ class MQTTService:
                 else:
                     device.is_online = True
                     device.last_seen_at = last_seen
+                    if validated.get("sensor_kind") is not None and device.sensor_kind is None:
+                        device.sensor_kind = validated.get("sensor_kind")
 
                 event = Event(
                     device_id=device_id,

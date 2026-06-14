@@ -177,3 +177,38 @@ async def test_handle_event_sensor_occupancy_stores_device_state(db_session_fact
         ).scalar_one_or_none()
         assert state_row is not None
         assert state_row.state["occupancy"] == "occupied"
+
+
+@pytest.mark.asyncio
+async def test_handle_event_sensor_autoregisters_with_sensor_kind(db_session_factory):
+    """sensor auto-register from event: Device row must have sensor_kind set."""
+    # Use a device_id that does NOT exist in the DB yet.
+    new_device_id = "pir-new-99"
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+
+    _run, pending = _make_run_async_for_test()
+    service._run_async = _run
+
+    service._handle_event(
+        f"sb/gw-1/devices/sensor/{new_device_id}/event",
+        {
+            "ts": "2026-06-14T11:00:00+00:00",
+            "payload": {
+                "sensor_kind": 1,
+                "event": "occupancy_changed",
+                "occupancy": "occupied",
+            },
+        },
+    )
+    assert len(pending) == 1
+    await pending[0]()
+
+    async with db_session_factory() as s:
+        device = (
+            await s.execute(select(Device).where(Device.id == new_device_id))
+        ).scalar_one_or_none()
+        assert device is not None
+        assert device.device_type == "sensor"
+        assert device.sensor_kind == 1
