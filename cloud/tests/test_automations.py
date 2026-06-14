@@ -1155,3 +1155,60 @@ async def test_reported_stale_version_ignored(db_session_factory):
         rule = await session.get(Automation, auto_id)
         # Still pending — ack was stale, ignored.
         assert rule.sync_status == "pending"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: sensor device_type accepted in automation triggers (additive)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_sensor_trigger_automation_accepted(
+    client, db_session_factory, fake_mqtt
+):
+    """trigger device_type='sensor' must be accepted after Phase 1 (additive).
+
+    Uses a SensorThresholdTrigger-style payload but with the new 'sensor' type.
+    The legacy 'environment' type must still work too (tested elsewhere).
+    """
+    await _seed_automation_devices(db_session_factory)
+    # Add a sensor-typed device to the seed so router FK checks pass.
+    from cloud.app.models import Device
+
+    async with db_session_factory() as session:
+        session.add(
+            Device(
+                id="sensor-01",
+                device_type="sensor",
+                sensor_kind=2,
+                room_id="room-1",
+                name="Sensor Device",
+                is_online=True,
+            )
+        )
+        await session.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+    rule = {
+        "name": "Sensor threshold rule",
+        "enabled": True,
+        "trigger": {
+            "type": "sensor_threshold",
+            "device_id": "sensor-01",
+            "device_type": "sensor",
+            "metric": "temperature_c",
+            "operator": "gte",
+            "threshold": 28,
+        },
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+    }
+    response = await client.post("/api/automations", json=rule, headers=headers)
+    assert response.status_code == 201, response.text
+    assert response.json()["trigger"]["device_type"] == "sensor"

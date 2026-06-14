@@ -98,7 +98,10 @@ def _normalize_trigger_event(trigger_device_type: str, event: str) -> str:
         raise HTTPException(
             status_code=422, detail="Switch trigger must be switch_toggle"
         )
-    if trigger_device_type == "motion":
+    # "sensor" is the device-model-v2 type for occupancy (kind 1); "motion" is
+    # the legacy type kept for rules created before the migration. Both fire on
+    # occupancy_changed.
+    if trigger_device_type in {"motion", "sensor"}:
         if event == "occupancy_changed":
             return event
         raise HTTPException(
@@ -133,14 +136,16 @@ async def _validate_rule_template(
         trigger_device_type = _require_string(trigger, "device_type")
 
         if trigger_type == "sensor_threshold":
-            if trigger_device_type != "environment":
+            # "sensor" (kind 2) is the v2 type; "environment" kept for legacy.
+            if trigger_device_type not in {"environment", "sensor"}:
                 raise HTTPException(
                     status_code=422,
-                    detail="Sensor threshold trigger device_type must be environment",
+                    detail="Sensor threshold trigger device_type must be environment or sensor",
                 )
         elif trigger_type == "device_event":
             event = _require_string(trigger, "event")
-            if trigger_device_type not in {"switch", "motion"}:
+            # "sensor" (kind 1 occupancy) is the v2 type; "motion" kept for legacy.
+            if trigger_device_type not in {"switch", "motion", "sensor"}:
                 raise HTTPException(
                     status_code=422,
                     detail="Unsupported trigger device_type",

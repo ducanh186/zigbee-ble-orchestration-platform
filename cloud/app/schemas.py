@@ -377,7 +377,9 @@ class GatewayStatusOut(BaseModel):
 class DeviceEventTrigger(BaseModel):
     type: Literal["device_event"] = "device_event"
     device_id: str = Field(min_length=1)
-    device_type: Literal["motion", "switch"]
+    # "sensor" is the v2 type (occupancy = sensor kind 1); "motion" kept for
+    # legacy rules created/cached before the device-model-v2 migration.
+    device_type: Literal["sensor", "motion", "switch"]
     event: Literal["occupancy_changed", "switch_toggle", "toggle"]
     state: dict[str, Any] = Field(default_factory=dict)
 
@@ -385,7 +387,9 @@ class DeviceEventTrigger(BaseModel):
 class SensorThresholdTrigger(BaseModel):
     type: Literal["sensor_threshold"]
     device_id: str = Field(min_length=1)
-    device_type: Literal["environment"]
+    # "sensor" is the v2 type (environment = sensor kind 2); "environment" kept
+    # for legacy rules created/cached before the device-model-v2 migration.
+    device_type: Literal["sensor", "environment"]
     metric: Literal["temperature_c", "humidity_percent"]
     operator: Literal["gte", "lte"]
     threshold: float
@@ -608,7 +612,7 @@ class ProvisioningErrorCode(str, Enum):
 
 class ProvisioningDevicePayload(BaseModel):
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
 
     @field_validator("eui64")
     @classmethod
@@ -620,7 +624,7 @@ class ProvisioningDevicePayload(BaseModel):
 
 class ProvisioningLabelCreate(BaseModel):
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
 
     @field_validator("eui64")
     @classmethod
@@ -645,7 +649,7 @@ class FactoryDeviceRegister(BaseModel):
 
     eui64: str
     install_code: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
     model: str | None = None
 
     @field_validator("eui64")
@@ -686,7 +690,7 @@ class ProvisioningSessionOut(BaseModel):
     gateway_id: str
     room_id: str
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
     model: str | None
     reason: str | None = None
     expires_at: datetime | None = None

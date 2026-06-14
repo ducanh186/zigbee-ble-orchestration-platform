@@ -874,3 +874,21 @@ async def test_create_session_still_blocks_on_fresh_active(
     )
     assert r.status_code == 409, r.text
     assert r.json()["detail"]["error_code"] == "SESSION_ALREADY_ACTIVE"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: device_type="sensor" accepted (additive)
+# ---------------------------------------------------------------------------
+
+
+def test_device_payload_accepts_sensor():
+    """device_type='sensor' must be valid after Phase 1 schema extension."""
+    p = ProvisioningDevicePayload(eui64=VALID_EUI64, device_type="sensor")
+    assert p.device_type == "sensor"
+
+
+def test_device_payload_sensor_still_rejects_bad_types():
+    """Extending to 'sensor' must not break rejection of truly invalid types."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        ProvisioningDevicePayload(eui64=VALID_EUI64, device_type="occupancy")
