@@ -6,6 +6,16 @@ import unittest
 from cloud.app.mqtt_client import MQTTService
 
 
+class _FakeScalars:
+    def all(self):
+        return []
+
+
+class _FakeExecuteResult:
+    def scalars(self):
+        return _FakeScalars()
+
+
 class _FakeSession:
     def __init__(self):
         self.added = []
@@ -23,6 +33,9 @@ class _FakeSession:
     async def commit(self):
         self.committed = True
 
+    async def execute(self, stmt):
+        return _FakeExecuteResult()
+
 
 class GatewayEventPersistenceTest(unittest.TestCase):
     def test_gateway_online_message_is_saved_as_event_log(self):
@@ -30,8 +43,10 @@ class GatewayEventPersistenceTest(unittest.TestCase):
         session = _FakeSession()
         service.set_db_session_factory(lambda: session)
         service._run_async = lambda coro_func: asyncio.run(coro_func())
+        import cloud.app.models as _real_models
         fake_models = types.ModuleType("cloud.app.models")
         fake_models.Event = _FakeEvent
+        fake_models.Device = _real_models.Device
         previous_models = sys.modules.get("cloud.app.models")
         sys.modules["cloud.app.models"] = fake_models
 
@@ -66,6 +81,10 @@ class _FakeEvent:
         self.event_type = event_type
         self.payload = payload
         self.occurred_at = occurred_at
+
+
+class _FakeDevice:
+    pass
 
 
 if __name__ == "__main__":
@@ -183,6 +202,85 @@ async def test_handle_event_sensor_occupancy_stores_device_state(db_session_fact
         ).scalar_one_or_none()
         assert state_row is not None
         assert state_row.state["occupancy"] == "occupied"
+
+
+@pytest.mark.asyncio
+async def test_gateway_online_repushes_set_room_for_roomed_devices(db_session_factory):
+    """On gateway online, device.set_room must be published for every device
+    that has room_id set; devices without room_id are skipped."""
+    from cloud.app.models import Device, Home, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-gw", name="GW Home"))
+        s.add(Room(id="room-gw-1", home_id="home-gw", name="Living"))
+        s.add(Room(id="room-gw-2", home_id="home-gw", name="Bedroom"))
+        s.add(
+            Device(
+                id="light-gw-1",
+                device_type="light",
+                room_id="room-gw-1",
+                name="Light 1",
+                is_online=True,
+            )
+        )
+        s.add(
+            Device(
+                id="light-gw-2",
+                device_type="light",
+                room_id="room-gw-2",
+                name="Light 2",
+                is_online=True,
+            )
+        )
+        # This device has no room_id -- must NOT be published
+        s.add(
+            Device(
+                id="light-gw-no-room",
+                device_type="light",
+                room_id=None,
+                name="Unassigned",
+                is_online=True,
+            )
+        )
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+
+    published_calls = []
+
+    def _fake_publish_command(command_id, device_id, op, target, timeout_ms=5000):
+        published_calls.append(
+            {"command_id": command_id, "device_id": device_id, "op": op, "target": target}
+        )
+
+    service.publish_command = _fake_publish_command
+
+    _run, pending = _make_run_async_for_test()
+    service._run_async = _run
+
+    service._handle_gateway_online(
+        {
+            "ts": 1781432000000,
+            "gateway_id": "gw-test",
+            "source": "gateway",
+            "payload": {"value": "online"},
+        }
+    )
+    assert len(pending) == 1
+    await pending[0]()
+
+    set_room_calls = [c for c in published_calls if c["op"] == "device.set_room"]
+    assert len(set_room_calls) == 2
+
+    device_ids_published = {c["device_id"] for c in set_room_calls}
+    assert "light-gw-1" in device_ids_published
+    assert "light-gw-2" in device_ids_published
+    assert "light-gw-no-room" not in device_ids_published
+
+    targets = {c["device_id"]: c["target"] for c in set_room_calls}
+    assert targets["light-gw-1"] == {"room_id": "room-gw-1"}
+    assert targets["light-gw-2"] == {"room_id": "room-gw-2"}
 
 
 @pytest.mark.asyncio

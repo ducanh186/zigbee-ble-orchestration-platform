@@ -535,7 +535,8 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Event
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
 
             payload = dict(inner)
             payload["gateway_id"] = envelope.get("gateway_id")
@@ -549,6 +550,27 @@ class MQTTService:
                 )
                 session.add(event)
                 await session.commit()
+
+                # Re-push room assignments so the gateway (which keeps room in
+                # RAM only) is back in sync after a reconnect.
+                if status == "online":
+                    roomed_devices = (
+                        await session.execute(
+                            select(Device).where(Device.room_id.isnot(None))
+                        )
+                    ).scalars().all()
+                    for device in roomed_devices:
+                        try:
+                            self.publish_command(
+                                command_id=uuid4().hex,
+                                device_id=device.id,
+                                op="device.set_room",
+                                target={"room_id": device.room_id},
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Failed to re-push room for device %s", device.id
+                            )
 
         self._run_async(_write)
 
