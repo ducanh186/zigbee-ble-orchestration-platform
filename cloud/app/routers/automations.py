@@ -55,6 +55,12 @@ def _publish_delete(rule: Automation) -> None:
     )
 
 
+def _syncs_to_gateway(rule: Automation) -> bool:
+    """Only event rules are pushed to the gateway. Schedule rules execute
+    entirely cloud-side (the gateway has no cron), so they are never synced."""
+    return rule.trigger_type == "event"
+
+
 def _require_string(payload: dict[str, Any], field: str) -> str:
     value = payload.get(field)
     if not isinstance(value, str) or not value:
@@ -276,11 +282,16 @@ async def create_automation(
         last_run_status="never_run",
         last_error=None,
     )
-    mark_sync_pending(rule, "automation.upsert")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.upsert")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -297,10 +308,17 @@ async def _set_enabled(
     rule.enabled = enabled
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.enable" if enabled else "automation.disable")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(
+            rule, "automation.enable" if enabled else "automation.disable"
+        )
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -335,6 +353,8 @@ async def update_automation(
     await ensure_automation_visible(db, rule, current_user)
     if body.version is not None and body.version != rule.version:
         raise HTTPException(status_code=409, detail="Automation version conflict")
+
+    was_syncing = _syncs_to_gateway(rule)
 
     # If trigger or actions change, re-validate the resulting rule body. We
     # validate against the *merged* values so partial updates still get the
@@ -377,10 +397,19 @@ async def update_automation(
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.update")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.update")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
+    elif was_syncing:
+        # Converted event -> schedule: clear the stale retained desired so the
+        # gateway stops executing the old event rule (cloud now owns execution).
+        _publish_delete(rule)
     return rule
 
 
