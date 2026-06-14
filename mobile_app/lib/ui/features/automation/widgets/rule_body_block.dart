@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../domain/models/cron_humanizer.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 
-/// Monospace `WHEN ... THEN ...` block. Reads the rule like a sentence using
-/// the same device IDs that appear in the Logs tab.
+/// Readable rule body. Device ids are resolved to their soft labels via
+/// [deviceNames] (falling back to the id). Schedule rules read as one flowing
+/// English sentence ("Every hour at minute 35, turn Lab Light on."); event /
+/// threshold rules keep the `WHEN ... THEN ...` block.
 class RuleBodyBlock extends StatelessWidget {
-  const RuleBodyBlock({required this.rule, super.key});
+  const RuleBodyBlock({
+    required this.rule,
+    this.deviceNames = const {},
+    super.key,
+  });
 
   final AutomationRule rule;
+  final Map<String, String> deviceNames;
+
+  String _name(String id) => deviceNames[id] ?? id;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
     final trigger = rule.trigger;
-    final triggerDeviceId = switch (trigger) {
-      ScheduleAutomationTrigger() => l10n.scheduleTriggerLabel,
-      _ => trigger.deviceId,
-    };
-    final triggerEvent = _eventText(trigger, l10n);
+
+    final Widget body;
+    if (trigger is ScheduleAutomationTrigger) {
+      body = _ScheduleSentence(text: _scheduleSentence(trigger, l10n));
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Line(
+            label: l10n.whenLabel,
+            labelColor: palette.primary,
+            subject: _name(trigger.deviceId),
+            detail: _eventText(trigger, l10n),
+          ),
+          const SizedBox(height: 4),
+          _ThenLine(label: l10n.thenLabel, actions: rule.actions, name: _name),
+        ],
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -29,29 +53,53 @@ class RuleBodyBlock extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Line(
-            label: l10n.whenLabel,
-            labelColor: palette.primary,
-            deviceId: triggerDeviceId,
-            detail: triggerEvent,
-          ),
-          const SizedBox(height: 4),
-          _ThenLine(
-            label: l10n.thenLabel,
-            actions: rule.actions,
-          ),
-        ],
-      ),
+      child: body,
     );
   }
 
-  String _eventText(
-    AutomationTrigger trigger,
+  /// "Every hour at minute 35, turn Lab Light on."
+  String _scheduleSentence(
+    ScheduleAutomationTrigger trigger,
     AppLocalizations l10n,
   ) {
+    final when = _capitalize(humanizeCron(trigger.cron));
+    final actions = rule.actions.map((action) => _actionClause(action)).toList();
+    if (actions.isEmpty) {
+      return '$when.';
+    }
+    return '$when, ${_joinClauses(actions)}.';
+  }
+
+  String _actionClause(AutomationAction action) {
+    return switch (action) {
+      DeviceCommandAutomationAction(:final deviceId, :final command) =>
+        'turn ${_name(deviceId)} ${_verb(command)}',
+      SceneActivateAutomationAction(:final sceneId) => 'activate $sceneId',
+    };
+  }
+
+  String _verb(AutomationActionCommand command) => switch (command) {
+    AutomationActionCommand.on => 'on',
+    AutomationActionCommand.off => 'off',
+    AutomationActionCommand.toggle => 'toggle',
+  };
+
+  String _joinClauses(List<String> clauses) {
+    if (clauses.length == 1) {
+      return clauses.first;
+    }
+    return '${clauses.sublist(0, clauses.length - 1).join(', ')} '
+        'and ${clauses.last}';
+  }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) {
+      return value;
+    }
+    return value[0].toUpperCase() + value.substring(1);
+  }
+
+  String _eventText(AutomationTrigger trigger, AppLocalizations l10n) {
     if (trigger is SensorThresholdAutomationTrigger) {
       final metric = trigger.metric == EnvironmentMetric.temperature
           ? l10n.temperatureLabel
@@ -65,9 +113,6 @@ class RuleBodyBlock extends StatelessWidget {
           : l10n.percentUnit;
       return '$metric $operator $threshold$unit';
     }
-    if (trigger case ScheduleAutomationTrigger(:final cron)) {
-      return cron;
-    }
     final occupancy = trigger.state['occupancy'];
     if (trigger.event == AutomationTriggerEvent.occupancyChanged) {
       return occupancy == null
@@ -78,17 +123,45 @@ class RuleBodyBlock extends StatelessWidget {
   }
 }
 
+class _ScheduleSentence extends StatelessWidget {
+  const _ScheduleSentence({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.event_repeat, size: 16, color: palette.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Line extends StatelessWidget {
   const _Line({
     required this.label,
     required this.labelColor,
-    required this.deviceId,
+    required this.subject,
     required this.detail,
   });
 
   final String label;
   final Color labelColor;
-  final String deviceId;
+  final String subject;
   final String detail;
 
   @override
@@ -103,9 +176,8 @@ class _Line extends StatelessWidget {
             label,
             style: TextStyle(
               color: labelColor,
-              fontFamily: 'JetBrains Mono',
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
             ),
           ),
@@ -115,10 +187,9 @@ class _Line extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                deviceId,
+                subject,
                 style: TextStyle(
                   color: palette.textSecondary,
-                  fontFamily: 'JetBrains Mono',
                   fontSize: 12,
                   height: 1.45,
                 ),
@@ -127,7 +198,6 @@ class _Line extends StatelessWidget {
                 detail,
                 style: TextStyle(
                   color: palette.textPrimary,
-                  fontFamily: 'JetBrains Mono',
                   fontSize: 12,
                   height: 1.45,
                 ),
@@ -144,10 +214,12 @@ class _ThenLine extends StatelessWidget {
   const _ThenLine({
     required this.label,
     required this.actions,
+    required this.name,
   });
 
   final String label;
   final List<AutomationAction> actions;
+  final String Function(String id) name;
 
   @override
   Widget build(BuildContext context) {
@@ -163,9 +235,8 @@ class _ThenLine extends StatelessWidget {
             label,
             style: TextStyle(
               color: palette.success,
-              fontFamily: 'JetBrains Mono',
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
             ),
           ),
@@ -182,7 +253,6 @@ class _ThenLine extends StatelessWidget {
                         _targetText(action),
                         style: TextStyle(
                           color: palette.textSecondary,
-                          fontFamily: 'JetBrains Mono',
                           fontSize: 12,
                           height: 1.45,
                         ),
@@ -194,7 +264,6 @@ class _ThenLine extends StatelessWidget {
                       _verbText(action, l10n),
                       style: TextStyle(
                         color: palette.textPrimary,
-                        fontFamily: 'JetBrains Mono',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.45,
@@ -211,16 +280,13 @@ class _ThenLine extends StatelessWidget {
 
   String _targetText(AutomationAction action) {
     return switch (action) {
-      DeviceCommandAutomationAction(:final deviceId) => deviceId,
+      DeviceCommandAutomationAction(:final deviceId) => name(deviceId),
       SceneActivateAutomationAction(:final groupId, :final sceneId) =>
         '$groupId / $sceneId',
     };
   }
 
-  String _verbText(
-    AutomationAction action,
-    AppLocalizations? l10n,
-  ) {
+  String _verbText(AutomationAction action, AppLocalizations? l10n) {
     return switch (action) {
       DeviceCommandAutomationAction(command: AutomationActionCommand.on) =>
         l10n?.turnOnLabel ?? 'on',

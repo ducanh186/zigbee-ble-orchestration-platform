@@ -14,6 +14,7 @@ class RuleCard extends StatelessWidget {
   const RuleCard({
     required this.rule,
     required this.template,
+    this.deviceNames = const {},
     this.onEnabledChanged,
     this.onDelete,
     this.highlight = false,
@@ -22,6 +23,7 @@ class RuleCard extends StatelessWidget {
 
   final AutomationRule rule;
   final AutomationRuleTemplate template;
+  final Map<String, String> deviceNames;
   final ValueChanged<bool>? onEnabledChanged;
   final VoidCallback? onDelete;
   final bool highlight;
@@ -132,7 +134,7 @@ class RuleCard extends StatelessWidget {
               lastRunAt: rule.updatedAt ?? rule.createdAt,
             ),
             const SizedBox(height: 10),
-            RuleBodyBlock(rule: rule),
+            RuleBodyBlock(rule: rule, deviceNames: deviceNames),
             if (rule.lastError != null && rule.lastError!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(

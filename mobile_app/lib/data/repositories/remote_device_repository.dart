@@ -7,7 +7,6 @@ import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
 import '../models/command_api_model.dart';
 import '../models/device_api_model.dart';
-import '../models/device_state_api_model.dart';
 import '../models/event_api_model.dart';
 import '../services/api_client.dart';
 
@@ -68,38 +67,22 @@ class RemoteDeviceRepository implements DeviceRepository {
 
   @override
   Future<List<SmartDevice>> fetchDevices() async {
+    // The list endpoint inlines each device's latest `state` + `reported_at`,
+    // so this is a single round-trip (no per-device /state fan-out).
     final json = await _apiClient.getJson('/api/devices/');
-    final devices = (json as List)
-        .whereType<Map>()
-        .map((item) => DeviceApiModel.fromJson(Map<String, Object?>.from(item)))
-        .toList();
-
-    final resolved = <SmartDevice>[];
-    for (final device in devices) {
-      try {
-        final stateJson = await _apiClient.getJson(
-          '/api/devices/${device.id}/state',
-        );
-        final state = DeviceStateApiModel.fromJson(
-          Map<String, Object?>.from(stateJson as Map),
-        );
-        resolved.add(
-          device.toDomain(
-            power: state.power,
-            reportedAt: state.reportedAt,
-            state: state.state,
-          ),
-        );
-      } on ApiException catch (error) {
-        if (error.statusCode == 404) {
-          resolved.add(device.toDomain());
-          continue;
-        }
-        rethrow;
-      }
-    }
-
-    return resolved;
+    return (json as List).whereType<Map>().map((item) {
+      final map = Map<String, Object?>.from(item);
+      final model = DeviceApiModel.fromJson(map);
+      final reachable = model.state['reachable'] as bool? ?? true;
+      final power = DevicePower.fromJson(
+        model.state['power'],
+        reachable: reachable,
+      );
+      return model.toDomain(
+        power: power,
+        reportedAt: map['reported_at'] as String?,
+      );
+    }).toList();
   }
 
   @override

@@ -19,7 +19,6 @@ from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.models import Automation, AutomationEvent, Device, User
-from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
@@ -433,38 +432,38 @@ async def delete_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Delete an automation.
+    """Delete an automation; removed immediately, never waits on the gateway.
 
-    Event rules: soft-delete — bump version, set sync_status="pending", publish
-    an op=delete tombstone, and keep the row until the gateway acks with
-    sync_status="deleted" (handled in _handle_automation_reported). Cloud stays
-    the source of truth and the gateway confirms apply.
-
-    Schedule rules: hard-delete immediately (and their child automation_events),
-    because they are never synced to the gateway so no ack will ever arrive.
+    Deleting is fully cloud-side and deterministic — the DB row (and its child
+    automation_events) is hard-deleted right away, so the app sees it gone and
+    delete never hangs on a gateway ack (the original "rule won't delete" bug).
+    Event rules — the only ones the gateway knows about — additionally get a
+    retained op=delete tombstone so the gateway drops them on its next sync,
+    using the mechanism it already has (no firmware change). Schedule rules run
+    cloud-side and are never synced, so they need no tombstone.
     """
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     await ensure_automation_visible(db, rule, current_user)
 
-    if not _syncs_to_gateway(rule):
-        # Schedule rules are never synced to the gateway, so there is no
-        # tombstone to publish and no ack will arrive. Hard-delete now,
-        # removing child audit rows first to satisfy the FK (PostgreSQL has
-        # no ON DELETE CASCADE on automation_events.automation_id).
-        # expire_on_commit=False keeps `rule` serializable for the response.
-        await db.execute(
-            delete(AutomationEvent).where(AutomationEvent.automation_id == rule.id)
-        )
-        await db.delete(rule)
-        await db.commit()
-        return rule
+    # Tell the gateway to drop it — only event rules are synced there.
+    if _syncs_to_gateway(rule):
+        rule.version = (rule.version or 0) + 1
+        rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        _publish_delete(rule)
 
-    rule.version = (rule.version or 0) + 1
-    rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.delete")
+    # Snapshot the response before the row is gone (expire_on_commit=False keeps
+    # the instance readable, but a snapshot is explicit and safe).
+    response = AutomationOut.model_validate(rule)
+
+    # Hard-delete now regardless of any gateway ack. Remove FK-referencing audit
+    # rows first (no ON DELETE cascade on automation_events.automation_id).
+    await db.execute(
+        delete(AutomationEvent).where(
+            AutomationEvent.automation_id == automation_id
+        )
+    )
+    await db.delete(rule)
     await db.commit()
-    await db.refresh(rule)
-    _publish_delete(rule)
-    return rule
+    return response

@@ -94,6 +94,51 @@ async def test_get_device_state_returns_latest(
 
 
 @pytest.mark.asyncio
+async def test_list_devices_includes_latest_state_inline(
+    client, seed_light, db_session_factory
+):
+    """GET /api/devices returns each device's latest state inline (no N+1)."""
+    from cloud.app.models import DeviceState
+
+    async with db_session_factory() as s:
+        s.add(
+            DeviceState(
+                device_id=seed_light,
+                state={"power": "off"},
+                reported_at=datetime(2026, 6, 14, 7, 0),
+            )
+        )
+        s.add(
+            DeviceState(
+                device_id=seed_light,
+                state={"power": "on", "level": 80},
+                reported_at=datetime(2026, 6, 14, 7, 15),
+            )
+        )
+        await s.commit()
+
+    headers = await _viewer_headers(client, db_session_factory)
+    r = await client.get("/api/devices/", headers=headers)
+    assert r.status_code == 200
+    dev = next(d for d in r.json() if d["id"] == seed_light)
+    # latest state (07:15) wins, not the earlier 07:00 row
+    assert dev["state"] == {"power": "on", "level": 80}
+    assert dev["reported_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_list_devices_state_null_when_no_state(
+    client, seed_light, db_session_factory
+):
+    headers = await _viewer_headers(client, db_session_factory)
+    r = await client.get("/api/devices/", headers=headers)
+    assert r.status_code == 200
+    dev = next(d for d in r.json() if d["id"] == seed_light)
+    assert dev["state"] is None
+    assert dev["reported_at"] is None
+
+
+@pytest.mark.asyncio
 async def test_list_devices_filter_by_room(client, seed_light, db_session_factory):
     headers = await _viewer_headers(client, db_session_factory)
 

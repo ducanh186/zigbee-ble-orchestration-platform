@@ -57,11 +57,13 @@ void main() {
     },
   );
 
-  test('maps a v2 sensor (kind 2) into typed environment values', () async {
+  test('maps a v2 sensor (kind 2) from inline list state', () async {
+    final requests = <Uri>[];
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
         baseUrl: 'https://dashboard.iot-building.app',
         httpClient: MockClient((request) async {
+          requests.add(request.url);
           if (request.url.path == '/api/devices/') {
             return http.Response(
               jsonEncode([
@@ -73,24 +75,16 @@ void main() {
                   'room_id': 'room-01',
                   'name': 'DHT11 Sensor',
                   'is_online': true,
+                  // latest state is now inlined by the list endpoint
+                  'state': {
+                    'temperature_c': 28.5,
+                    'humidity_percent': 48,
+                    'sensor': 'dht11',
+                    'reachable': true,
+                  },
+                  'reported_at': '10:11 06/13/2026',
                 },
               ]),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          if (request.url.path == '/api/devices/environment-01/state') {
-            return http.Response(
-              jsonEncode({
-                'device_id': 'environment-01',
-                'state': {
-                  'temperature_c': 28.5,
-                  'humidity_percent': 48,
-                  'sensor': 'dht11',
-                  'reachable': true,
-                },
-                'reported_at': '10:11 06/13/2026',
-              }),
               200,
               headers: {'content-type': 'application/json'},
             );
@@ -107,6 +101,9 @@ void main() {
     expect(device.temperatureC, 28.5);
     expect(device.humidityPercent, 48);
     expect(device.sensorLabel, 'dht11');
+    expect(device.reportedAt, '10:11 06/13/2026');
+    // No per-device /state fan-out — only the list endpoint is hit.
+    expect(requests.map((u) => u.path), ['/api/devices/']);
   });
 
   test(

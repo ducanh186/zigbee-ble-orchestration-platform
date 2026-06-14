@@ -110,6 +110,7 @@ class HomeView extends StatelessWidget {
                   const SizedBox(height: 8),
                   _QuickLightGrid(
                     lights: viewModel.lights.take(4).toList(),
+                    viewModel: viewModel,
                     onOpenLight: onOpenLight,
                   ),
                   if (viewModel.isLoading)
@@ -220,9 +221,14 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _QuickLightGrid extends StatelessWidget {
-  const _QuickLightGrid({required this.lights, required this.onOpenLight});
+  const _QuickLightGrid({
+    required this.lights,
+    required this.viewModel,
+    required this.onOpenLight,
+  });
 
   final List<SmartDevice> lights;
+  final DeviceDashboardViewModel viewModel;
   final ValueChanged<SmartDevice> onOpenLight;
 
   @override
@@ -240,13 +246,18 @@ class _QuickLightGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 1.05,
+        // Denser/compact tiles now that the EUI64 line is gone.
+        childAspectRatio: 1.45,
       ),
       itemBuilder: (context, index) {
         final light = lights[index];
         return AppCard(
+          padding: const EdgeInsets.all(12),
           onTap: () => onOpenLight(light),
-          child: _LightTile(light: light),
+          child: _LightTile(
+            light: light,
+            roomName: viewModel.roomNameFor(light.roomId),
+          ),
         );
       },
     );
@@ -254,9 +265,10 @@ class _QuickLightGrid extends StatelessWidget {
 }
 
 class _LightTile extends StatelessWidget {
-  const _LightTile({required this.light});
+  const _LightTile({required this.light, required this.roomName});
 
   final SmartDevice light;
+  final String roomName;
 
   @override
   Widget build(BuildContext context) {
@@ -268,14 +280,15 @@ class _LightTile extends StatelessWidget {
         Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: isOn ? palette.warningTint : const Color(0x1F6B7280),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: Icon(
                 isOn ? Icons.lightbulb : Icons.lightbulb_outline,
+                size: 18,
                 color: isOn ? palette.warning : palette.textSecondary,
               ),
             ),
@@ -294,18 +307,28 @@ class _LightTile extends StatelessWidget {
         const Spacer(),
         Text(
           light.name,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 2),
-        Text(
-          light.id,
-          style: TextStyle(
-            color: palette.textSecondary,
-            fontFamily: 'JetBrains Mono',
-            fontSize: 11,
-          ),
+        Row(
+          children: [
+            Icon(
+              Icons.meeting_room_outlined,
+              size: 12,
+              color: palette.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                roomName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: palette.textSecondary, fontSize: 12),
+              ),
+            ),
+          ],
         ),
       ],
     );

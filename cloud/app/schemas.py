@@ -256,13 +256,18 @@ class DeviceOut(BaseModel):
     room_id: str | None
     name: str | None
     is_online: bool
+    # Latest reported state inlined by `list_devices` so the app needs one
+    # round-trip instead of an N+1 fan-out to /devices/{id}/state. Null when the
+    # device has never reported.
+    state: dict | None = None
+    reported_at: datetime | None = None
     last_seen_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer("last_seen_at", "created_at", "updated_at")
+    @field_serializer("reported_at", "last_seen_at", "created_at", "updated_at")
     def _ser_ts(self, v: datetime | None) -> str | None:
         return _fmt_ts(v)
 
