@@ -315,7 +315,7 @@ class _DeviceHeroCard extends StatelessWidget {
         device.power == DevicePower.on
             ? Icons.lightbulb
             : Icons.lightbulb_outline,
-      'motion' => Icons.sensors,
+      'motion' || 'sensor' => Icons.sensors,
       'switch' => Icons.toggle_off,
       _ => Icons.hub_outlined,
     };

@@ -443,17 +443,20 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   bool _isTriggerDevice(SmartDevice device) {
-    return device.deviceType == AutomationDeviceType.switchDevice.wireValue ||
-        device.deviceType == AutomationDeviceType.motion.wireValue ||
-        device.deviceType == AutomationDeviceType.environment.wireValue;
+    // Accept switches and any sensor — v2 'sensor'+kind or legacy
+    // 'motion'/'environment' (isMotion/isEnvironment dual-read both).
+    return device.deviceType == 'switch' ||
+        device.deviceType == 'sensor' ||
+        device.isMotion ||
+        device.isEnvironment;
   }
 
   AutomationDeviceType _automationTypeFor(SmartDevice device) {
-    return switch (device.deviceType) {
-      'switch' => AutomationDeviceType.switchDevice,
-      'environment' => AutomationDeviceType.environment,
-      _ => AutomationDeviceType.motion,
-    };
+    if (device.isEnvironment) return AutomationDeviceType.environment;
+    if (device.deviceType == 'switch') {
+      return AutomationDeviceType.switchDevice;
+    }
+    return AutomationDeviceType.motion;
   }
 
   void _applyDefaultsForTriggerType(AutomationDeviceType type) {

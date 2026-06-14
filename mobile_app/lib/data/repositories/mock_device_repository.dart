@@ -39,7 +39,8 @@ class MockDeviceRepository implements DeviceRepository {
     ),
     const SmartDevice(
       id: 'pir-01',
-      deviceType: 'motion',
+      deviceType: 'sensor',
+      sensorKind: 1,
       name: 'Lab Motion',
       roomId: 'lab01',
       isOnline: true,
@@ -58,7 +59,8 @@ class MockDeviceRepository implements DeviceRepository {
     ),
     const SmartDevice(
       id: 'environment-01',
-      deviceType: 'environment',
+      deviceType: 'sensor',
+      sensorKind: 2,
       name: 'DHT11 Sensor',
       roomId: 'lab01',
       isOnline: true,

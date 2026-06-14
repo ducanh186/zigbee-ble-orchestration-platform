@@ -97,11 +97,11 @@ class DevicePickerRow extends StatelessWidget {
   }
 
   AutomationDeviceType _typeFor(SmartDevice device) {
-    return switch (device.deviceType) {
-      'motion' => AutomationDeviceType.motion,
-      'switch' => AutomationDeviceType.switchDevice,
-      _ => AutomationDeviceType.light,
-    };
+    // isEnvironment/isMotion dual-read v2 'sensor'+kind and legacy types.
+    if (device.isEnvironment) return AutomationDeviceType.environment;
+    if (device.isMotion) return AutomationDeviceType.motion;
+    if (device.deviceType == 'switch') return AutomationDeviceType.switchDevice;
+    return AutomationDeviceType.light;
   }
 }
 
