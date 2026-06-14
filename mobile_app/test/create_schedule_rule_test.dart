@@ -8,6 +8,7 @@ import 'package:zigbee_smart_building/domain/models/command_result.dart';
 import 'package:zigbee_smart_building/domain/models/device_power.dart';
 import 'package:zigbee_smart_building/domain/models/event_log.dart';
 import 'package:zigbee_smart_building/domain/models/light_scene.dart';
+import 'package:zigbee_smart_building/domain/models/room.dart';
 import 'package:zigbee_smart_building/domain/models/smart_device.dart';
 import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
@@ -20,25 +21,22 @@ import 'package:zigbee_smart_building/ui/features/automation/widgets/schedule_tr
 import 'package:zigbee_smart_building/ui/features/devices/view_models/device_dashboard_view_model.dart';
 
 void main() {
-  testWidgets('schedule template labels follow the active locale', (
-    tester,
-  ) async {
+  testWidgets('rule kind labels follow the active locale', (tester) async {
     await _pumpSheet(tester, locale: const Locale('vi'));
 
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
-    await tester.pump();
-
-    expect(find.text('Lịch bật'), findsOneWidget);
-    expect(find.text('Lịch tắt'), findsOneWidget);
+    // The rule-type selector replaces the old quick-template grid.
+    expect(find.text('Thiết bị kích hoạt'), findsWidgets);
+    expect(find.text('Theo lịch'), findsOneWidget);
   });
 
-  testWidgets('schedule_on preset saves direct light rule', (tester) async {
+  testWidgets('schedule + turn on + weekdays saves direct light rule', (
+    tester,
+  ) async {
     final repository = await _pumpSheet(tester);
 
     await tester.enterText(find.byType(TextField).first, 'Weekday lights on');
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
-    await tester.pump();
-    await _tapVisible(tester, find.text('Schedule on'));
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
+    await _tapVisible(tester, find.byKey(const ValueKey('schedule-action-on')));
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('schedule-mode-weekdays')),
@@ -56,30 +54,34 @@ void main() {
     );
   });
 
-  testWidgets('switching schedule templates clears visible selections', (
-    tester,
-  ) async {
+  testWidgets('switching rule kind clears visible selections', (tester) async {
     await _pumpSheet(tester);
 
     await tester.enterText(find.byType(TextField).first, 'Schedule reset');
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
-    await tester.pump();
-    await _tapVisible(tester, find.text('Schedule on'));
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('schedule-mode-weekdays')),
     );
     await _tapVisible(tester, find.text('Lab Light'));
 
-    await _tapVisible(tester, find.text('Schedule off'));
+    // Back to the device-trigger kind: the schedule section is gone.
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('rule-kind-deviceTrigger')),
+    );
+    expect(find.byKey(const ValueKey('schedule-mode-weekdays')), findsNothing);
 
-    // Switching templates rebuilds the schedule section with a fresh key, so
-    // the mode resets to the default (Daily) and Weekdays is no longer chosen.
+    // Returning to schedule starts from the default mode (Daily), not Weekdays.
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
     final weekdaysChip = tester.widget<ChoiceChip>(
       find.byKey(const ValueKey('schedule-mode-weekdays')),
     );
     expect(weekdaysChip.selected, isFalse);
-    expect(find.byIcon(Icons.check_circle), findsNothing);
+    final dailyChip = tester.widget<ChoiceChip>(
+      find.byKey(const ValueKey('schedule-mode-daily')),
+    );
+    expect(dailyChip.selected, isTrue);
   });
 
   testWidgets('invalid custom cron disables Save and uses form error area', (
@@ -88,9 +90,7 @@ void main() {
     await _pumpSheet(tester);
 
     await tester.enterText(find.byType(TextField).first, 'Invalid cron rule');
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
-    await tester.pump();
-    await _tapVisible(tester, find.text('Schedule on'));
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('schedule-mode-custom')),
@@ -114,13 +114,17 @@ void main() {
     );
   });
 
-  testWidgets('schedule_off saves scene activation target', (tester) async {
+  testWidgets('schedule + turn off + weekly Sunday + scene saves activation', (
+    tester,
+  ) async {
     final repository = await _pumpSheet(tester);
 
     await tester.enterText(find.byType(TextField).first, 'Sunday lights off');
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
-    await tester.pump();
-    await _tapVisible(tester, find.text('Schedule off'));
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-action-off')),
+    );
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('schedule-mode-weekly')),
@@ -278,6 +282,17 @@ class _FakeDeviceRepository implements DeviceRepository {
   Future<SmartDevice> renameDeviceName({
     required String deviceId,
     required String name,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Room>> fetchRooms() async => const [];
+
+  @override
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
   }) {
     throw UnimplementedError();
   }

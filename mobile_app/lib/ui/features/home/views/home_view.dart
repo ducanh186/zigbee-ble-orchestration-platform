@@ -69,7 +69,18 @@ class HomeView extends StatelessWidget {
                   ),
                   if (environmentSensor != null) ...[
                     const SizedBox(height: 18),
-                    SectionTitle(title: l10n.environmentTitle),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SectionTitle(title: l10n.environmentTitle),
+                        ),
+                        _RoomBadge(
+                          name: viewModel.roomNameFor(
+                            environmentSensor.roomId,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,10 +91,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.temperatureC,
                             unit: '°C',
                             label: l10n.temperatureLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -93,10 +100,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.humidityPercent,
                             unit: '%',
                             label: l10n.humidityLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                       ],
@@ -305,6 +308,40 @@ class _LightTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Small pill showing which room an environment sensor lives in.
+class _RoomBadge extends StatelessWidget {
+  const _RoomBadge({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.primaryTint,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.meeting_room_outlined, size: 13, color: palette.primary),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(
+              color: palette.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

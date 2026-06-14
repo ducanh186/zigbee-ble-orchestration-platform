@@ -78,10 +78,7 @@ class _GatewayStatusPresentation {
     final logTime = status.occurredAt == null
         ? ''
         : l10n.gatewayLastReport(status.occurredAt!);
-    final eventType = status.eventType == null ? '' : ' (${status.eventType})';
-    final latestReport = logTime.isEmpty && eventType.isEmpty
-        ? l10n.gatewayLatestEvent
-        : '$logTime$eventType';
+    final latestReport = logTime.isEmpty ? l10n.gatewayLatestEvent : logTime;
 
     return switch (status.state) {
       CloudConnectionState.online => _GatewayStatusPresentation(

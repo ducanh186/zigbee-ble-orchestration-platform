@@ -273,6 +273,49 @@ class TestValidateEventPayload:
         assert result == inner
 
 
+class TestValidateSensorPayloads:
+    def test_validate_reported_payload_accepts_sensor_kind2(self):
+        out = validate_reported_payload(
+            "sensor",
+            {
+                "sensor_kind": 2,
+                "sensor": "environment",
+                "state": {"temperature_c": 28.5, "humidity_percent": 48},
+            },
+        )
+        assert out is not None
+        assert out["state"]["temperature_c"] == 28.5
+
+    def test_validate_reported_payload_sensor_kind2_invalid_state_returns_none(self):
+        # humidity_percent > 100 is invalid
+        out = validate_reported_payload(
+            "sensor",
+            {
+                "sensor_kind": 2,
+                "sensor": "environment",
+                "state": {"humidity_percent": 999},
+            },
+        )
+        assert out is None
+
+    def test_validate_event_payload_accepts_sensor_occupancy(self):
+        out = validate_event_payload(
+            "sensor",
+            {"sensor_kind": 1, "event": "occupancy_changed", "occupancy": "occupied"},
+        )
+        assert out is not None
+
+    def test_validate_reported_payload_sensor_unknown_kind_passthrough(self):
+        inner = {"sensor_kind": 3, "state": {"flame": True}}
+        out = validate_reported_payload("sensor", inner)
+        assert out == inner
+
+    def test_validate_reported_payload_sensor_kind2_missing_state_returns_none(self):
+        # kind-2 with no `state` key must be rejected (malformed payload)
+        out = validate_reported_payload("sensor", {"sensor_kind": 2})
+        assert out is None
+
+
 # ---- translate_command_for_gateway ----
 
 class TestTranslateCommandForGateway:
@@ -320,3 +363,36 @@ class TestTranslateCommandForGateway:
     def test_unknown_type_rejects(self):
         with pytest.raises(ValueError, match="does not accept commands"):
             translate_command_for_gateway("motion", "set", {"power": "on"})
+
+    def test_set_room_sensor(self):
+        op, t = translate_command_for_gateway(
+            "sensor", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_light(self):
+        op, t = translate_command_for_gateway(
+            "light", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_switch(self):
+        op, t = translate_command_for_gateway(
+            "switch", "device.set_room", {"room_id": "room-2"}
+        )
+        assert op == "device.set_room"
+        assert t == {"room_id": "room-2"}
+
+    def test_set_room_missing_room_id_raises(self):
+        with pytest.raises(ValueError):
+            translate_command_for_gateway(
+                "sensor", "device.set_room", {}
+            )
+
+    def test_set_room_empty_room_id_raises(self):
+        with pytest.raises(ValueError):
+            translate_command_for_gateway(
+                "light", "device.set_room", {"room_id": ""}
+            )

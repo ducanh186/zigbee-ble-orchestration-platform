@@ -6,12 +6,16 @@ final _eui64Pattern = RegExp(r'^[0-9a-fA-F]{16}$');
 enum ProvisioningDeviceType {
   light,
   switchDevice,
-  motion;
+  motion,
+  sensor;
 
   static ProvisioningDeviceType fromJson(Object? value) {
     return switch (value) {
       'light' => ProvisioningDeviceType.light,
       'switch' => ProvisioningDeviceType.switchDevice,
+      // device-model-v2 provisions sensors as 'sensor'; 'motion' kept for
+      // legacy QR payloads/labels printed before the migration.
+      'sensor' => ProvisioningDeviceType.sensor,
       'motion' => ProvisioningDeviceType.motion,
       _ => throw FormatException('Unsupported provisioning device_type: $value'),
     };
@@ -21,12 +25,14 @@ enum ProvisioningDeviceType {
     ProvisioningDeviceType.light => 'light',
     ProvisioningDeviceType.switchDevice => 'switch',
     ProvisioningDeviceType.motion => 'motion',
+    ProvisioningDeviceType.sensor => 'sensor',
   };
 
   String get label => switch (this) {
     ProvisioningDeviceType.light => 'Light',
     ProvisioningDeviceType.switchDevice => 'Switch',
     ProvisioningDeviceType.motion => 'Sensors',
+    ProvisioningDeviceType.sensor => 'Sensor',
   };
 }
 

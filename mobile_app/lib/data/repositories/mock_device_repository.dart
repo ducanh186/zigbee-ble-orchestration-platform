@@ -5,6 +5,7 @@ import '../../domain/models/command_status.dart';
 import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
+import '../../domain/models/room.dart';
 import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
 
@@ -39,7 +40,8 @@ class MockDeviceRepository implements DeviceRepository {
     ),
     const SmartDevice(
       id: 'pir-01',
-      deviceType: 'motion',
+      deviceType: 'sensor',
+      sensorKind: 1,
       name: 'Lab Motion',
       roomId: 'lab01',
       isOnline: true,
@@ -58,7 +60,8 @@ class MockDeviceRepository implements DeviceRepository {
     ),
     const SmartDevice(
       id: 'environment-01',
-      deviceType: 'environment',
+      deviceType: 'sensor',
+      sensorKind: 2,
       name: 'DHT11 Sensor',
       roomId: 'lab01',
       isOnline: true,
@@ -109,6 +112,12 @@ class MockDeviceRepository implements DeviceRepository {
     ),
   ];
 
+  final List<Room> _rooms = const [
+    Room(id: 'lab01', name: 'Lab 01'),
+    Room(id: 'lobby', name: 'Lobby'),
+    Room(id: 'floor2', name: 'Floor 2'),
+  ];
+
   final Map<String, _MockCommand> _commands = {};
   int _nextCommand = 10;
 
@@ -122,6 +131,12 @@ class MockDeviceRepository implements DeviceRepository {
   Future<List<SmartDevice>> fetchDevices() async {
     await Future<void>.delayed(const Duration(milliseconds: 160));
     return List.unmodifiable(_devices);
+  }
+
+  @override
+  Future<List<Room>> fetchRooms() async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    return List.unmodifiable(_rooms);
   }
 
   @override
@@ -170,6 +185,27 @@ class MockDeviceRepository implements DeviceRepository {
       );
     }
     _devices[index] = _devices[index].copyWith(name: name);
+    return _devices[index];
+  }
+
+  @override
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final index = _devices.indexWhere((device) => device.id == deviceId);
+    if (index == -1) {
+      return SmartDevice(
+        id: deviceId,
+        deviceType: 'unknown',
+        name: deviceId,
+        isOnline: false,
+        power: DevicePower.unknown,
+        roomId: roomId,
+      );
+    }
+    _devices[index] = _devices[index].copyWith(roomId: roomId);
     return _devices[index];
   }
 

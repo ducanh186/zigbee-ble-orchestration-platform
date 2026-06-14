@@ -9,17 +9,18 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../view_models/automation_view_model.dart';
-import 'automation_visuals.dart';
 import 'device_picker_row.dart';
 import 'environment_condition_section.dart';
 import 'rule_preview.dart';
 import 'scene_target_section.dart';
 import 'schedule_trigger_section.dart';
-import 'template_card.dart';
 
-/// Modal bottom-sheet form for creating a rule. Mirrors the design's
-/// `CreateRuleSheet.jsx` — sectioned form, sticky footer, plain-language
-/// preview that appears once a template is chosen.
+/// Whether the rule fires from a device event/condition or from a schedule.
+enum _RuleKind { deviceTrigger, schedule }
+
+/// Modal bottom-sheet form for creating a rule. A rule-type selector switches
+/// between a device-triggered rule and a scheduled rule, followed by a sticky
+/// footer and a plain-language preview for device-triggered rules.
 class CreateRuleSheet extends StatefulWidget {
   const CreateRuleSheet({super.key});
 
@@ -45,8 +46,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   final TextEditingController _thresholdController = TextEditingController(
     text: '30',
   );
-  AutomationRuleTemplate? _template;
-  bool _isTemplateExpanded = false;
+  _RuleKind _ruleKind = _RuleKind.deviceTrigger;
   bool _enabled = true;
   String? _triggerId;
   AutomationDeviceType? _triggerDeviceType;
@@ -60,6 +60,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   ScheduleSelection? _scheduleSelection;
   ScheduleTargetSelection? _scheduleTarget;
   String? _scheduleValidationMessage;
+  AutomationActionCommand _scheduleAction = AutomationActionCommand.on;
 
   @override
   void initState() {
@@ -126,25 +127,32 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                           const SizedBox(height: 6),
                           _NameField(controller: _nameController),
                           const SizedBox(height: 16),
-                          _QuickTemplateSection(
-                            selected: _template,
-                            isExpanded: _isTemplateExpanded,
-                            onToggleExpanded: () => setState(
-                              () => _isTemplateExpanded = !_isTemplateExpanded,
-                            ),
-                            onChanged: _setTemplate,
+                          _FieldLabel(label: l10n.ruleKindLabel),
+                          const SizedBox(height: 6),
+                          _RuleKindSelector(
+                            kind: _ruleKind,
+                            onChanged: _setRuleKind,
                           ),
                           const SizedBox(height: 16),
-                          if (_isScheduleTemplate) ...[
+                          if (_ruleKind == _RuleKind.schedule) ...[
+                            _FieldLabel(
+                              label: l10n.scheduleActionLabel,
+                              required: true,
+                            ),
+                            const SizedBox(height: 6),
+                            _ScheduleActionSelector(
+                              command: _scheduleAction,
+                              onChanged: (command) =>
+                                  setState(() => _scheduleAction = command),
+                            ),
+                            const SizedBox(height: 16),
                             _FieldLabel(
                               label: l10n.scheduleTriggerLabel,
                               required: true,
                             ),
                             const SizedBox(height: 6),
                             ScheduleTriggerSection(
-                              key: ValueKey(
-                                'schedule-trigger-${_template!.name}',
-                              ),
+                              key: const ValueKey('schedule-trigger'),
                               onChanged: (value) =>
                                   setState(() => _scheduleSelection = value),
                               onValidationChanged: (message) => setState(
@@ -158,9 +166,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             ),
                             const SizedBox(height: 6),
                             SceneTargetSection(
-                              key: ValueKey(
-                                'schedule-target-${_template!.name}',
-                              ),
+                              key: const ValueKey('schedule-target'),
                               availability: automation.sceneAvailability,
                               lights: lights,
                               scenes: automation.scenes,
@@ -194,16 +200,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                                 operator: _thresholdOperator,
                                 thresholdController: _thresholdController,
                                 onMetricChanged: (metric) {
-                                  setState(() {
-                                    _environmentMetric = metric;
-                                    _template = null;
-                                  });
+                                  setState(() => _environmentMetric = metric);
                                 },
                                 onOperatorChanged: (operator) {
-                                  setState(() {
-                                    _thresholdOperator = operator;
-                                    _template = null;
-                                  });
+                                  setState(
+                                    () => _thresholdOperator = operator,
+                                  );
                                 },
                               ),
                             ],
@@ -290,7 +292,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   bool _canSave() {
-    if (_isScheduleTemplate) {
+    if (_ruleKind == _RuleKind.schedule) {
       return _nameController.text.trim().isNotEmpty &&
           _scheduleSelection != null &&
           _scheduleSelection!.isValid &&
@@ -319,41 +321,24 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     return threshold >= range.$1 && threshold <= range.$2 ? threshold : null;
   }
 
-  void _setTemplate(AutomationRuleTemplate template) {
+  void _setRuleKind(_RuleKind kind) {
+    if (_ruleKind == kind) {
+      return;
+    }
     setState(() {
-      final previousTriggerType = _triggerDeviceType;
-      _template = template;
-      if (template.isSchedule) {
-        _triggerId = null;
-        _triggerDeviceType = null;
-        _triggerEvent = null;
-        _triggerState = const {};
-        _actionCommand = template.actionCommand;
-        _targetIds = {};
-        _targetActionCommands = {};
-        _scheduleSelection = null;
-        _scheduleTarget = null;
-        _scheduleValidationMessage = null;
-        return;
-      }
+      _ruleKind = kind;
+      // Reset the other branch's selections so a half-filled form from one
+      // rule kind never leaks into the other.
       _scheduleSelection = null;
       _scheduleTarget = null;
       _scheduleValidationMessage = null;
-      _triggerDeviceType = template.triggerDeviceType;
-      _triggerEvent = template.triggerEvent;
-      _triggerState = template.triggerState;
-      _actionCommand = template.actionCommand;
-      _targetActionCommands = {
-        for (final targetId in _targetIds) targetId: template.actionCommand,
-      };
-      if (_triggerId != null &&
-          previousTriggerType != null &&
-          previousTriggerType != template.triggerDeviceType) {
-        _triggerId = null;
-      }
-      if (!_allowsMultipleTargets && _targetIds.length > 1) {
-        _targetIds = {_targetIds.first};
-      }
+      _triggerId = null;
+      _triggerDeviceType = null;
+      _triggerEvent = null;
+      _triggerState = const {};
+      _actionCommand = null;
+      _targetIds = {};
+      _targetActionCommands = {};
     });
   }
 
@@ -372,9 +357,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       final type = _automationTypeFor(device);
       _triggerId = device.id;
       _triggerDeviceType = type;
-      if (_template != null && _template!.triggerDeviceType != type) {
-        _template = null;
-      }
       _applyDefaultsForTriggerType(type);
     });
   }
@@ -393,11 +375,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
           ? AutomationTriggerEvent.switchToggle
           : AutomationTriggerEvent.occupancyChanged;
       _actionCommand ??= _actionForTrigger(triggerDeviceType, state);
-      if (_template != null &&
-          (_template!.triggerState.toString() != state.toString() ||
-              _template!.actionCommand != _actionCommand)) {
-        _template = null;
-      }
     });
   }
 
@@ -425,9 +402,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     setState(() {
       _actionCommand = command;
       _targetActionCommands = {..._targetActionCommands, deviceId: command};
-      if (_template != null && _template!.actionCommand != command) {
-        _template = null;
-      }
     });
   }
 
@@ -454,11 +428,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     }
   }
 
-  bool get _allowsMultipleTargets {
-    return _template != AutomationRuleTemplate.switchTogglesOneLight;
-  }
-
-  bool get _isScheduleTemplate => _template?.isSchedule ?? false;
+  bool get _allowsMultipleTargets => true;
 
   SmartDevice? _findDevice(List<SmartDevice> devices, String? deviceId) {
     if (deviceId == null) {
@@ -473,17 +443,20 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   bool _isTriggerDevice(SmartDevice device) {
-    return device.deviceType == AutomationDeviceType.switchDevice.wireValue ||
-        device.deviceType == AutomationDeviceType.motion.wireValue ||
-        device.deviceType == AutomationDeviceType.environment.wireValue;
+    // Accept switches and any sensor — v2 'sensor'+kind or legacy
+    // 'motion'/'environment' (isMotion/isEnvironment dual-read both).
+    return device.deviceType == 'switch' ||
+        device.deviceType == 'sensor' ||
+        device.isMotion ||
+        device.isEnvironment;
   }
 
   AutomationDeviceType _automationTypeFor(SmartDevice device) {
-    return switch (device.deviceType) {
-      'switch' => AutomationDeviceType.switchDevice,
-      'environment' => AutomationDeviceType.environment,
-      _ => AutomationDeviceType.motion,
-    };
+    if (device.isEnvironment) return AutomationDeviceType.environment;
+    if (device.deviceType == 'switch') {
+      return AutomationDeviceType.switchDevice;
+    }
+    return AutomationDeviceType.motion;
   }
 
   void _applyDefaultsForTriggerType(AutomationDeviceType type) {
@@ -552,9 +525,8 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   }
 
   Future<void> _onSave(AutomationViewModel automation) async {
-    final template = _template;
     late final AutomationRuleDraft draft;
-    if (template?.isSchedule ?? false) {
+    if (_ruleKind == _RuleKind.schedule) {
       final schedule = _scheduleSelection;
       final target = _scheduleTarget;
       if (schedule == null || !schedule.isValid || target == null) {
@@ -563,7 +535,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       final action = switch (target) {
         DirectLightTarget direct => DeviceCommandAutomationAction(
           deviceId: direct.deviceId,
-          command: template!.actionCommand,
+          command: _scheduleAction,
         ),
         SceneTarget scene => SceneActivateAutomationAction(
           groupId: scene.groupId,
@@ -573,7 +545,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       draft = AutomationRuleDraft.typed(
         name: _nameController.text.trim(),
         enabled: _enabled,
-        template: template,
         trigger: ScheduleAutomationTrigger(cron: schedule.cron),
         scheduleCron: schedule.cron,
         actions: [action],
@@ -597,7 +568,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         draft = AutomationRuleDraft.typed(
           name: _nameController.text.trim(),
           enabled: _enabled,
-          template: template,
           trigger: SensorThresholdAutomationTrigger(
             deviceId: triggerId,
             metric: _environmentMetric,
@@ -619,7 +589,6 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         draft = AutomationRuleDraft(
           name: _nameController.text.trim(),
           enabled: _enabled,
-          template: template,
           triggerDeviceId: triggerId,
           triggerDeviceType: triggerDeviceType,
           triggerEvent: triggerEvent,
@@ -757,84 +726,129 @@ class _NameField extends StatelessWidget {
   }
 }
 
-class _QuickTemplateSection extends StatelessWidget {
-  const _QuickTemplateSection({
-    required this.selected,
-    required this.isExpanded,
-    required this.onToggleExpanded,
-    required this.onChanged,
-  });
+/// Segmented selector for the rule kind (device trigger vs schedule). This
+/// replaces the old quick-template grid as the single switch between the two
+/// rule shapes the sheet supports.
+class _RuleKindSelector extends StatelessWidget {
+  const _RuleKindSelector({required this.kind, required this.onChanged});
 
-  final AutomationRuleTemplate? selected;
-  final bool isExpanded;
-  final VoidCallback onToggleExpanded;
-  final ValueChanged<AutomationRuleTemplate> onChanged;
+  final _RuleKind kind;
+  final ValueChanged<_RuleKind> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _FieldLabel(
-                label: l10n.quickTemplateLabel,
-                hint: selected?.label,
-              ),
-            ),
-            IconButton(
-              key: const Key('quick-template-toggle'),
-              tooltip: isExpanded
-                  ? l10n.collapseQuickTemplateTooltip
-                  : l10n.expandQuickTemplateTooltip,
-              onPressed: onToggleExpanded,
-              icon: Icon(
-                isExpanded ? Icons.expand_less : Icons.expand_more,
-                color: palette.textSecondary,
-              ),
-            ),
-          ],
+        Expanded(
+          child: _SegButton(
+            key: const ValueKey('rule-kind-deviceTrigger'),
+            label: l10n.ruleKindDeviceTrigger,
+            icon: Icons.sensors,
+            selected: kind == _RuleKind.deviceTrigger,
+            onTap: () => onChanged(_RuleKind.deviceTrigger),
+          ),
         ),
-        if (isExpanded) ...[
-          const SizedBox(height: 6),
-          _TemplateGrid(selected: selected, onChanged: onChanged),
-        ],
+        const SizedBox(width: 8),
+        Expanded(
+          child: _SegButton(
+            key: const ValueKey('rule-kind-schedule'),
+            label: l10n.ruleKindSchedule,
+            icon: Icons.schedule,
+            selected: kind == _RuleKind.schedule,
+            onTap: () => onChanged(_RuleKind.schedule),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _TemplateGrid extends StatelessWidget {
-  const _TemplateGrid({required this.selected, required this.onChanged});
+/// ON / OFF action selector for scheduled rules. The chosen command is applied
+/// to a direct-light target; scene targets activate the scene regardless.
+class _ScheduleActionSelector extends StatelessWidget {
+  const _ScheduleActionSelector({
+    required this.command,
+    required this.onChanged,
+  });
 
-  final AutomationRuleTemplate? selected;
-  final ValueChanged<AutomationRuleTemplate> onChanged;
+  final AutomationActionCommand command;
+  final ValueChanged<AutomationActionCommand> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final templates = AutomationVisuals.templateOrder;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cellWidth = (constraints.maxWidth - 8) / 2;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final template in templates)
-              SizedBox(
-                width: cellWidth,
-                child: TemplateCard(
-                  template: template,
-                  selected: selected == template,
-                  onTap: () => onChanged(template),
+    final l10n = AppLocalizations.of(context)!;
+    return _StateButtonRow(
+      children: [
+        _StateButton(
+          key: const ValueKey('schedule-action-on'),
+          label: l10n.turnOnLabel,
+          icon: Icons.lightbulb_outline,
+          selected: command == AutomationActionCommand.on,
+          onTap: () => onChanged(AutomationActionCommand.on),
+        ),
+        _StateButton(
+          key: const ValueKey('schedule-action-off'),
+          label: l10n.turnOffLabel,
+          icon: Icons.lightbulb,
+          selected: command == AutomationActionCommand.off,
+          onTap: () => onChanged(AutomationActionCommand.off),
+        ),
+      ],
+    );
+  }
+}
+
+/// Full-width segmented button used by [_RuleKindSelector].
+class _SegButton extends StatelessWidget {
+  const _SegButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final color = selected ? palette.primary : palette.textPrimary;
+    return Material(
+      color: selected ? palette.primaryTint : palette.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? palette.primary : palette.border,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-          ],
-        );
-      },
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1115,6 +1129,7 @@ class _StateButton extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    super.key,
   });
 
   final String label;

@@ -9,6 +9,7 @@ class DeviceApiModel {
     this.state = const <String, Object?>{},
     this.eui64,
     this.roomId,
+    this.sensorKind,
     this.name,
   });
 
@@ -23,6 +24,7 @@ class DeviceApiModel {
       deviceType: json['device_type'] as String,
       eui64: json['eui64'] as String?,
       roomId: json['room_id'] as String?,
+      sensorKind: (json['sensor_kind'] as num?)?.toInt(),
       name: json['name'] as String?,
       isOnline: json['is_online'] as bool? ?? false,
       state: state,
@@ -33,6 +35,7 @@ class DeviceApiModel {
   final String deviceType;
   final String? eui64;
   final String? roomId;
+  final int? sensorKind;
   final String? name;
   final bool isOnline;
   final Map<String, Object?> state;
@@ -52,6 +55,7 @@ class DeviceApiModel {
       deviceType: deviceType,
       eui64: eui64,
       roomId: roomId,
+      sensorKind: sensorKind,
       name: name == null || name!.isEmpty ? id : name!,
       isOnline: isOnline,
       power: power,

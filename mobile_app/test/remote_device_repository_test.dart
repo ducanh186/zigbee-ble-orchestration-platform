@@ -57,7 +57,7 @@ void main() {
     },
   );
 
-  test('maps partial environment state into typed sensor values', () async {
+  test('maps a v2 sensor (kind 2) into typed environment values', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
         baseUrl: 'https://dashboard.iot-building.app',
@@ -67,7 +67,8 @@ void main() {
               jsonEncode([
                 {
                   'id': 'environment-01',
-                  'device_type': 'environment',
+                  'device_type': 'sensor',
+                  'sensor_kind': 2,
                   'eui64': '00124b0001dht011',
                   'room_id': 'room-01',
                   'name': 'DHT11 Sensor',
@@ -102,9 +103,10 @@ void main() {
     final device = (await repository.fetchDevices()).single;
 
     expect(device.isEnvironment, isTrue);
+    expect(device.sensorKind, 2);
     expect(device.temperatureC, 28.5);
     expect(device.humidityPercent, 48);
-    expect(device.sensorKind, 'dht11');
+    expect(device.sensorLabel, 'dht11');
   });
 
   test(

@@ -1,16 +1,22 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.access_control import (
+    ensure_room_visible,
     get_manageable_device_or_404,
     get_visible_device_or_404,
     visible_device_clause,
 )
 from cloud.app.auth import get_current_user, require_parent_or_admin
+from cloud.app.command_execution import CommandExecutionError, execute_device_command
 from cloud.app.database import get_db
 from cloud.app.models import Command, Device, DeviceState, Event, Room, User
 from cloud.app.schemas import DeviceOut, DeviceStateOut, DeviceUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -71,14 +77,42 @@ async def update_device(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Update the user-facing device label only.
+    """Update the user-facing device label, and optionally move it to a room.
 
-    Gateway identity remains the immutable device id / EUI64.
+    Gateway identity remains the immutable device id / EUI64. When `room_id`
+    is provided it must reference a room in the caller's home.
     """
     device = await get_manageable_device_or_404(db, device_id, current_user)
-    device.name = body.name
+    if body.name is not None:
+        device.name = body.name
+    if body.room_id is not None:
+        room = await db.get(Room, body.room_id)
+        if room is None:
+            raise HTTPException(status_code=404, detail="Room not found")
+        await ensure_room_visible(db, room, current_user)
+        device.room_id = body.room_id
     await db.commit()
     await db.refresh(device)
+    if body.room_id is not None:
+        # The DB is the source of truth for room; pushing device.set_room to the
+        # gateway is a best-effort side effect (the gateway keeps room in RAM and
+        # is re-synced on its next online event). A publish failure must not fail
+        # the PATCH whose DB write already succeeded.
+        try:
+            await execute_device_command(
+                db,
+                device_id=device_id,
+                op="device.set_room",
+                target={"room_id": body.room_id},
+                timeout_ms=5000,
+                current_user=current_user,
+            )
+        except CommandExecutionError:
+            logger.exception(
+                "device.set_room publish failed for %s; room committed, "
+                "gateway will resync on next online",
+                device_id,
+            )
     return device
 
 

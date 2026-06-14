@@ -172,6 +172,13 @@ def translate_command_for_gateway(
             LightCommandTarget(**target)  # raises on bad input
         return op, target
 
+    # --- room assignment: valid for any device type ---
+    if op == "device.set_room":
+        room_id = target.get("room_id")
+        if not room_id:
+            raise ValueError("device.set_room requires a non-empty 'room_id' in target")
+        return "device.set_room", {"room_id": room_id}
+
     # --- user-friendly translation ---
     if device_type == "light":
         friendly = UserFriendlyLightTarget(**target)
@@ -209,6 +216,13 @@ def validate_reported_payload(device_type: str, inner: dict) -> dict | None:
         # switch reported is optional but validate if state present
         if device_type == "switch" and "state" in inner:
             SwitchReportedState(**inner.get("state", {}))
+        if device_type == "sensor" and inner.get("sensor_kind") == 2:
+            if "state" not in inner:
+                return None  # malformed kind-2 sensor report: state is required
+            # Validate temp/humi ranges only; sensor v2 omits `reachable`, inject True
+            # for the model. `inner` is returned unchanged — reachable extraction in
+            # _handle_reported defaults to True when absent. (I1 clarification.)
+            EnvironmentReportedState(**{**inner["state"], "reachable": True})
         return inner
     except Exception:
         return None
@@ -222,6 +236,8 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
     try:
         if device_type == "switch":
             return SwitchEventPayload(**inner).model_dump()
+        # motion/sensor events (incl. kind-1 occupancy reserved) have no
+        # kind-specific validation yet and pass through unchanged.
         return inner
     except Exception:
         return None
@@ -235,6 +251,7 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
 class DeviceOut(BaseModel):
     id: str
     device_type: str
+    sensor_kind: int | None = None
     eui64: str | None
     room_id: str | None
     name: str | None
@@ -251,7 +268,23 @@ class DeviceOut(BaseModel):
 
 
 class DeviceUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    # Both fields optional so a caller can rename, move room, or both. A
+    # room-only move must not be forced to re-send the current name.
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    room_id: str | None = None
+
+    @model_validator(mode="after")
+    def _require_one_field(self):
+        if self.name is None and self.room_id is None:
+            raise ValueError("DeviceUpdate requires at least one of: name, room_id")
+        return self
+
+
+class RoomOut(BaseModel):
+    id: str
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthLogin(BaseModel):
@@ -359,7 +392,9 @@ class GatewayStatusOut(BaseModel):
 class DeviceEventTrigger(BaseModel):
     type: Literal["device_event"] = "device_event"
     device_id: str = Field(min_length=1)
-    device_type: Literal["motion", "switch"]
+    # "sensor" is the v2 type (occupancy = sensor kind 1); "motion" kept for
+    # legacy rules created/cached before the device-model-v2 migration.
+    device_type: Literal["sensor", "motion", "switch"]
     event: Literal["occupancy_changed", "switch_toggle", "toggle"]
     state: dict[str, Any] = Field(default_factory=dict)
 
@@ -367,7 +402,9 @@ class DeviceEventTrigger(BaseModel):
 class SensorThresholdTrigger(BaseModel):
     type: Literal["sensor_threshold"]
     device_id: str = Field(min_length=1)
-    device_type: Literal["environment"]
+    # "sensor" is the v2 type (environment = sensor kind 2); "environment" kept
+    # for legacy rules created/cached before the device-model-v2 migration.
+    device_type: Literal["sensor", "environment"]
     metric: Literal["temperature_c", "humidity_percent"]
     operator: Literal["gte", "lte"]
     threshold: float
@@ -590,7 +627,7 @@ class ProvisioningErrorCode(str, Enum):
 
 class ProvisioningDevicePayload(BaseModel):
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
 
     @field_validator("eui64")
     @classmethod
@@ -602,7 +639,7 @@ class ProvisioningDevicePayload(BaseModel):
 
 class ProvisioningLabelCreate(BaseModel):
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
 
     @field_validator("eui64")
     @classmethod
@@ -627,7 +664,7 @@ class FactoryDeviceRegister(BaseModel):
 
     eui64: str
     install_code: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
     model: str | None = None
 
     @field_validator("eui64")
@@ -668,7 +705,7 @@ class ProvisioningSessionOut(BaseModel):
     gateway_id: str
     room_id: str
     eui64: str
-    device_type: Literal["light", "switch", "motion"]
+    device_type: Literal["light", "switch", "motion", "sensor"]
     model: str | None
     reason: str | None = None
     expires_at: datetime | None = None

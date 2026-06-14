@@ -9,6 +9,7 @@ class SmartDevice {
     required this.power,
     this.eui64,
     this.roomId,
+    this.sensorKind,
     this.reportedAt,
     this.state = const <String, Object?>{},
   });
@@ -18,19 +19,28 @@ class SmartDevice {
   final String name;
   final String? eui64;
   final String? roomId;
+  /// Device-model-v2 sensor slot: 1 = occupancy, 2 = environment (temp/humi).
+  /// Null for non-sensor devices and legacy rows.
+  final int? sensorKind;
   final bool isOnline;
   final DevicePower power;
   final String? reportedAt;
   final Map<String, Object?> state;
 
   bool get isLight => deviceType == 'light';
-  bool get isMotion => deviceType == 'motion';
-  bool get isEnvironment => deviceType == 'environment';
+  // Device-model-v2 unifies sensors under deviceType 'sensor' + sensorKind;
+  // the legacy 'motion'/'environment' types are still read for rows that
+  // predate the cloud migration (dual-read during rollout).
+  bool get isMotion =>
+      deviceType == 'sensor' ? sensorKind == 1 : deviceType == 'motion';
+  bool get isEnvironment =>
+      deviceType == 'sensor' ? sensorKind == 2 : deviceType == 'environment';
   bool get isReachable => isOnline && power != DevicePower.unreachable;
   double? get temperatureC => (state['temperature_c'] as num?)?.toDouble();
   double? get humidityPercent =>
       (state['humidity_percent'] as num?)?.toDouble();
-  String? get sensorKind => state['sensor']?.toString();
+  /// Free-form sensor model label from reported state (e.g. "dht11").
+  String? get sensorLabel => state['sensor']?.toString();
   String get roomLabel =>
       roomId == null || roomId!.isEmpty ? 'No room' : roomId!;
   OccupancyState get occupancy => OccupancyState.fromValue(
@@ -43,6 +53,7 @@ class SmartDevice {
     String? name,
     String? eui64,
     String? roomId,
+    int? sensorKind,
     bool? isOnline,
     DevicePower? power,
     String? reportedAt,
@@ -54,6 +65,7 @@ class SmartDevice {
       name: name ?? this.name,
       eui64: eui64 ?? this.eui64,
       roomId: roomId ?? this.roomId,
+      sensorKind: sensorKind ?? this.sensorKind,
       isOnline: isOnline ?? this.isOnline,
       power: power ?? this.power,
       reportedAt: reportedAt ?? this.reportedAt,

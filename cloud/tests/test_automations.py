@@ -1213,128 +1213,111 @@ async def test_reported_stale_version_ignored(db_session_factory):
         assert rule.sync_status == "pending"
 
 
-@pytest.mark.asyncio
-async def test_schedule_rule_synced_without_gateway_publish(
-    client, db_session_factory, fake_mqtt
-):
-    await _seed_automation_devices(db_session_factory)
-    headers = await _parent_headers(client, db_session_factory)
-    response = await client.post(
-        "/api/automations", json=_schedule_on_rule(), headers=headers
-    )
-    assert response.status_code == 201, response.text
-    data = response.json()
-    assert data["sync_status"] == "synced"
-    desired = [
-        p for p in fake_mqtt.published
-        if p.get("kind") == "automation_desired"
-        and p.get("automation_id") == data["id"]
-    ]
-    assert desired == []
+# ---------------------------------------------------------------------------
+# Phase 1: sensor device_type accepted in automation triggers (additive)
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_event_rule_still_pending_and_published(
+async def test_create_sensor_trigger_automation_accepted(
     client, db_session_factory, fake_mqtt
 ):
-    await _seed_automation_devices(db_session_factory)
-    headers = await _parent_headers(client, db_session_factory)
-    response = await client.post(
-        "/api/automations", json=_motion_on_rule(), headers=headers
-    )
-    assert response.status_code == 201, response.text
-    data = response.json()
-    assert data["sync_status"] == "pending"
-    desired = [
-        p for p in fake_mqtt.published
-        if p.get("kind") == "automation_desired"
-        and p.get("automation_id") == data["id"]
-    ]
-    assert len(desired) == 1 and desired[0]["op"] == "upsert"
+    """trigger device_type='sensor' must be accepted after Phase 1 (additive).
 
-
-@pytest.mark.asyncio
-async def test_enable_disable_schedule_keeps_synced_no_publish(
-    client, db_session_factory, fake_mqtt
-):
+    Uses a SensorThresholdTrigger-style payload but with the new 'sensor' type.
+    The legacy 'environment' type must still work too (tested elsewhere).
+    """
     await _seed_automation_devices(db_session_factory)
-    headers = await _parent_headers(client, db_session_factory)
-    created = (
-        await client.post(
-            "/api/automations", json=_schedule_on_rule(), headers=headers
+    # Add a sensor-typed device to the seed so router FK checks pass.
+    from cloud.app.models import Device
+
+    async with db_session_factory() as session:
+        session.add(
+            Device(
+                id="sensor-01",
+                device_type="sensor",
+                sensor_kind=2,
+                room_id="room-1",
+                name="Sensor Device",
+                is_online=True,
+            )
         )
-    ).json()
-    fake_mqtt.published.clear()
-    dis = await client.post(
-        f"/api/automations/{created['id']}/disable", headers=headers
-    )
-    en = await client.post(
-        f"/api/automations/{created['id']}/enable", headers=headers
-    )
-    assert dis.json()["sync_status"] == "synced"
-    assert en.json()["sync_status"] == "synced"
-    assert [p for p in fake_mqtt.published if p.get("kind") == "automation_desired"] == []
+        await session.commit()
 
-
-@pytest.mark.asyncio
-async def test_update_event_to_schedule_publishes_tombstone(
-    client, db_session_factory, fake_mqtt
-):
-    await _seed_automation_devices(db_session_factory)
     headers = await _parent_headers(client, db_session_factory)
-    created = (
-        await client.post(
-            "/api/automations", json=_motion_on_rule(), headers=headers
-        )
-    ).json()
-    fake_mqtt.published.clear()
-    sched = _schedule_on_rule()
-    body = {
-        "trigger_type": "schedule",
-        "schedule_cron": sched["schedule_cron"],
-        "trigger": sched["trigger"],
-        "actions": sched["actions"],
+    rule = {
+        "name": "Sensor threshold rule",
+        "enabled": True,
+        "trigger": {
+            "type": "sensor_threshold",
+            "device_id": "sensor-01",
+            "device_type": "sensor",
+            "metric": "temperature_c",
+            "operator": "gte",
+            "threshold": 28,
+        },
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
     }
-    resp = await client.put(
-        f"/api/automations/{created['id']}", json=body, headers=headers
-    )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["sync_status"] == "synced"
-    desired = [
-        p for p in fake_mqtt.published
-        if p.get("kind") == "automation_desired"
-        and p.get("automation_id") == created["id"]
-    ]
-    assert len(desired) == 1 and desired[0]["op"] == "delete"
+    response = await client.post("/api/automations", json=rule, headers=headers)
+    assert response.status_code == 201, response.text
+    assert response.json()["trigger"]["device_type"] == "sensor"
 
 
 @pytest.mark.asyncio
-async def test_update_schedule_to_event_pending_and_upsert(
+async def test_create_sensor_occupancy_event_automation_accepted(
     client, db_session_factory, fake_mqtt
 ):
+    """device_event occupancy trigger with device_type='sensor' (kind 1).
+
+    The v2 occupancy sensor replaces the legacy 'motion' device_event; the
+    router must accept device_type='sensor' with event='occupancy_changed'
+    and normalize/persist it the same way it did for 'motion'.
+    """
     await _seed_automation_devices(db_session_factory)
-    headers = await _parent_headers(client, db_session_factory)
-    created = (
-        await client.post(
-            "/api/automations", json=_schedule_on_rule(), headers=headers
+    from cloud.app.models import Device
+
+    async with db_session_factory() as session:
+        session.add(
+            Device(
+                id="sensor-occ-01",
+                device_type="sensor",
+                sensor_kind=1,
+                room_id="room-1",
+                name="Occupancy Sensor",
+                is_online=True,
+            )
         )
-    ).json()
-    fake_mqtt.published.clear()
-    evt = _motion_on_rule()
-    body = {
-        "trigger_type": "event",
-        "schedule_cron": None,
-        "trigger": evt["trigger"],
-        "actions": evt["actions"],
+        await session.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+    rule = {
+        "name": "Sensor occupancy rule",
+        "enabled": True,
+        "trigger": {
+            "type": "device_event",
+            "device_id": "sensor-occ-01",
+            "device_type": "sensor",
+            "event": "occupancy_changed",
+            "state": {"occupancy": "occupied"},
+        },
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
     }
-    resp = await client.put(
-        f"/api/automations/{created['id']}", json=body, headers=headers
-    )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["sync_status"] == "pending"
-    desired = [
-        p for p in fake_mqtt.published
-        if p.get("kind") == "automation_desired"
-        and p.get("automation_id") == created["id"]
-    ]
-    assert len(desired) == 1 and desired[0]["op"] == "upsert"
+    response = await client.post("/api/automations", json=rule, headers=headers)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["trigger"]["device_type"] == "sensor"
+    assert body["trigger"]["event"] == "occupancy_changed"

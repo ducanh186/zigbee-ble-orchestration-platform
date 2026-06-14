@@ -8,6 +8,7 @@ import '../../../../domain/models/command_status.dart';
 import '../../../../domain/models/cloud_status.dart';
 import '../../../../domain/models/device_power.dart';
 import '../../../../domain/models/event_log.dart';
+import '../../../../domain/models/room.dart';
 import '../../../../domain/models/smart_device.dart';
 import '../../../../domain/repositories/device_repository.dart';
 
@@ -18,6 +19,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   final DeviceRepository _repository;
 
   List<SmartDevice> _devices = [];
+  List<Room> _rooms = [];
   List<EventLog> _events = [];
   final Map<String, List<EventLog>> _deviceEvents = {};
   final Set<String> _loadingEventDeviceIds = {};
@@ -30,8 +32,10 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   CommandResult? _lastCommand;
   DevicePower? _lastTarget;
   bool _isRenamingDevice = false;
+  bool _isMovingDevice = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
+  List<Room> get rooms => List.unmodifiable(_rooms);
   List<SmartDevice> get lights =>
       _devices.where((device) => device.isLight).toList(growable: false);
   List<EventLog> get events => List.unmodifiable(_events);
@@ -41,6 +45,21 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   CommandResult? get lastCommand => _lastCommand;
   DevicePower? get lastTarget => _lastTarget;
   bool get isRenamingDevice => _isRenamingDevice;
+  bool get isMovingDevice => _isMovingDevice;
+
+  /// Human-readable room name for a device's [roomId], falling back to the raw
+  /// id (then "No room") when the room list hasn't loaded or has no match.
+  String roomNameFor(String? roomId) {
+    if (roomId == null || roomId.isEmpty) {
+      return 'No room';
+    }
+    for (final room in _rooms) {
+      if (room.id == roomId) {
+        return room.name;
+      }
+    }
+    return roomId;
+  }
 
   int get onlineCount => _devices.where((device) => device.isOnline).length;
   int get lightsOnCount =>
@@ -82,6 +101,13 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       _devices = devices;
       _events = events;
       _deviceEvents.clear();
+      // Rooms are optional metadata; a backend without /api/rooms (pre-v2)
+      // must not blank the dashboard, so failures here are swallowed.
+      try {
+        _rooms = await _repository.fetchRooms();
+      } catch (_) {
+        _rooms = const [];
+      }
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
       _errorMessage = friendlyErrorMessage(
@@ -188,6 +214,35 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
     } finally {
       _isRenamingDevice = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> moveDevice(SmartDevice device, String roomId) async {
+    if (roomId == device.roomId || _isMovingDevice) {
+      return;
+    }
+
+    _isMovingDevice = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final moved = await _repository.moveDeviceToRoom(
+        deviceId: device.id,
+        roomId: roomId,
+      );
+      final index = _devices.indexWhere((item) => item.id == device.id);
+      if (index != -1) {
+        _devices[index] = _devices[index].copyWith(roomId: moved.roomId);
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not move device to room',
+      );
+    } finally {
+      _isMovingDevice = false;
       notifyListeners();
     }
   }

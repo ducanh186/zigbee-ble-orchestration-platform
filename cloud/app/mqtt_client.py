@@ -240,6 +240,7 @@ class MQTTService:
                             "device_type",
                             device_type,
                         ),
+                        sensor_kind=normalized_inner.get("sensor_kind"),
                         eui64=normalized_inner.get("eui64"),
                         name=device_id,
                         is_online=reachable,
@@ -251,9 +252,11 @@ class MQTTService:
                     device.last_seen_at = last_seen
                     if normalized_inner.get("eui64"):
                         device.eui64 = normalized_inner["eui64"]
+                    if normalized_inner.get("sensor_kind") is not None:
+                        device.sensor_kind = normalized_inner.get("sensor_kind")
 
                 state = normalized_inner.get("state", normalized_inner)
-                if device_type == "environment":
+                if device_type in {"environment", "sensor"}:
                     previous = (
                         await session.execute(
                             select(DeviceState)
@@ -347,6 +350,7 @@ class MQTTService:
                         id=device_id,
                         device_type=validated.get("device_type", device_type),
                         eui64=validated.get("eui64"),
+                        sensor_kind=validated.get("sensor_kind"),
                         name=device_id,
                         is_online=True,
                         last_seen_at=last_seen,
@@ -357,6 +361,8 @@ class MQTTService:
                 else:
                     device.is_online = True
                     device.last_seen_at = last_seen
+                    if validated.get("sensor_kind") is not None and device.sensor_kind is None:
+                        device.sensor_kind = validated.get("sensor_kind")
 
                 event = Event(
                     device_id=device_id,
@@ -368,7 +374,7 @@ class MQTTService:
                 )
                 session.add(event)
                 if (
-                    device_type == "motion"
+                    device_type in {"motion", "sensor"}
                     and validated.get("event") == "occupancy_changed"
                     and validated.get("occupancy") in {"occupied", "unoccupied"}
                 ):
@@ -529,7 +535,8 @@ class MQTTService:
         async def _write():
             if not self._db_session_factory:
                 return
-            from cloud.app.models import Event
+            from cloud.app.models import Device, Event
+            from sqlalchemy import select
 
             payload = dict(inner)
             payload["gateway_id"] = envelope.get("gateway_id")
@@ -543,6 +550,27 @@ class MQTTService:
                 )
                 session.add(event)
                 await session.commit()
+
+                # Re-push room assignments so the gateway (which keeps room in
+                # RAM only) is back in sync after a reconnect.
+                if status == "online":
+                    roomed_devices = (
+                        await session.execute(
+                            select(Device).where(Device.room_id.isnot(None))
+                        )
+                    ).scalars().all()
+                    for device in roomed_devices:
+                        try:
+                            self.publish_command(
+                                command_id=uuid4().hex,
+                                device_id=device.id,
+                                op="device.set_room",
+                                target={"room_id": device.room_id},
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Failed to re-push room for device %s", device.id
+                            )
 
         self._run_async(_write)
 

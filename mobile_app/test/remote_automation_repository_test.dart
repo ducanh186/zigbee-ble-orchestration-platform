@@ -110,7 +110,7 @@ void main() {
         'trigger': {
           'type': 'device_event',
           'device_id': 'pir-01',
-          'device_type': 'motion',
+          'device_type': 'sensor',
           'event': 'occupancy_changed',
           'state': {'occupancy': 'occupied'},
         },
@@ -293,7 +293,7 @@ void main() {
     expect(capturedBody!['trigger'], {
       'type': 'device_event',
       'device_id': 'pir-01',
-      'device_type': 'motion',
+      'device_type': 'sensor',
       'event': 'occupancy_changed',
       'state': {'occupancy': 'occupied'},
     });
@@ -407,7 +407,7 @@ void main() {
     expect(capturedBody!['trigger'], {
       'type': 'device_event',
       'device_id': 'pir-01',
-      'device_type': 'motion',
+      'device_type': 'sensor',
       'event': 'occupancy_changed',
       'state': {'occupancy': 'unoccupied'},
     });

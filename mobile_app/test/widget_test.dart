@@ -255,13 +255,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATE RULE'), findsOneWidget);
-    expect(find.text('QUICK TEMPLATE'), findsOneWidget);
-    expect(find.text('Switch toggles one light'), findsNothing);
+    expect(find.text('RULE TYPE'), findsOneWidget);
+    expect(find.byKey(const ValueKey('rule-kind-schedule')), findsOneWidget);
     expect(find.text('Save rule'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
+    // Switching to the schedule rule type reveals the period chips.
+    await tester.tap(find.byKey(const ValueKey('rule-kind-schedule')));
     await tester.pumpAndSettle();
-    expect(find.text('Switch toggles one light'), findsOneWidget);
+    expect(find.byKey(const ValueKey('schedule-mode-daily')), findsOneWidget);
 
     // Dismiss via Cancel to confirm Cancel works.
     await tester.tap(find.text('Cancel'));

@@ -728,23 +728,23 @@ abstract class AppLocalizations {
   /// **'e.g. Motion turns on lab lights'**
   String get ruleNameHint;
 
-  /// No description provided for @quickTemplateLabel.
+  /// No description provided for @ruleKindLabel.
   ///
   /// In en, this message translates to:
-  /// **'Quick template'**
-  String get quickTemplateLabel;
+  /// **'Rule type'**
+  String get ruleKindLabel;
 
-  /// No description provided for @expandQuickTemplateTooltip.
+  /// No description provided for @ruleKindDeviceTrigger.
   ///
   /// In en, this message translates to:
-  /// **'Expand quick template'**
-  String get expandQuickTemplateTooltip;
+  /// **'Device trigger'**
+  String get ruleKindDeviceTrigger;
 
-  /// No description provided for @collapseQuickTemplateTooltip.
+  /// No description provided for @ruleKindSchedule.
   ///
   /// In en, this message translates to:
-  /// **'Collapse quick template'**
-  String get collapseQuickTemplateTooltip;
+  /// **'Schedule'**
+  String get ruleKindSchedule;
 
   /// No description provided for @triggerDeviceLabel.
   ///
@@ -1172,6 +1172,24 @@ abstract class AppLocalizations {
   /// **'Room'**
   String get roomLabel;
 
+  /// No description provided for @moveRoomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move room'**
+  String get moveRoomLabel;
+
+  /// No description provided for @moveRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to room'**
+  String get moveRoomTitle;
+
+  /// No description provided for @noRoomsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No rooms available'**
+  String get noRoomsAvailable;
+
   /// No description provided for @occupancyLabel.
   ///
   /// In en, this message translates to:
@@ -1592,12 +1610,6 @@ abstract class AppLocalizations {
   /// **'Humidity'**
   String get humidityLabel;
 
-  /// No description provided for @zigbeeLocalLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Zigbee local'**
-  String get zigbeeLocalLabel;
-
   /// No description provided for @sensorConditionLabel.
   ///
   /// In en, this message translates to:
@@ -1663,6 +1675,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Schedule'**
   String get scheduleTriggerLabel;
+
+  /// No description provided for @scheduleActionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get scheduleActionLabel;
 
   /// No description provided for @scheduleModeHourly.
   ///

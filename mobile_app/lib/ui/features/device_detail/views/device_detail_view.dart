@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../domain/models/command_status.dart';
 import '../../../../domain/models/device_power.dart';
 import '../../../../domain/models/event_log.dart';
+import '../../../../domain/models/room.dart';
 import '../../../../domain/models/smart_device.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../l10n/localized_error_message.dart';
@@ -83,6 +84,13 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
                   icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
+                  tooltip: l10n.moveRoomLabel,
+                  onPressed: viewModel.isMovingDevice
+                      ? null
+                      : () => _moveDevice(context, viewModel, current),
+                  icon: const Icon(Icons.drive_file_move_outlined),
+                ),
+                IconButton(
                   tooltip: l10n.refreshTooltip,
                   onPressed: () => _refresh(viewModel, current.id),
                   icon: const Icon(Icons.refresh),
@@ -99,7 +107,10 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
                     _LastCommandCard(viewModel: viewModel),
                   ] else ...[
                     const SizedBox(height: 12),
-                    _DeviceInfoCard(device: current),
+                    _DeviceInfoCard(
+                      device: current,
+                      roomName: viewModel.roomNameFor(current.roomId),
+                    ),
                   ],
                   if (current.isMotion) ...[
                     const SizedBox(height: 18),
@@ -143,6 +154,81 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
       return;
     }
     await viewModel.renameDevice(device, name);
+  }
+
+  Future<void> _moveDevice(
+    BuildContext context,
+    DeviceDashboardViewModel viewModel,
+    SmartDevice device,
+  ) async {
+    final roomId = await showDialog<String>(
+      context: context,
+      builder: (_) => _MoveRoomDialog(
+        rooms: viewModel.rooms,
+        selectedRoomId: device.roomId,
+      ),
+    );
+    if (!mounted || roomId == null) {
+      return;
+    }
+    await viewModel.moveDevice(device, roomId);
+  }
+}
+
+class _MoveRoomDialog extends StatefulWidget {
+  const _MoveRoomDialog({required this.rooms, required this.selectedRoomId});
+
+  final List<Room> rooms;
+  final String? selectedRoomId;
+
+  @override
+  State<_MoveRoomDialog> createState() => _MoveRoomDialogState();
+}
+
+class _MoveRoomDialogState extends State<_MoveRoomDialog> {
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.selectedRoomId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.moveRoomTitle),
+      content: widget.rooms.isEmpty
+          ? Text(l10n.noRoomsAvailable)
+          : RadioGroup<String>(
+              groupValue: _selected,
+              onChanged: (value) => setState(() => _selected = value),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final room in widget.rooms)
+                    RadioListTile<String>(
+                      key: ValueKey('move-room-${room.id}'),
+                      title: Text(room.name),
+                      value: room.id,
+                    ),
+                ],
+              ),
+            ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancelLabel),
+        ),
+        FilledButton(
+          onPressed: (_selected == null || widget.rooms.isEmpty)
+              ? null
+              : () => Navigator.of(context).pop(_selected),
+          child: Text(l10n.saveLabel),
+        ),
+      ],
+    );
   }
 }
 
@@ -239,7 +325,7 @@ class _DeviceHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '${device.id} - ${device.roomLabel}',
+            '${device.id} - ${viewModel.roomNameFor(device.roomId)}',
             style: TextStyle(
               color: palette.textSecondary,
               fontFamily: 'JetBrains Mono',
@@ -315,7 +401,7 @@ class _DeviceHeroCard extends StatelessWidget {
         device.power == DevicePower.on
             ? Icons.lightbulb
             : Icons.lightbulb_outline,
-      'motion' => Icons.sensors,
+      'motion' || 'sensor' => Icons.sensors,
       'switch' => Icons.toggle_off,
       _ => Icons.hub_outlined,
     };
@@ -323,9 +409,10 @@ class _DeviceHeroCard extends StatelessWidget {
 }
 
 class _DeviceInfoCard extends StatelessWidget {
-  const _DeviceInfoCard({required this.device});
+  const _DeviceInfoCard({required this.device, required this.roomName});
 
   final SmartDevice device;
+  final String roomName;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +426,7 @@ class _DeviceInfoCard extends StatelessWidget {
             label: l10n.statusLabel,
             value: device.isOnline ? l10n.onlineLabel : l10n.offlineLabel,
           ),
-          _InfoRow(label: l10n.roomLabel, value: device.roomLabel),
+          _InfoRow(label: l10n.roomLabel, value: roomName),
           if (device.isMotion)
             _InfoRow(
               label: l10n.occupancyLabel,
