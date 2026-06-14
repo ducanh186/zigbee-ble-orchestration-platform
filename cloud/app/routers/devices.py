@@ -9,6 +9,7 @@ from cloud.app.access_control import (
     visible_device_clause,
 )
 from cloud.app.auth import get_current_user, require_parent_or_admin
+from cloud.app.command_execution import execute_device_command
 from cloud.app.database import get_db
 from cloud.app.models import Command, Device, DeviceState, Event, Room, User
 from cloud.app.schemas import DeviceOut, DeviceStateOut, DeviceUpdate
@@ -87,6 +88,15 @@ async def update_device(
         device.room_id = body.room_id
     await db.commit()
     await db.refresh(device)
+    if body.room_id is not None:
+        await execute_device_command(
+            db,
+            device_id=device_id,
+            op="device.set_room",
+            target={"room_id": body.room_id},
+            timeout_ms=5000,
+            current_user=current_user,
+        )
     return device
 
 

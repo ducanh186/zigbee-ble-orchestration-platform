@@ -263,6 +263,57 @@ async def test_update_device_requires_parent_or_admin(
 
 
 @pytest.mark.asyncio
+async def test_patch_room_publishes_set_room_command(
+    client, seed_light, db_session_factory, fake_mqtt
+):
+    """Moving a device to a room should publish device.set_room via MQTT."""
+    from cloud.app.models import Room
+
+    async with db_session_factory() as s:
+        s.add(Room(id="room-2", home_id="home-1", name="Bedroom"))
+        await s.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Main Light", "room_id": "room-2"},
+    )
+    assert r.status_code == 200
+    assert r.json()["room_id"] == "room-2"
+
+    set_room_entries = [
+        e for e in fake_mqtt.published if e["op"] == "device.set_room"
+    ]
+    assert len(set_room_entries) == 1
+    entry = set_room_entries[0]
+    assert entry["device_id"] == seed_light
+    assert entry["target"] == {"room_id": "room-2"}
+
+
+@pytest.mark.asyncio
+async def test_patch_name_only_does_not_publish_set_room(
+    client, seed_light, db_session_factory, fake_mqtt
+):
+    """Renaming a device (no room_id change) must NOT publish device.set_room."""
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Renamed Light"},
+    )
+    assert r.status_code == 200
+    assert r.json()["room_id"] == "room-1"
+
+    set_room_entries = [
+        e for e in fake_mqtt.published if e["op"] == "device.set_room"
+    ]
+    assert set_room_entries == []
+
+
+@pytest.mark.asyncio
 async def test_device_out_includes_sensor_kind(client, db_session_factory):
     from cloud.app.models import Device, Home, Room
 
