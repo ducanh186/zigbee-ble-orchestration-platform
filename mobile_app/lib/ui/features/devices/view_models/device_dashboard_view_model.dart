@@ -256,9 +256,11 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     }
   }
 
-  // Short backoff so a confirmed command settles fast; the device is already
-  // showing the optimistic state, so this only reconciles / reverts.
-  static const _pollBackoffMs = [250, 400, 600, 800, 1000];
+  // Short backoff so a confirmed command settles fast and the button frees up
+  // again quickly; the device already shows the optimistic state, so this only
+  // reconciles / reverts. First poll is tight (gateway often replies in
+  // ~150ms); it widens to cap total wait near 3s before declaring a timeout.
+  static const _pollBackoffMs = [150, 300, 500, 800, 1200];
 
   Future<void> _pollCommand(
     String deviceId,
