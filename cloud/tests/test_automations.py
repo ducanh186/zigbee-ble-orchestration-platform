@@ -1212,3 +1212,56 @@ async def test_create_sensor_trigger_automation_accepted(
     response = await client.post("/api/automations", json=rule, headers=headers)
     assert response.status_code == 201, response.text
     assert response.json()["trigger"]["device_type"] == "sensor"
+
+
+@pytest.mark.asyncio
+async def test_create_sensor_occupancy_event_automation_accepted(
+    client, db_session_factory, fake_mqtt
+):
+    """device_event occupancy trigger with device_type='sensor' (kind 1).
+
+    The v2 occupancy sensor replaces the legacy 'motion' device_event; the
+    router must accept device_type='sensor' with event='occupancy_changed'
+    and normalize/persist it the same way it did for 'motion'.
+    """
+    await _seed_automation_devices(db_session_factory)
+    from cloud.app.models import Device
+
+    async with db_session_factory() as session:
+        session.add(
+            Device(
+                id="sensor-occ-01",
+                device_type="sensor",
+                sensor_kind=1,
+                room_id="room-1",
+                name="Occupancy Sensor",
+                is_online=True,
+            )
+        )
+        await session.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+    rule = {
+        "name": "Sensor occupancy rule",
+        "enabled": True,
+        "trigger": {
+            "type": "device_event",
+            "device_id": "sensor-occ-01",
+            "device_type": "sensor",
+            "event": "occupancy_changed",
+            "state": {"occupancy": "occupied"},
+        },
+        "actions": [
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+    }
+    response = await client.post("/api/automations", json=rule, headers=headers)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["trigger"]["device_type"] == "sensor"
+    assert body["trigger"]["event"] == "occupancy_changed"

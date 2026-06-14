@@ -153,6 +153,12 @@ async def _validate_rule_template(
         else:
             raise HTTPException(status_code=422, detail="Unsupported trigger type")
 
+        # _require_device matches the live DB row's device_type exactly. This is
+        # by design under the device-model-v2 hard cutover: once the migration
+        # has run, every sensor row is device_type="sensor", so a NEW rule must
+        # use "sensor" (a stale client still sending "motion"/"environment" is
+        # correctly rejected here). Legacy literals stay accepted upstream only
+        # to keep the deploy window safe (code ships before the migration runs).
         await _require_device(
             db,
             trigger_device_id,
