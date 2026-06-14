@@ -109,15 +109,12 @@ class AutomationViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // A successful DELETE (HTTP 2xx) means the request was accepted; reflect
+      // whatever the backend now returns. Do not treat a still-present rule as
+      // an error — the cloud removes the row and tells the gateway, but a
+      // deferring/eventually-consistent backend must not surface a false error.
       await _repository.deleteRule(ruleId);
-      final refreshedRules = await _repository.fetchRules();
-      if (refreshedRules.any((rule) => rule.id == ruleId)) {
-        _rules = refreshedRules;
-        _errorMessage =
-            'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.';
-        return;
-      }
-      _rules = refreshedRules;
+      _rules = await _repository.fetchRules();
     } catch (error) {
       _errorMessage = friendlyErrorMessage(
         error,

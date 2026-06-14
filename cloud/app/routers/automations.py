@@ -5,7 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.access_control import (
@@ -18,8 +18,7 @@ from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.models import Automation, Device, User
-from cloud.app.mqtt_client import mqtt_service
+from cloud.app.models import Automation, AutomationEvent, Device, User
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
@@ -404,25 +403,38 @@ async def delete_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Publish retained tombstone; keep row in DB until gateway acks.
+    """Hard-delete the rule and publish a retained delete tombstone.
 
-    DB strategy: we do **not** hard-delete here. Instead we bump `version`,
-    set `sync_status="pending"`, and publish op=delete tombstone. The row is
-    hard-deleted by `_handle_automation_reported` when the gateway acks with
-    `sync_status="deleted"`. This keeps the wire contract clean (cloud is the
-    source of truth for desired state, gateway confirms apply) without adding
-    a soft-delete column. Status after this endpoint returns is still
-    `pending` until gateway responds.
+    The gateway is still told to drop the rule from its desired set (retained
+    `op=delete` tombstone, version bumped), but the cloud row is removed
+    immediately rather than waiting for a gateway ack. Earlier this endpoint
+    kept the row `pending` until `_handle_automation_reported` saw
+    `sync_status="deleted"`; if the gateway never acked (e.g. offline / command
+    timeout) the rule lingered forever and the app reported a delete failure.
+    Cloud is the source of truth for desired state, so removing the row here is
+    deterministic; the tombstone keeps the gateway eventually consistent.
     """
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     await ensure_automation_visible(db, rule, current_user)
 
+    # Bump version + publish the delete tombstone so the gateway drops it.
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
     mark_sync_pending(rule, "automation.delete")
-    await db.commit()
-    await db.refresh(rule)
     _publish_delete(rule)
-    return rule
+
+    # Snapshot the response payload before the row is gone.
+    response = AutomationOut.model_validate(rule)
+
+    # Remove FK-referencing audit rows first (no ON DELETE cascade), then the
+    # rule itself.
+    await db.execute(
+        delete(AutomationEvent).where(
+            AutomationEvent.automation_id == automation_id
+        )
+    )
+    await db.delete(rule)
+    await db.commit()
+    return response

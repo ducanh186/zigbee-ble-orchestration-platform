@@ -138,7 +138,7 @@ void main() {
   });
 
   test(
-    'deleteRule surfaces an error when cloud reload still returns deleted rule',
+    'deleteRule does not surface a false error if the backend defers removal',
     () async {
       final repository = _FakeAutomationRepository(
         initialRules: [_rule(syncStatus: AutomationSyncStatus.synced)],
@@ -151,11 +151,10 @@ void main() {
 
       expect(repository.deletedRuleIds, ['automation-01']);
       expect(repository.fetchRulesCount, 2);
-      expect(viewModel.rules.single.id, 'automation-01');
-      expect(
-        viewModel.errorMessage,
-        'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.',
-      );
+      // A successful DELETE is accepted even if the rule is still returned;
+      // no false "cloud hasn't deleted" error.
+      expect(viewModel.errorMessage, isNull);
+      expect(viewModel.rules.map((rule) => rule.id), ['automation-01']);
     },
   );
 
