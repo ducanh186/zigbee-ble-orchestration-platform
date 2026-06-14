@@ -54,6 +54,12 @@ def _publish_delete(rule: Automation) -> None:
     )
 
 
+def _syncs_to_gateway(rule: Automation) -> bool:
+    """Only event rules are pushed to the gateway. Schedule rules execute
+    entirely cloud-side (the gateway has no cron), so they are never synced."""
+    return rule.trigger_type == "event"
+
+
 def _require_string(payload: dict[str, Any], field: str) -> str:
     value = payload.get(field)
     if not isinstance(value, str) or not value:
@@ -289,11 +295,16 @@ async def create_automation(
         last_run_status="never_run",
         last_error=None,
     )
-    mark_sync_pending(rule, "automation.upsert")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.upsert")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -310,10 +321,17 @@ async def _set_enabled(
     rule.enabled = enabled
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.enable" if enabled else "automation.disable")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(
+            rule, "automation.enable" if enabled else "automation.disable"
+        )
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -348,6 +366,8 @@ async def update_automation(
     await ensure_automation_visible(db, rule, current_user)
     if body.version is not None and body.version != rule.version:
         raise HTTPException(status_code=409, detail="Automation version conflict")
+
+    was_syncing = _syncs_to_gateway(rule)
 
     # If trigger or actions change, re-validate the resulting rule body. We
     # validate against the *merged* values so partial updates still get the
@@ -390,10 +410,19 @@ async def update_automation(
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.update")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.update")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
+    elif was_syncing:
+        # Converted event -> schedule: clear the stale retained desired so the
+        # gateway stops executing the old event rule (cloud now owns execution).
+        _publish_delete(rule)
     return rule
 
 
@@ -403,33 +432,33 @@ async def delete_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Hard-delete the rule and publish a retained delete tombstone.
+    """Delete an automation; removed immediately, never waits on the gateway.
 
-    The gateway is still told to drop the rule from its desired set (retained
-    `op=delete` tombstone, version bumped), but the cloud row is removed
-    immediately rather than waiting for a gateway ack. Earlier this endpoint
-    kept the row `pending` until `_handle_automation_reported` saw
-    `sync_status="deleted"`; if the gateway never acked (e.g. offline / command
-    timeout) the rule lingered forever and the app reported a delete failure.
-    Cloud is the source of truth for desired state, so removing the row here is
-    deterministic; the tombstone keeps the gateway eventually consistent.
+    Deleting is fully cloud-side and deterministic — the DB row (and its child
+    automation_events) is hard-deleted right away, so the app sees it gone and
+    delete never hangs on a gateway ack (the original "rule won't delete" bug).
+    Event rules — the only ones the gateway knows about — additionally get a
+    retained op=delete tombstone so the gateway drops them on its next sync,
+    using the mechanism it already has (no firmware change). Schedule rules run
+    cloud-side and are never synced, so they need no tombstone.
     """
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     await ensure_automation_visible(db, rule, current_user)
 
-    # Bump version + publish the delete tombstone so the gateway drops it.
-    rule.version = (rule.version or 0) + 1
-    rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.delete")
-    _publish_delete(rule)
+    # Tell the gateway to drop it — only event rules are synced there.
+    if _syncs_to_gateway(rule):
+        rule.version = (rule.version or 0) + 1
+        rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        _publish_delete(rule)
 
-    # Snapshot the response payload before the row is gone.
+    # Snapshot the response before the row is gone (expire_on_commit=False keeps
+    # the instance readable, but a snapshot is explicit and safe).
     response = AutomationOut.model_validate(rule)
 
-    # Remove FK-referencing audit rows first (no ON DELETE cascade), then the
-    # rule itself.
+    # Hard-delete now regardless of any gateway ack. Remove FK-referencing audit
+    # rows first (no ON DELETE cascade on automation_events.automation_id).
     await db.execute(
         delete(AutomationEvent).where(
             AutomationEvent.automation_id == automation_id

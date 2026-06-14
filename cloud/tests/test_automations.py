@@ -363,7 +363,7 @@ async def test_delete_automation_hard_deletes_and_publishes_tombstone(
 
 
 @pytest.mark.asyncio
-async def test_delete_automation_removes_audit_events(
+async def test_delete_event_rule_hard_deletes_clears_events_and_tombstones(
     client, db_session_factory, fake_mqtt
 ):
     from datetime import datetime
@@ -379,33 +379,92 @@ async def test_delete_automation_removes_audit_events(
             "/api/automations", json=_motion_on_rule(), headers=headers
         )
     ).json()
-
-    async with db_session_factory() as s:
-        s.add(
+    async with db_session_factory() as session:
+        session.add(
             AutomationEvent(
                 automation_id=created["id"],
-                event_type="executed",
-                status="ok",
-                payload={"k": "v"},
+                event_type="automation_executed",
+                payload={"result": "ok"},
                 occurred_at=datetime(2026, 6, 14, 10, 0),
             )
         )
-        await s.commit()
+        await session.commit()
+    fake_mqtt.published.clear()
 
-    delete_response = await client.delete(
+    resp = await client.delete(
         f"/api/automations/{created['id']}", headers=headers
     )
-    assert delete_response.status_code == 200
-
-    async with db_session_factory() as s:
-        events = (
-            await s.execute(
+    assert resp.status_code == 200, resp.text
+    # Hard-deleted immediately, no waiting on a gateway ack.
+    missing = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert missing.status_code == 404
+    async with db_session_factory() as session:
+        rows = (
+            await session.execute(
                 select(AutomationEvent).where(
                     AutomationEvent.automation_id == created["id"]
                 )
             )
         ).scalars().all()
-        assert events == []
+        assert rows == []
+    # An event rule is synced to the gateway, so it still gets a tombstone.
+    pub = _auto_pubs(fake_mqtt)[-1]
+    assert pub["automation_id"] == created["id"]
+    assert pub["op"] == "delete"
+
+
+@pytest.mark.asyncio
+async def test_delete_schedule_rule_hard_deletes_without_tombstone(
+    client, db_session_factory, fake_mqtt
+):
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from cloud.app.models import AutomationEvent
+
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    created = (
+        await client.post(
+            "/api/automations", json=_schedule_on_rule(), headers=headers
+        )
+    ).json()
+    async with db_session_factory() as session:
+        session.add(
+            AutomationEvent(
+                automation_id=created["id"],
+                event_type="automation_executed",
+                payload={"result": "ok"},
+                occurred_at=datetime(2026, 6, 14, 10, 0),
+            )
+        )
+        await session.commit()
+    fake_mqtt.published.clear()
+
+    resp = await client.delete(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    missing = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert missing.status_code == 404
+    async with db_session_factory() as session:
+        rows = (
+            await session.execute(
+                select(AutomationEvent).where(
+                    AutomationEvent.automation_id == created["id"]
+                )
+            )
+        ).scalars().all()
+        assert rows == []
+    # Schedule rules are cloud-only — no gateway tombstone published.
+    assert [
+        p for p in fake_mqtt.published if p.get("kind") == "automation_desired"
+    ] == []
 
 
 @pytest.mark.asyncio

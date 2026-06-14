@@ -27,6 +27,18 @@ Useful environment variables:
 
 Cloud starts even if MQTT connection fails, but live command and device flows will not work until MQTT is reachable.
 
+## Gateway Run
+
+The standard run mode connects the Z3Gateway host directly to the **EC2 production broker** (`98.83.4.87:8883`) over TLS + mTLS, so cloud-issued commands — including schedule automations — reach the gateway:
+
+```bash
+bash scripts/start-gateway-cloud.sh
+```
+
+This exports the cloud MQTT + mTLS env (CA + client cert/key under `mqtt/certs`, signed by the production CA; ACL user `gateway`), stops any running gateway, frees `/dev/ttyACM0`, and launches against `98.83.4.87:8883` under the `hust/lab01/gw-ubuntu-01` topic prefix. Confirm `/tmp/z3gw.log` shows `MQTT: connected` to `98.83.4.87:8883` and `MQTT: subscribed …/commands/+/request`.
+
+`scripts/start-gateway.sh` (localhost:1883) is retained only for offline local-dev when the cloud broker is unavailable; it is not the standard path. Because the dashboard and cloud also default to EC2, keeping the gateway on EC2 means all three share one broker.
+
 ## Local Mobile Run
 
 ```powershell

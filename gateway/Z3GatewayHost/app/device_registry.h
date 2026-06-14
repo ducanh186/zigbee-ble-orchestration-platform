@@ -22,7 +22,8 @@ extern "C" {
 typedef struct {
   EmberNodeId nodeId;
   uint8_t     endpoint;
-  char        device_type[16]; // "light"|"switch"|"motion"|"unknown"
+  char        device_type[16]; // "light"|"switch"|"sensor"|"unknown"
+  uint8_t     sensor_kind;     // 1=occupancy,2=environment,3=flame; 0=n/a
 } device_resolved_t;
 
 // Resolve a logical device_id into Zigbee coordinates.
@@ -73,6 +74,14 @@ const EmberEUI64 *deviceRegistryGetEuiLe(void);
 
 // Number of populated slots (used by gateway/health publish).
 uint32_t    deviceRegistryCount(void);
+
+// Set the sensor_kind (1/2/3) for an existing entry keyed by EUI64.
+// Returns false if the EUI64 is unknown.
+bool deviceRegistrySetSensorKind(const char *eui64Str, uint8_t sensor_kind);
+
+// Set the cloud room_id string for an existing entry keyed by EUI64.
+// room_id may be NULL/empty to clear. Returns false if the EUI64 is unknown.
+bool deviceRegistrySetRoom(const char *eui64Str, const char *room_id);
 
 #ifdef __cplusplus
 }
