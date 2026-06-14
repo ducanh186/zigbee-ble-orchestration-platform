@@ -30,6 +30,16 @@ flutter test
 flutter analyze
 ```
 
+### Gateway
+
+The gateway runs against the **EC2 production broker by default** (`98.83.4.87:8883`, TLS + mTLS) so cloud commands and schedule automations reach it:
+
+```bash
+bash scripts/start-gateway-cloud.sh
+```
+
+Use `scripts/start-gateway.sh` (localhost:1883) only for offline local-dev when the cloud broker is unreachable. See [`OPERATIONS.md`](OPERATIONS.md) → "Gateway Run" for details.
+
 ### Deploy Scripts
 
 PowerShell is the default shell on this machine. Use PowerShell syntax for multiline scripts and temp files. Do not paste Bash heredocs into PowerShell.
