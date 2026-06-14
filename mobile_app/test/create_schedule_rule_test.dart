@@ -8,6 +8,7 @@ import 'package:zigbee_smart_building/domain/models/command_result.dart';
 import 'package:zigbee_smart_building/domain/models/device_power.dart';
 import 'package:zigbee_smart_building/domain/models/event_log.dart';
 import 'package:zigbee_smart_building/domain/models/light_scene.dart';
+import 'package:zigbee_smart_building/domain/models/room.dart';
 import 'package:zigbee_smart_building/domain/models/smart_device.dart';
 import 'package:zigbee_smart_building/domain/repositories/automation_repository.dart';
 import 'package:zigbee_smart_building/domain/repositories/device_repository.dart';
@@ -281,6 +282,17 @@ class _FakeDeviceRepository implements DeviceRepository {
   Future<SmartDevice> renameDeviceName({
     required String deviceId,
     required String name,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<Room>> fetchRooms() async => const [];
+
+  @override
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
   }) {
     throw UnimplementedError();
   }

@@ -2,6 +2,7 @@ import '../../domain/models/command_result.dart';
 import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
+import '../../domain/models/room.dart';
 import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
 import '../models/command_api_model.dart';
@@ -102,6 +103,20 @@ class RemoteDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<List<Room>> fetchRooms() async {
+    final json = await _apiClient.getJson('/api/rooms/');
+    return (json as List)
+        .whereType<Map>()
+        .map(
+          (item) => Room(
+            id: item['id'] as String,
+            name: (item['name'] as String?) ?? item['id'] as String,
+          ),
+        )
+        .toList();
+  }
+
+  @override
   Future<List<EventLog>> fetchEvents({String? deviceId}) async {
     final query = deviceId == null
         ? '?limit=30'
@@ -136,6 +151,19 @@ class RemoteDeviceRepository implements DeviceRepository {
   }) async {
     final json = await _apiClient.patchJson('/api/devices/$deviceId', {
       'name': name,
+    });
+    return DeviceApiModel.fromJson(
+      Map<String, Object?>.from(json as Map),
+    ).toDomain();
+  }
+
+  @override
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
+  }) async {
+    final json = await _apiClient.patchJson('/api/devices/$deviceId', {
+      'room_id': roomId,
     });
     return DeviceApiModel.fromJson(
       Map<String, Object?>.from(json as Map),

@@ -82,6 +82,7 @@ class _DevicesViewState extends State<DevicesView> {
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
                         device: device,
+                        roomName: viewModel.roomNameFor(device.roomId),
                         onTap: () => widget.onOpenLight(device),
                       ),
                       const SizedBox(height: 10),
@@ -197,9 +198,10 @@ class _DeviceFilter {
 }
 
 class _DeviceRow extends StatelessWidget {
-  const _DeviceRow({required this.device, this.onTap});
+  const _DeviceRow({required this.device, required this.roomName, this.onTap});
 
   final SmartDevice device;
+  final String roomName;
   final VoidCallback? onTap;
 
   @override
@@ -249,7 +251,7 @@ class _DeviceRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${device.id} - ${device.roomLabel}',
+                  '${device.id} - $roomName',
                   style: TextStyle(
                     color: palette.textSecondary,
                     fontFamily: 'JetBrains Mono',

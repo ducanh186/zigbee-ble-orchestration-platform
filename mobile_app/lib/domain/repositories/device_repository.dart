@@ -2,12 +2,15 @@ import '../models/command_result.dart';
 import '../models/cloud_status.dart';
 import '../models/device_power.dart';
 import '../models/event_log.dart';
+import '../models/room.dart';
 import '../models/smart_device.dart';
 
 abstract class DeviceRepository {
   Future<CloudStatus> fetchCloudStatus();
 
   Future<List<SmartDevice>> fetchDevices();
+
+  Future<List<Room>> fetchRooms();
 
   Future<List<EventLog>> fetchEvents({String? deviceId});
 
@@ -19,6 +22,11 @@ abstract class DeviceRepository {
   Future<SmartDevice> renameDeviceName({
     required String deviceId,
     required String name,
+  });
+
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
   });
 
   Future<CommandResult> fetchCommand(String commandId);

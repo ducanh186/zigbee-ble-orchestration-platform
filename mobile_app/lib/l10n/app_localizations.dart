@@ -1172,6 +1172,24 @@ abstract class AppLocalizations {
   /// **'Room'**
   String get roomLabel;
 
+  /// No description provided for @moveRoomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move room'**
+  String get moveRoomLabel;
+
+  /// No description provided for @moveRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to room'**
+  String get moveRoomTitle;
+
+  /// No description provided for @noRoomsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No rooms available'**
+  String get noRoomsAvailable;
+
   /// No description provided for @occupancyLabel.
   ///
   /// In en, this message translates to:

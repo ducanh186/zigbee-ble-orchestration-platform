@@ -572,6 +572,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roomLabel => 'Room';
 
   @override
+  String get moveRoomLabel => 'Move room';
+
+  @override
+  String get moveRoomTitle => 'Move to room';
+
+  @override
+  String get noRoomsAvailable => 'No rooms available';
+
+  @override
   String get occupancyLabel => 'Occupancy';
 
   @override

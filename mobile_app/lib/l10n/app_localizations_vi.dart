@@ -565,6 +565,15 @@ class AppLocalizationsVi extends AppLocalizations {
   String get roomLabel => 'Phòng';
 
   @override
+  String get moveRoomLabel => 'Đổi phòng';
+
+  @override
+  String get moveRoomTitle => 'Chuyển sang phòng';
+
+  @override
+  String get noRoomsAvailable => 'Chưa có phòng';
+
+  @override
   String get occupancyLabel => 'Trạng thái có người';
 
   @override
