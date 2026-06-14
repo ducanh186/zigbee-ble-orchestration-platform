@@ -238,6 +238,7 @@ def validate_event_payload(device_type: str, inner: dict) -> dict | None:
 class DeviceOut(BaseModel):
     id: str
     device_type: str
+    sensor_kind: int | None = None
     eui64: str | None
     room_id: str | None
     name: str | None

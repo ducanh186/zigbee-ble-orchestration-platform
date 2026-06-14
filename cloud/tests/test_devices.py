@@ -260,3 +260,39 @@ async def test_update_device_requires_parent_or_admin(
         json={"name": "Nope"},
     )
     assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_device_out_includes_sensor_kind(client, db_session_factory):
+    from cloud.app.models import Device, Home, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-sk", name="Sensor Home"))
+        s.add(Room(id="room-sk", home_id="home-sk", name="Hall"))
+        s.add(
+            Device(
+                id="env-sensor-01",
+                device_type="sensor",
+                sensor_kind=2,
+                room_id="room-sk",
+                name="DHT11",
+                is_online=True,
+            )
+        )
+        await s.commit()
+
+    await create_auth_user(
+        db_session_factory,
+        user_id="viewer-sk",
+        username="viewer-sk",
+        role="viewer",
+        password="pass-sk",
+        home_id="home-sk",
+    )
+    headers = await login_headers(client, "viewer-sk", "pass-sk")
+
+    r = await client.get("/api/devices/env-sensor-01", headers=headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["sensor_kind"] == 2
+    assert body["device_type"] == "sensor"
