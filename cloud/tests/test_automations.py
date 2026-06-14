@@ -362,6 +362,62 @@ async def test_delete_automation_publishes_tombstone_and_marks_pending(
 
 
 @pytest.mark.asyncio
+async def test_delete_schedule_rule_hard_deletes_without_tombstone(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_automation_devices(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from cloud.app.models import AutomationEvent
+
+    created = (
+        await client.post(
+            "/api/automations", json=_schedule_on_rule(), headers=headers
+        )
+    ).json()
+    # Simulate at least one executed event so the FK has a child row. On
+    # PostgreSQL a bare delete of the parent would raise ForeignKeyViolation;
+    # the endpoint must clear children first.
+    async with db_session_factory() as session:
+        session.add(
+            AutomationEvent(
+                automation_id=created["id"],
+                event_type="automation_executed",
+                payload={"result": "ok"},
+                occurred_at=datetime.utcnow(),
+            )
+        )
+        await session.commit()
+    fake_mqtt.published.clear()
+    resp = await client.delete(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    # row gone
+    missing = await client.get(
+        f"/api/automations/{created['id']}", headers=headers
+    )
+    assert missing.status_code == 404
+    # child audit rows cascade-deleted with the parent
+    async with db_session_factory() as session:
+        rows = (
+            await session.execute(
+                select(AutomationEvent).where(
+                    AutomationEvent.automation_id == created["id"]
+                )
+            )
+        ).scalars().all()
+        assert rows == []
+    # no tombstone published for a schedule rule
+    assert [
+        p for p in fake_mqtt.published if p.get("kind") == "automation_desired"
+    ] == []
+
+
+@pytest.mark.asyncio
 async def test_create_switch_toggle_to_light_toggle_rule(client, db_session_factory):
     await _seed_automation_devices(db_session_factory)
     headers = await _parent_headers(client, db_session_factory)
