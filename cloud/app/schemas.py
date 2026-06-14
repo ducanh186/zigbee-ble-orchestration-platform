@@ -252,6 +252,14 @@ class DeviceOut(BaseModel):
 
 class DeviceUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    room_id: str | None = None
+
+
+class RoomOut(BaseModel):
+    id: str
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthLogin(BaseModel):

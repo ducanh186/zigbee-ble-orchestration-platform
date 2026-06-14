@@ -160,3 +160,103 @@ async def test_delete_device_404_when_missing(client, db_session_factory):
 
     r = await client.delete("/api/devices/nope", headers=headers)
     assert r.status_code == 404
+
+
+async def _parent_headers(client, db_session_factory) -> dict[str, str]:
+    await create_auth_user(
+        db_session_factory,
+        user_id="parent-1",
+        username="parent",
+        role="parent",
+        password="parent-pass",
+        home_id="home-1",
+    )
+    return await login_headers(client, "parent", "parent-pass")
+
+
+@pytest.mark.asyncio
+async def test_update_device_name_only_keeps_room(
+    client, seed_light, db_session_factory
+):
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Renamed Light"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Renamed Light"
+    # room is untouched when room_id is omitted
+    assert body["room_id"] == "room-1"
+
+
+@pytest.mark.asyncio
+async def test_update_device_moves_to_room_in_home(
+    client, seed_light, db_session_factory
+):
+    from cloud.app.models import Room
+
+    async with db_session_factory() as s:
+        s.add(Room(id="room-2", home_id="home-1", name="Bedroom"))
+        await s.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Main Light", "room_id": "room-2"},
+    )
+    assert r.status_code == 200
+    assert r.json()["room_id"] == "room-2"
+
+
+@pytest.mark.asyncio
+async def test_update_device_room_outside_home_forbidden(
+    client, seed_light, db_session_factory
+):
+    from cloud.app.models import Home, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-2", name="Other Home"))
+        s.add(Room(id="room-other", home_id="home-2", name="Garage"))
+        await s.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Main Light", "room_id": "room-other"},
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_update_device_room_missing_404(
+    client, seed_light, db_session_factory
+):
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Main Light", "room_id": "ghost-room"},
+    )
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_device_requires_parent_or_admin(
+    client, seed_light, db_session_factory
+):
+    headers = await _viewer_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"name": "Nope"},
+    )
+    assert r.status_code == 403
