@@ -209,8 +209,12 @@ def validate_reported_payload(device_type: str, inner: dict) -> dict | None:
         # switch reported is optional but validate if state present
         if device_type == "switch" and "state" in inner:
             SwitchReportedState(**inner.get("state", {}))
-        if device_type == "sensor" and inner.get("sensor_kind") == 2 and "state" in inner:
-            # sensor v2 payload omits `reachable`; inject True to satisfy the model
+        if device_type == "sensor" and inner.get("sensor_kind") == 2:
+            if "state" not in inner:
+                return None  # malformed kind-2 sensor report: state is required
+            # Validate temp/humi ranges only; sensor v2 omits `reachable`, inject True
+            # for the model. `inner` is returned unchanged — reachable extraction in
+            # _handle_reported defaults to True when absent. (I1 clarification.)
             EnvironmentReportedState(**{**inner["state"], "reachable": True})
         return inner
     except Exception:

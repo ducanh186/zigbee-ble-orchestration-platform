@@ -106,7 +106,7 @@ async def test_handle_reported_sensor_kind2_stores_sensor_kind(db_session_factor
     service._handle_reported(
         "sb/gw-1/devices/sensor/env-sensor-01/reported",
         {
-            "ts": "2026-06-14T10:00:00+00:00",
+            "ts": 1781431200000,
             "payload": {
                 "sensor_kind": 2,
                 "sensor": "environment",
@@ -155,7 +155,7 @@ async def test_handle_event_sensor_occupancy_stores_device_state(db_session_fact
     service._handle_event(
         "sb/gw-1/devices/sensor/motion-sensor-01/event",
         {
-            "ts": "2026-06-14T10:05:00+00:00",
+            "ts": 1781431500000,
             "payload": {
                 "sensor_kind": 1,
                 "event": "occupancy_changed",
@@ -167,6 +167,12 @@ async def test_handle_event_sensor_occupancy_stores_device_state(db_session_fact
     await pending[0]()
 
     async with db_session_factory() as s:
+        device = (await s.execute(select(Device).where(Device.id == "motion-sensor-01"))).scalar_one_or_none()
+        assert device is not None
+        # sensor_kind must remain the seeded value — the backfill guard
+        # (`device.sensor_kind is None`) prevents overwriting an existing value.
+        assert device.sensor_kind == 1
+
         state_row = (
             await s.execute(
                 select(DeviceState)
@@ -194,7 +200,7 @@ async def test_handle_event_sensor_autoregisters_with_sensor_kind(db_session_fac
     service._handle_event(
         f"sb/gw-1/devices/sensor/{new_device_id}/event",
         {
-            "ts": "2026-06-14T11:00:00+00:00",
+            "ts": 1781434800000,
             "payload": {
                 "sensor_kind": 1,
                 "event": "occupancy_changed",

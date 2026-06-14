@@ -253,7 +253,7 @@ class MQTTService:
                     if normalized_inner.get("eui64"):
                         device.eui64 = normalized_inner["eui64"]
                     if normalized_inner.get("sensor_kind") is not None:
-                        device.sensor_kind = normalized_inner["sensor_kind"]
+                        device.sensor_kind = normalized_inner.get("sensor_kind")
 
                 state = normalized_inner.get("state", normalized_inner)
                 if device_type in {"environment", "sensor"}:

@@ -310,6 +310,11 @@ class TestValidateSensorPayloads:
         out = validate_reported_payload("sensor", inner)
         assert out == inner
 
+    def test_validate_reported_payload_sensor_kind2_missing_state_returns_none(self):
+        # kind-2 with no `state` key must be rejected (malformed payload)
+        out = validate_reported_payload("sensor", {"sensor_kind": 2})
+        assert out is None
+
 
 # ---- translate_command_for_gateway ----
 
