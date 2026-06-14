@@ -70,3 +70,110 @@ class _FakeEvent:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Integration tests for sensor v2 ingest (use real async SQLite via conftest)
+# ---------------------------------------------------------------------------
+
+import pytest
+import pytest_asyncio
+from sqlalchemy import select
+
+from cloud.app.models import Device, DeviceState, Event
+
+
+def _make_run_async_for_test():
+    """Return a _run_async replacement that stores the pending coroutine
+    so the test can await it after the synchronous _handle_* call."""
+    pending = []
+
+    def _run(coro_func):
+        pending.append(coro_func)
+
+    return _run, pending
+
+
+@pytest.mark.asyncio
+async def test_handle_reported_sensor_kind2_stores_sensor_kind(db_session_factory):
+    """sensor kind-2 reported message: device row gets sensor_kind=2."""
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+
+    _run, pending = _make_run_async_for_test()
+    service._run_async = _run
+
+    service._handle_reported(
+        "sb/gw-1/devices/sensor/env-sensor-01/reported",
+        {
+            "ts": "2026-06-14T10:00:00+00:00",
+            "payload": {
+                "sensor_kind": 2,
+                "sensor": "environment",
+                "state": {"temperature_c": 28.5, "humidity_percent": 48},
+            },
+        },
+    )
+    assert len(pending) == 1
+    await pending[0]()
+
+    async with db_session_factory() as s:
+        device = (await s.execute(select(Device).where(Device.id == "env-sensor-01"))).scalar_one_or_none()
+        assert device is not None
+        assert device.device_type == "sensor"
+        assert device.sensor_kind == 2
+
+        state_row = (
+            await s.execute(
+                select(DeviceState)
+                .where(DeviceState.device_id == "env-sensor-01")
+                .order_by(DeviceState.reported_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        assert state_row is not None
+        assert state_row.state["temperature_c"] == 28.5
+
+
+@pytest.mark.asyncio
+async def test_handle_event_sensor_occupancy_stores_device_state(db_session_factory):
+    """sensor kind-1 occupancy event: DeviceState with occupancy is inserted."""
+    from cloud.app.models import Home, Room
+
+    async with db_session_factory() as s:
+        s.add(Home(id="home-s", name="Sensor Home"))
+        s.add(Room(id="room-s", home_id="home-s", name="Hallway"))
+        s.add(Device(id="motion-sensor-01", device_type="sensor", sensor_kind=1, room_id="room-s", name="PIR"))
+        await s.commit()
+
+    service = MQTTService()
+    service.set_db_session_factory(db_session_factory)
+
+    _run, pending = _make_run_async_for_test()
+    service._run_async = _run
+
+    service._handle_event(
+        "sb/gw-1/devices/sensor/motion-sensor-01/event",
+        {
+            "ts": "2026-06-14T10:05:00+00:00",
+            "payload": {
+                "sensor_kind": 1,
+                "event": "occupancy_changed",
+                "occupancy": "occupied",
+            },
+        },
+    )
+    assert len(pending) == 1
+    await pending[0]()
+
+    async with db_session_factory() as s:
+        state_row = (
+            await s.execute(
+                select(DeviceState)
+                .where(DeviceState.device_id == "motion-sensor-01")
+                .order_by(DeviceState.reported_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        assert state_row is not None
+        assert state_row.state["occupancy"] == "occupied"

@@ -240,6 +240,7 @@ class MQTTService:
                             "device_type",
                             device_type,
                         ),
+                        sensor_kind=normalized_inner.get("sensor_kind"),
                         eui64=normalized_inner.get("eui64"),
                         name=device_id,
                         is_online=reachable,
@@ -251,9 +252,11 @@ class MQTTService:
                     device.last_seen_at = last_seen
                     if normalized_inner.get("eui64"):
                         device.eui64 = normalized_inner["eui64"]
+                    if normalized_inner.get("sensor_kind") is not None:
+                        device.sensor_kind = normalized_inner["sensor_kind"]
 
                 state = normalized_inner.get("state", normalized_inner)
-                if device_type == "environment":
+                if device_type in {"environment", "sensor"}:
                     previous = (
                         await session.execute(
                             select(DeviceState)
@@ -368,7 +371,7 @@ class MQTTService:
                 )
                 session.add(event)
                 if (
-                    device_type == "motion"
+                    device_type in {"motion", "sensor"}
                     and validated.get("event") == "occupancy_changed"
                     and validated.get("occupancy") in {"occupied", "unoccupied"}
                 ):
