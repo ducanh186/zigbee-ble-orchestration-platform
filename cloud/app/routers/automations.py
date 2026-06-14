@@ -5,7 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.access_control import (
@@ -18,7 +18,7 @@ from cloud.app.automation_sync import mark_sync_pending
 from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.mqtt_client import mqtt_service
-from cloud.app.models import Automation, Device, User
+from cloud.app.models import Automation, AutomationEvent, Device, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
@@ -53,6 +53,12 @@ def _publish_delete(rule: Automation) -> None:
         op="delete",
         version=rule.version,
     )
+
+
+def _syncs_to_gateway(rule: Automation) -> bool:
+    """Only event rules are pushed to the gateway. Schedule rules execute
+    entirely cloud-side (the gateway has no cron), so they are never synced."""
+    return rule.trigger_type == "event"
 
 
 def _require_string(payload: dict[str, Any], field: str) -> str:
@@ -290,11 +296,16 @@ async def create_automation(
         last_run_status="never_run",
         last_error=None,
     )
-    mark_sync_pending(rule, "automation.upsert")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.upsert")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     db.add(rule)
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -311,10 +322,17 @@ async def _set_enabled(
     rule.enabled = enabled
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.enable" if enabled else "automation.disable")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(
+            rule, "automation.enable" if enabled else "automation.disable"
+        )
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
     return rule
 
 
@@ -349,6 +367,8 @@ async def update_automation(
     await ensure_automation_visible(db, rule, current_user)
     if body.version is not None and body.version != rule.version:
         raise HTTPException(status_code=409, detail="Automation version conflict")
+
+    was_syncing = _syncs_to_gateway(rule)
 
     # If trigger or actions change, re-validate the resulting rule body. We
     # validate against the *merged* values so partial updates still get the
@@ -391,10 +411,19 @@ async def update_automation(
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.update")
+    if _syncs_to_gateway(rule):
+        mark_sync_pending(rule, "automation.update")
+    else:
+        rule.sync_status = "synced"
+        rule.last_error = None
     await db.commit()
     await db.refresh(rule)
-    _publish_upsert(rule)
+    if _syncs_to_gateway(rule):
+        _publish_upsert(rule)
+    elif was_syncing:
+        # Converted event -> schedule: clear the stale retained desired so the
+        # gateway stops executing the old event rule (cloud now owns execution).
+        _publish_delete(rule)
     return rule
 
 
@@ -404,20 +433,33 @@ async def delete_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Publish retained tombstone; keep row in DB until gateway acks.
+    """Delete an automation.
 
-    DB strategy: we do **not** hard-delete here. Instead we bump `version`,
-    set `sync_status="pending"`, and publish op=delete tombstone. The row is
-    hard-deleted by `_handle_automation_reported` when the gateway acks with
-    `sync_status="deleted"`. This keeps the wire contract clean (cloud is the
-    source of truth for desired state, gateway confirms apply) without adding
-    a soft-delete column. Status after this endpoint returns is still
-    `pending` until gateway responds.
+    Event rules: soft-delete — bump version, set sync_status="pending", publish
+    an op=delete tombstone, and keep the row until the gateway acks with
+    sync_status="deleted" (handled in _handle_automation_reported). Cloud stays
+    the source of truth and the gateway confirms apply.
+
+    Schedule rules: hard-delete immediately (and their child automation_events),
+    because they are never synced to the gateway so no ack will ever arrive.
     """
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     await ensure_automation_visible(db, rule, current_user)
+
+    if not _syncs_to_gateway(rule):
+        # Schedule rules are never synced to the gateway, so there is no
+        # tombstone to publish and no ack will arrive. Hard-delete now,
+        # removing child audit rows first to satisfy the FK (PostgreSQL has
+        # no ON DELETE CASCADE on automation_events.automation_id).
+        # expire_on_commit=False keeps `rule` serializable for the response.
+        await db.execute(
+            delete(AutomationEvent).where(AutomationEvent.automation_id == rule.id)
+        )
+        await db.delete(rule)
+        await db.commit()
+        return rule
 
     rule.version = (rule.version or 0) + 1
     rule.updated_at = datetime.now(UTC).replace(tzinfo=None)

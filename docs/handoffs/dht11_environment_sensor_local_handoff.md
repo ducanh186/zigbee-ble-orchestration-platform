@@ -223,16 +223,20 @@ occupancy→light path. Users create/edit these rules from app/dashboard.
 **Rule shape** (MQTT `automations/{id}/desired`, retained — same envelope as
 occupancy, new `environment` trigger):
 
+**The canonical trigger shape is the Cloud contract** (`cloud.app.schemas.
+SensorThresholdTrigger`, see `docs/handoffs/gateway-environment-sensor-contract.md`).
+The gateway parser was aligned to it on `feat/107`:
+
 ```json
 {
   "op": "upsert", "version": 1, "name": "Bat den khi nong", "enabled": true,
   "trigger": {
-    "device_type": "environment",
+    "type": "sensor_threshold",
     "device_id": "0000000000000053",
-    "event": "threshold_crossed",
-    "metric": "temperature",      // temperature | humidity
-    "comparator": "gte",          // gte (>=) | lte (<=)
-    "threshold": 2800             // centi-unit: 2800 = 28.00C, 6500 = 65.00%RH
+    "device_type": "environment",
+    "metric": "temperature_c",    // temperature_c | humidity_percent
+    "operator": "gte",            // gte (>=) | lte (<=)
+    "threshold": 30               // whole units: 30 = 30 C, 65 = 65 %RH (float ok, e.g. 28.5)
   },
   "actions": [
     { "device_type": "light", "device_id": "000000000000004F", "command": "on" }
@@ -242,9 +246,14 @@ occupancy, new `environment` trigger):
 
 **Semantics:** fires once on the transition into "condition met" (edge-trigger),
 not every report, plus the existing 500 ms per-rule cooldown. Use two rules with
-offset thresholds (e.g. on ≥28.0 °C, off ≤27.0 °C) for hysteresis. `comparator`
-(not `op`) names the operator inside `trigger` to avoid colliding with the
-envelope's `"op":"upsert"`.
+offset thresholds (e.g. on ≥28 °C, off ≤27 °C) for hysteresis. The gateway
+scales the whole-unit `threshold` ×100 internally to compare against the ZCL
+centi-unit MeasuredValue (`30` → `3000`; `28.5` → `2850`).
+
+> Note: an earlier local-only draft of this firmware used
+> `event:"threshold_crossed"` / `comparator` / centi-unit `threshold`. That was
+> superseded by the Cloud contract above when integrating on `feat/107`; the
+> gateway now parses the Cloud shape.
 
 **Why the light turned on during earlier testing (the original Phase-6
 question):** it was NOT the DHT11 device. On a shared demo network, light
