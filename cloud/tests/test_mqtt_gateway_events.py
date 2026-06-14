@@ -83,10 +83,6 @@ class _FakeEvent:
         self.occurred_at = occurred_at
 
 
-class _FakeDevice:
-    pass
-
-
 if __name__ == "__main__":
     unittest.main()
 

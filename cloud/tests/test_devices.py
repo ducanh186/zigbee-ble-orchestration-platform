@@ -214,6 +214,46 @@ async def test_update_device_moves_to_room_in_home(
 
 
 @pytest.mark.asyncio
+async def test_update_device_room_only_without_name(
+    client, seed_light, db_session_factory
+):
+    """A room move must not require re-sending the device name (name optional)."""
+    from cloud.app.models import Room
+
+    async with db_session_factory() as s:
+        s.add(Room(id="room-2", home_id="home-1", name="Bedroom"))
+        await s.commit()
+
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={"room_id": "room-2"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["room_id"] == "room-2"
+    # name is untouched when omitted
+    assert body["name"] == "Main Light"
+
+
+@pytest.mark.asyncio
+async def test_update_device_empty_body_rejected(
+    client, seed_light, db_session_factory
+):
+    """Neither name nor room_id provided is a 422 (nothing to update)."""
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.patch(
+        f"/api/devices/{seed_light}",
+        headers=headers,
+        json={},
+    )
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_update_device_room_outside_home_forbidden(
     client, seed_light, db_session_factory
 ):

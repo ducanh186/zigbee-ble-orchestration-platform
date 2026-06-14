@@ -268,8 +268,16 @@ class DeviceOut(BaseModel):
 
 
 class DeviceUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    # Both fields optional so a caller can rename, move room, or both. A
+    # room-only move must not be forced to re-send the current name.
+    name: str | None = Field(default=None, min_length=1, max_length=120)
     room_id: str | None = None
+
+    @model_validator(mode="after")
+    def _require_one_field(self):
+        if self.name is None and self.room_id is None:
+            raise ValueError("DeviceUpdate requires at least one of: name, room_id")
+        return self
 
 
 class RoomOut(BaseModel):
