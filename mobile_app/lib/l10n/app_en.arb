@@ -34,6 +34,7 @@
   "settingsSystemAdminHint": "Technical and production system access",
   "settingsHomeManagement": "Home management",
   "settingsDevices": "Devices",
+  "settingsRooms": "Rooms",
   "settingsAddNewDevice": "Add new device",
   "settingsAutomationRules": "Automation rules",
   "settingsActivityHistory": "Activity history",
@@ -185,6 +186,8 @@
   "scanQrLabel": "Scan QR",
   "useManualLabel": "Use manual",
   "qrJsonLabel": "QR JSON",
+  "assignDeviceRoomTitle": "Assign device to room",
+  "assignDeviceRoomBody": "Which room should this device use?",
   "clearLabel": "Clear",
   "startProvisioningLabel": "Start provisioning",
   "scanProvisioningQrTitle": "Scan provisioning QR",
@@ -207,6 +210,19 @@
   "saveLabel": "Save",
   "statusLabel": "Status",
   "roomLabel": "Room",
+  "roomsTitle": "Rooms",
+  "createRoomLabel": "Create room",
+  "renameRoomLabel": "Rename room",
+  "roomNameLabel": "Room name",
+  "deleteRoomTitle": "Delete room?",
+  "deleteRoomBody": "Delete \"{name}\" from this home. Rooms with devices cannot be deleted.",
+  "@deleteRoomBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "moveRoomLabel": "Move room",
   "moveRoomTitle": "Move to room",
   "noRoomsAvailable": "No rooms available",

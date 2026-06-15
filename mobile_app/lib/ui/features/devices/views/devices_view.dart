@@ -100,7 +100,8 @@ class _DevicesViewState extends State<DevicesView> {
     final normalizedQuery = _query.trim().toLowerCase();
     // The "sensor" filter matches v2 'sensor'+kind devices and legacy
     // 'motion'/'environment' rows (isMotion/isEnvironment dual-read).
-    final matchesType = _type == 'all' ||
+    final matchesType =
+        _type == 'all' ||
         (_type == 'sensor'
             ? (device.isMotion || device.isEnvironment)
             : device.deviceType == _type);
@@ -252,10 +253,7 @@ class _DeviceRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   roomName,
-                  style: TextStyle(
-                    color: palette.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: palette.textSecondary, fontSize: 12),
                 ),
               ],
             ),

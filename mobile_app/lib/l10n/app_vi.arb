@@ -34,6 +34,7 @@
   "settingsSystemAdminHint": "Quyền kỹ thuật và production system",
   "settingsHomeManagement": "Quản lý home",
   "settingsDevices": "Thiết bị",
+  "settingsRooms": "Phòng",
   "settingsAddNewDevice": "Thêm thiết bị mới",
   "settingsAutomationRules": "Luật tự động hóa",
   "settingsActivityHistory": "Lịch sử hoạt động",
@@ -185,6 +186,8 @@
   "scanQrLabel": "Quét QR",
   "useManualLabel": "Nhập thủ công",
   "qrJsonLabel": "QR JSON",
+  "assignDeviceRoomTitle": "Assign device to room",
+  "assignDeviceRoomBody": "Which room should this device use?",
   "clearLabel": "Xóa",
   "startProvisioningLabel": "Bắt đầu provisioning",
   "scanProvisioningQrTitle": "Quét QR provisioning",
@@ -207,6 +210,19 @@
   "saveLabel": "Lưu",
   "statusLabel": "Trạng thái",
   "roomLabel": "Phòng",
+  "roomsTitle": "Phòng",
+  "createRoomLabel": "Tạo phòng",
+  "renameRoomLabel": "Đổi tên phòng",
+  "roomNameLabel": "Tên phòng",
+  "deleteRoomTitle": "Xóa phòng?",
+  "deleteRoomBody": "Xóa \"{name}\" khỏi home này. Phòng đang có thiết bị thì không thể xóa.",
+  "@deleteRoomBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "moveRoomLabel": "Đổi phòng",
   "moveRoomTitle": "Chuyển sang phòng",
   "noRoomsAvailable": "Chưa có phòng",

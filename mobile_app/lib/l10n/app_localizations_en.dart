@@ -113,6 +113,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDevices => 'Devices';
 
   @override
+  String get settingsRooms => 'Rooms';
+
+  @override
   String get settingsAddNewDevice => 'Add new device';
 
   @override
@@ -505,6 +508,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrJsonLabel => 'QR JSON';
 
   @override
+  String get assignDeviceRoomTitle => 'Assign device to room';
+
+  @override
+  String get assignDeviceRoomBody => 'Which room should this device use?';
+
+  @override
   String get clearLabel => 'Clear';
 
   @override
@@ -570,6 +579,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roomLabel => 'Room';
+
+  @override
+  String get roomsTitle => 'Rooms';
+
+  @override
+  String get createRoomLabel => 'Create room';
+
+  @override
+  String get renameRoomLabel => 'Rename room';
+
+  @override
+  String get roomNameLabel => 'Room name';
+
+  @override
+  String get deleteRoomTitle => 'Delete room?';
+
+  @override
+  String deleteRoomBody(String name) {
+    return 'Delete \"$name\" from this home. Rooms with devices cannot be deleted.';
+  }
 
   @override
   String get moveRoomLabel => 'Move room';

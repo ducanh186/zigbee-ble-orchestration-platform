@@ -292,6 +292,14 @@ class RoomOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RoomCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class RoomUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class AuthLogin(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1)
@@ -632,7 +640,8 @@ class ProvisioningErrorCode(str, Enum):
 
 class ProvisioningDevicePayload(BaseModel):
     eui64: str
-    device_type: Literal["light", "switch", "motion", "sensor"]
+    device_type: Literal["light", "switch", "motion", "sensor", "environment"]
+    install_code: str | None = None
 
     @field_validator("eui64")
     @classmethod
@@ -640,6 +649,16 @@ class ProvisioningDevicePayload(BaseModel):
         if not _EUI64_RE.fullmatch(value):
             raise ValueError("eui64 must be 16 hex characters")
         return value.upper()
+
+    @field_validator("install_code")
+    @classmethod
+    def _validate_install_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return normalize_install_code(value)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class ProvisioningLabelCreate(BaseModel):
@@ -700,15 +719,19 @@ class FactoryDeviceOut(BaseModel):
 
 class ProvisioningSessionCreate(BaseModel):
     gateway_id: str = Field(min_length=1)
-    room_id: str = Field(min_length=1)
+    room_id: str | None = Field(default=None, min_length=1)
     device: ProvisioningDevicePayload
+
+
+class ProvisioningSessionRoomUpdate(BaseModel):
+    room_id: str = Field(min_length=1)
 
 
 class ProvisioningSessionOut(BaseModel):
     session_id: str = Field(validation_alias="id")
     status: ProvisioningStatus
     gateway_id: str
-    room_id: str
+    room_id: str | None
     eui64: str
     device_type: Literal["light", "switch", "motion", "sensor"]
     model: str | None

@@ -149,7 +149,11 @@ Widget gatewayStatusOnlinePreview() {
   );
 }
 
-@Preview(name: 'No home hub log', group: 'Home hub status', size: Size(390, 120))
+@Preview(
+  name: 'No home hub log',
+  group: 'Home hub status',
+  size: Size(390, 120),
+)
 Widget gatewayStatusUnknownPreview() {
   return _GatewayStatusPreviewShell(
     status: const CloudStatus.unknown(

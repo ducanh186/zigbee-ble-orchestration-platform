@@ -112,6 +112,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsDevices => 'Thiết bị';
 
   @override
+  String get settingsRooms => 'Phòng';
+
+  @override
   String get settingsAddNewDevice => 'Thêm thiết bị mới';
 
   @override
@@ -497,6 +500,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get qrJsonLabel => 'QR JSON';
 
   @override
+  String get assignDeviceRoomTitle => 'Assign device to room';
+
+  @override
+  String get assignDeviceRoomBody => 'Which room should this device use?';
+
+  @override
   String get clearLabel => 'Xóa';
 
   @override
@@ -563,6 +572,26 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get roomLabel => 'Phòng';
+
+  @override
+  String get roomsTitle => 'Phòng';
+
+  @override
+  String get createRoomLabel => 'Tạo phòng';
+
+  @override
+  String get renameRoomLabel => 'Đổi tên phòng';
+
+  @override
+  String get roomNameLabel => 'Tên phòng';
+
+  @override
+  String get deleteRoomTitle => 'Xóa phòng?';
+
+  @override
+  String deleteRoomBody(String name) {
+    return 'Xóa \"$name\" khỏi home này. Phòng đang có thiết bị thì không thể xóa.';
+  }
 
   @override
   String get moveRoomLabel => 'Đổi phòng';

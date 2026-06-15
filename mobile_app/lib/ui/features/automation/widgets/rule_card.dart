@@ -32,8 +32,7 @@ class RuleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context);
-    final scheduleLabel =
-        l10n?.scheduleTriggerLabel ?? 'Schedule';
+    final scheduleLabel = l10n?.scheduleTriggerLabel ?? 'Schedule';
     final opacity = rule.enabled ? 1.0 : 0.72;
     final showMutationControls = onDelete != null || onEnabledChanged != null;
     final isSchedule =

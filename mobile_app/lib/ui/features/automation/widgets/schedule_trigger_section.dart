@@ -44,7 +44,15 @@ class _ScheduleTriggerSectionState extends State<ScheduleTriggerSection> {
   bool _customTouched = false;
 
   // Short weekday labels indexed by cron day-of-week (0=Sun).
-  static const _weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  static const _weekdayLabels = [
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+  ];
 
   @override
   void initState() {
@@ -173,7 +181,9 @@ class _ScheduleTriggerSectionState extends State<ScheduleTriggerSection> {
         _buildModeControls(l10n, palette),
         if (_mode != ScheduleMode.custom) ...[
           const SizedBox(height: 12),
-          _ScheduleSummary(text: '${l10n.scheduleSummaryPrefix} ${_summary(l10n)}'),
+          _ScheduleSummary(
+            text: '${l10n.scheduleSummaryPrefix} ${_summary(l10n)}',
+          ),
         ],
       ],
     );
@@ -273,7 +283,11 @@ class _ScheduleTriggerSectionState extends State<ScheduleTriggerSection> {
 }
 
 class _TimeRow extends StatelessWidget {
-  const _TimeRow({required this.label, required this.time, required this.onTap});
+  const _TimeRow({
+    required this.label,
+    required this.time,
+    required this.onTap,
+  });
 
   final String label;
   final String time;
@@ -284,7 +298,10 @@ class _TimeRow extends StatelessWidget {
     final palette = context.palette;
     return Row(
       children: [
-        Text(label, style: TextStyle(color: palette.textSecondary, fontSize: 13)),
+        Text(
+          label,
+          style: TextStyle(color: palette.textSecondary, fontSize: 13),
+        ),
         const SizedBox(width: 12),
         Material(
           color: palette.surface,

@@ -213,6 +213,12 @@ async def init_db() -> None:
             await conn.execute(
                 text("ALTER TABLE commands ALTER COLUMN device_id DROP NOT NULL")
             )
+            await conn.execute(
+                text(
+                    "ALTER TABLE provisioning_sessions "
+                    "ALTER COLUMN room_id DROP NOT NULL"
+                )
+            )
 
     # Cross-dialect column backfill — runs on every startup, idempotent.
     await ensure_automation_version_column()

@@ -22,16 +22,10 @@ class RemoteDeviceRepository implements DeviceRepository {
   @override
   Future<CloudStatus> fetchCloudStatus() async {
     try {
-      final json = await _apiClient.getJson(
-        '/api/gateways/$gatewayId/status',
-      );
-      return _gatewayStatusFromJson(
-        Map<String, Object?>.from(json as Map),
-      );
+      final json = await _apiClient.getJson('/api/gateways/$gatewayId/status');
+      return _gatewayStatusFromJson(Map<String, Object?>.from(json as Map));
     } catch (error) {
-      return CloudStatus.unknown(
-        detail: 'Cannot read home hub status: $error',
-      );
+      return CloudStatus.unknown(detail: 'Cannot read home hub status: $error');
     }
   }
 
@@ -90,13 +84,36 @@ class RemoteDeviceRepository implements DeviceRepository {
     final json = await _apiClient.getJson('/api/rooms/');
     return (json as List)
         .whereType<Map>()
-        .map(
-          (item) => Room(
-            id: item['id'] as String,
-            name: (item['name'] as String?) ?? item['id'] as String,
-          ),
-        )
+        .map((item) => _roomFromJson(Map<String, Object?>.from(item)))
         .toList();
+  }
+
+  @override
+  Future<Room> createRoom(String name) async {
+    final json = await _apiClient.postJson('/api/rooms/', {'name': name});
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
+
+  @override
+  Future<Room> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    final json = await _apiClient.patchJson('/api/rooms/$roomId', {
+      'name': name,
+    });
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
+
+  @override
+  Future<Room> deleteRoom(String roomId) async {
+    final json = await _apiClient.deleteJson('/api/rooms/$roomId');
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
+
+  Room _roomFromJson(Map<String, Object?> json) {
+    final id = json['id'] as String;
+    return Room(id: id, name: (json['name'] as String?) ?? id);
   }
 
   @override

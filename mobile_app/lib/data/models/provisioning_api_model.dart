@@ -3,12 +3,12 @@ import '../../domain/models/provisioning_session.dart';
 class ProvisioningSessionCreateApiModel {
   const ProvisioningSessionCreateApiModel({
     required this.gatewayId,
-    required this.roomId,
     required this.payload,
+    this.roomId,
   });
 
   final String gatewayId;
-  final String roomId;
+  final String? roomId;
   final ProvisioningQrPayload payload;
 
   Map<String, Object?> toJson() {
@@ -22,11 +22,17 @@ class ProvisioningSessionCreateApiModel {
       device['model'] = model;
     }
 
-    return {
-      'gateway_id': gatewayId,
-      'room_id': roomId,
-      'device': device,
-    };
+    final installCode = payload.installCode;
+    if (installCode != null && installCode.isNotEmpty) {
+      device['install_code'] = installCode;
+    }
+
+    final body = <String, Object?>{'gateway_id': gatewayId, 'device': device};
+    final selectedRoomId = roomId;
+    if (selectedRoomId != null && selectedRoomId.isNotEmpty) {
+      body['room_id'] = selectedRoomId;
+    }
+    return body;
   }
 }
 
@@ -50,7 +56,7 @@ class ProvisioningSessionApiModel {
       sessionId: json['session_id'] as String,
       status: ProvisioningStatus.fromJson(json['status']),
       gatewayId: json['gateway_id'] as String,
-      roomId: json['room_id'] as String,
+      roomId: json['room_id'] as String?,
       eui64: json['eui64'] as String,
       deviceType: ProvisioningDeviceType.fromJson(json['device_type']),
       model: json['model'] as String?,
@@ -64,7 +70,7 @@ class ProvisioningSessionApiModel {
   final String sessionId;
   final ProvisioningStatus status;
   final String gatewayId;
-  final String roomId;
+  final String? roomId;
   final String eui64;
   final ProvisioningDeviceType deviceType;
   final String? model;

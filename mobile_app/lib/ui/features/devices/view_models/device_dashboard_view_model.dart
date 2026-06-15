@@ -33,6 +33,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? _lastTarget;
   bool _isRenamingDevice = false;
   bool _isMovingDevice = false;
+  bool _isMutatingRoom = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
   List<Room> get rooms => List.unmodifiable(_rooms);
@@ -46,6 +47,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? get lastTarget => _lastTarget;
   bool get isRenamingDevice => _isRenamingDevice;
   bool get isMovingDevice => _isMovingDevice;
+  bool get isMutatingRoom => _isMutatingRoom;
 
   /// Human-readable room name for a device's [roomId], falling back to the raw
   /// id (then "No room") when the room list hasn't loaded or has no match.
@@ -110,7 +112,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       _cloudStatus = await statusFuture;
       _devices = await devicesFuture;
       _events = await eventsFuture;
-      _rooms = await roomsFuture;
+      _rooms = [...await roomsFuture];
       _deviceEvents.clear();
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
@@ -252,6 +254,86 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
     } finally {
       _isMovingDevice = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> createRoom(String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final created = await _repository.createRoom(normalizedName);
+      _rooms = [..._rooms, created];
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not create room',
+      );
+    } finally {
+      _isMutatingRoom = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final renamed = await _repository.renameRoom(
+        roomId: roomId,
+        name: normalizedName,
+      );
+      final index = _rooms.indexWhere((room) => room.id == roomId);
+      if (index != -1) {
+        _rooms[index] = renamed;
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not rename room',
+      );
+    } finally {
+      _isMutatingRoom = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteRoom(String roomId) async {
+    if (_isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final deleted = await _repository.deleteRoom(roomId);
+      _rooms = _rooms.where((room) => room.id != deleted.id).toList();
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not delete room',
+      );
+    } finally {
+      _isMutatingRoom = false;
       notifyListeners();
     }
   }

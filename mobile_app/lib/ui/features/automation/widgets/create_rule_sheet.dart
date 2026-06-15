@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/automation_rule.dart';
+import '../../../../domain/models/rule_humanizer.dart';
 import '../../../../domain/models/smart_device.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../l10n/localized_error_message.dart';
@@ -96,6 +97,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
             .toList();
 
         final canSave = _canSave();
+        final previewText = _previewText(triggerDevice, targetDevices, lights);
 
         return Padding(
           padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
@@ -203,9 +205,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                                   setState(() => _environmentMetric = metric);
                                 },
                                 onOperatorChanged: (operator) {
-                                  setState(
-                                    () => _thresholdOperator = operator,
-                                  );
+                                  setState(() => _thresholdOperator = operator);
                                 },
                               ),
                             ],
@@ -233,18 +233,11 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
                             onChanged: (value) =>
                                 setState(() => _enabled = value),
                           ),
-                          if (_triggerEvent != null &&
-                              _previewActionCommand != null) ...[
+                          if (previewText != null) ...[
                             const SizedBox(height: 16),
                             _FieldLabel(label: l10n.previewLabel),
                             const SizedBox(height: 6),
-                            RulePreview(
-                              triggerEvent: _triggerEvent!,
-                              triggerState: _triggerState,
-                              actionCommand: _previewActionCommand!,
-                              trigger: triggerDevice,
-                              targets: targetDevices,
-                            ),
+                            RulePreview.text(text: previewText),
                           ],
                           if (automation.errorMessage != null) ...[
                             const SizedBox(height: 16),
@@ -506,6 +499,71 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
       }
     }
     return _actionCommand;
+  }
+
+  String? _previewText(
+    SmartDevice? triggerDevice,
+    List<SmartDevice> targetDevices,
+    List<SmartDevice> lights,
+  ) {
+    if (_ruleKind == _RuleKind.schedule) {
+      final schedule = _scheduleSelection;
+      final target = _scheduleTarget;
+      if (schedule == null || !schedule.isValid || target == null) {
+        return null;
+      }
+      final action = switch (target) {
+        DirectLightTarget(:final deviceId) => DeviceCommandAutomationAction(
+          deviceId: deviceId,
+          command: _scheduleAction,
+        ),
+        SceneTarget(:final groupId, :final sceneId) =>
+          SceneActivateAutomationAction(groupId: groupId, sceneId: sceneId),
+      };
+      return humanizeAutomationRule(
+        trigger: ScheduleAutomationTrigger(cron: schedule.cron),
+        actions: [action],
+        deviceNames: {for (final light in lights) light.id: light.name},
+      );
+    }
+
+    final triggerId = _triggerId;
+    final triggerDeviceType = _triggerDeviceType;
+    final previewAction = _previewActionCommand;
+    if (triggerId == null ||
+        triggerDeviceType == null ||
+        previewAction == null ||
+        targetDevices.isEmpty) {
+      return null;
+    }
+
+    final trigger = triggerDeviceType == AutomationDeviceType.environment
+        ? SensorThresholdAutomationTrigger(
+            deviceId: triggerId,
+            metric: _environmentMetric,
+            operator: _thresholdOperator,
+            threshold: _parsedThreshold ?? 0,
+          )
+        : EventAutomationTrigger(
+            deviceId: triggerId,
+            deviceType: triggerDeviceType,
+            event: _triggerEvent ?? AutomationTriggerEvent.occupancyChanged,
+            state: _triggerState,
+          );
+    return humanizeAutomationRule(
+      trigger: trigger,
+      actions: [
+        for (final target in targetDevices)
+          DeviceCommandAutomationAction(
+            deviceId: target.id,
+            command: _targetActionCommands[target.id] ?? previewAction,
+          ),
+      ],
+      deviceNames: {
+        if (triggerDevice != null) triggerDevice.id: triggerDevice.name,
+        for (final target in targetDevices) target.id: target.name,
+      },
+    );
   }
 
   AutomationActionCommand _actionForTrigger(

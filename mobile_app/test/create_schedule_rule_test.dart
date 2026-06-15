@@ -54,6 +54,25 @@ void main() {
     );
   });
 
+  testWidgets('schedule rule tab shows a humanized preview', (tester) async {
+    await _pumpSheet(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'Preview schedule');
+    await _tapVisible(tester, find.byKey(const ValueKey('rule-kind-schedule')));
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('schedule-mode-weekdays')),
+    );
+    await _tapVisible(tester, find.text('Lab Light'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PREVIEW'), findsOneWidget);
+    expect(
+      find.text('Every weekday at 07:00, turn Lab Light on.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('switching rule kind clears visible selections', (tester) async {
     await _pumpSheet(tester);
 
@@ -288,6 +307,21 @@ class _FakeDeviceRepository implements DeviceRepository {
 
   @override
   Future<List<Room>> fetchRooms() async => const [];
+
+  @override
+  Future<Room> createRoom(String name) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Room> renameRoom({required String roomId, required String name}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Room> deleteRoom(String roomId) {
+    throw UnimplementedError();
+  }
 
   @override
   Future<SmartDevice> moveDeviceToRoom({

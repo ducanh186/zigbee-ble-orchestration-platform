@@ -29,7 +29,10 @@ class EnvironmentConditionSection extends StatelessWidget {
       return InputDecoration(
         filled: true,
         fillColor: palette.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: palette.border),
@@ -85,14 +88,8 @@ class EnvironmentConditionSection extends StatelessWidget {
             initialValue: operator,
             decoration: decoration(),
             items: const [
-              DropdownMenuItem(
-                value: ThresholdOperator.gte,
-                child: Text('>='),
-              ),
-              DropdownMenuItem(
-                value: ThresholdOperator.lte,
-                child: Text('<='),
-              ),
+              DropdownMenuItem(value: ThresholdOperator.gte, child: Text('>=')),
+              DropdownMenuItem(value: ThresholdOperator.lte, child: Text('<=')),
             ],
             onChanged: (value) {
               if (value != null) {

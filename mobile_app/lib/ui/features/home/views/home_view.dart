@@ -75,9 +75,7 @@ class HomeView extends StatelessWidget {
                           child: SectionTitle(title: l10n.environmentTitle),
                         ),
                         _RoomBadge(
-                          name: viewModel.roomNameFor(
-                            environmentSensor.roomId,
-                          ),
+                          name: viewModel.roomNameFor(environmentSensor.roomId),
                         ),
                       ],
                     ),

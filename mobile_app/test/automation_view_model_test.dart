@@ -79,30 +79,33 @@ void main() {
     },
   );
 
-  test('createRule returns immediately and reconciles sync in background', () async {
-    final repository = _FakeAutomationRepository(
-      createdRule: _rule(syncStatus: AutomationSyncStatus.pending),
-      fetchedRule: _rule(syncStatus: AutomationSyncStatus.synced),
-    );
-    final viewModel = AutomationViewModel(
-      repository: repository,
-      pollDelay: Duration.zero,
-      maxPollAttempts: 2,
-    );
+  test(
+    'createRule returns immediately and reconciles sync in background',
+    () async {
+      final repository = _FakeAutomationRepository(
+        createdRule: _rule(syncStatus: AutomationSyncStatus.pending),
+        fetchedRule: _rule(syncStatus: AutomationSyncStatus.synced),
+      );
+      final viewModel = AutomationViewModel(
+        repository: repository,
+        pollDelay: Duration.zero,
+        maxPollAttempts: 2,
+      );
 
-    await viewModel.createRule(_draft());
+      await viewModel.createRule(_draft());
 
-    // Save does not block on the gateway-sync reconcile: the rule is present
-    // (still pending) and saving has finished right after the POST.
-    expect(repository.createdDrafts, hasLength(1));
-    expect(viewModel.isSaving, isFalse);
-    expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.pending);
+      // Save does not block on the gateway-sync reconcile: the rule is present
+      // (still pending) and saving has finished right after the POST.
+      expect(repository.createdDrafts, hasLength(1));
+      expect(viewModel.isSaving, isFalse);
+      expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.pending);
 
-    // The background reconcile then polls and updates the sync badge.
-    await viewModel.syncReconcileTask;
-    expect(repository.fetchedRuleIds, ['automation-01']);
-    expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
-  });
+      // The background reconcile then polls and updates the sync badge.
+      await viewModel.syncReconcileTask;
+      expect(repository.fetchedRuleIds, ['automation-01']);
+      expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
+    },
+  );
 
   test(
     'createRule surfaces friendly error without leaking raw exception',

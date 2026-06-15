@@ -326,10 +326,7 @@ class _DeviceHeroCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             viewModel.roomNameFor(device.roomId),
-            style: TextStyle(
-              color: palette.textSecondary,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: palette.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
           Wrap(

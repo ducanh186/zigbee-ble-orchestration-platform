@@ -3,8 +3,13 @@ import '../models/provisioning_session.dart';
 abstract class ProvisioningRepository {
   Future<ProvisioningSession> createSession({
     required String gatewayId,
-    required String roomId,
     required ProvisioningQrPayload payload,
+    String? roomId,
+  });
+
+  Future<ProvisioningSession> assignSessionRoom({
+    required String sessionId,
+    required String roomId,
   });
 
   Future<ProvisioningSession> fetchSession(String sessionId);

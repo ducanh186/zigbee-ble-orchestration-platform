@@ -259,7 +259,7 @@ class ProvisioningSession(Base):
 
     id = Column(String, primary_key=True)
     gateway_id = Column(String, nullable=False)
-    room_id = Column(String, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     eui64 = Column(String, nullable=False)
     install_code = Column(String, nullable=False)
     device_type = Column(String, nullable=False)

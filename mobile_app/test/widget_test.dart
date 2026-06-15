@@ -544,6 +544,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('HOME MANAGEMENT'), findsOneWidget);
     expect(find.text('Devices'), findsOneWidget);
+    expect(find.text('Rooms'), findsOneWidget);
     expect(find.text('Add new device'), findsOneWidget);
     expect(find.text('Automation rules'), findsOneWidget);
     expect(find.text('Activity history'), findsOneWidget);
