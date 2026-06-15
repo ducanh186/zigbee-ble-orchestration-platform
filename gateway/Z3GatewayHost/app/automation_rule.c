@@ -845,6 +845,21 @@ void automationRuleHandleMqttPayload(const char *topic, const char *body)
   char trig_dtype[16] = {0};
   findQuotedStringIn(trigBuf, "\"device_type\":", trig_dtype, sizeof(trig_dtype));
   parsed.trig_device_type = parseDeviceType(trig_dtype);
+  // device-model-v2: the cloud unified occupancy (sensor kind 1) and
+  // environment (sensor kind 2) under a single trigger device_type="sensor".
+  // The gateway's matching model still distinguishes environment vs motion, so
+  // map "sensor" back by the trigger discriminator: a "sensor_threshold" type
+  // means environment; otherwise (an event-based trigger) it means motion.
+  if (parsed.trig_device_type == AUTO_DEV_UNKNOWN
+      && strcmp(trig_dtype, "sensor") == 0) {
+    char v2TypeStr[24] = {0};
+    if (findQuotedStringIn(trigBuf, "\"type\":", v2TypeStr, sizeof(v2TypeStr))
+        && strcmp(v2TypeStr, "sensor_threshold") == 0) {
+      parsed.trig_device_type = AUTO_DEV_ENVIRONMENT;
+    } else {
+      parsed.trig_device_type = AUTO_DEV_MOTION;
+    }
+  }
   if (parsed.trig_device_type != AUTO_DEV_SWITCH
    && parsed.trig_device_type != AUTO_DEV_MOTION
    && parsed.trig_device_type != AUTO_DEV_ENVIRONMENT) {
