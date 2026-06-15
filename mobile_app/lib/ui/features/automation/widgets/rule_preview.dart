@@ -17,6 +17,7 @@ class RulePreview extends StatelessWidget {
     EnvironmentMetric environmentMetric = EnvironmentMetric.temperature,
     ThresholdOperator thresholdOperator = ThresholdOperator.gte,
     double? threshold,
+    AutomationRuleLanguage language = AutomationRuleLanguage.english,
     super.key,
   }) : text = humanizeAutomationRule(
          trigger: triggerDeviceType == AutomationDeviceType.environment
@@ -43,6 +44,7 @@ class RulePreview extends StatelessWidget {
            if (trigger != null) trigger.id: trigger.name,
            for (final target in targets) target.id: target.name,
          },
+         language: language,
        );
 
   const RulePreview.text({required this.text, super.key});

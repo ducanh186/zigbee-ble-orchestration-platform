@@ -18,10 +18,14 @@ class RuleBodyBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final language = automationRuleLanguageForCode(
+      Localizations.localeOf(context).languageCode,
+    );
     final sentence = humanizeAutomationRule(
       trigger: rule.trigger,
       actions: rule.actions,
       deviceNames: deviceNames,
+      language: language,
     );
 
     return Container(

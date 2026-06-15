@@ -171,6 +171,11 @@ class RemoteDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<void> deleteDevice(String deviceId) async {
+    await _apiClient.deleteJson('/api/devices/$deviceId');
+  }
+
+  @override
   Future<CommandResult> fetchCommand(String commandId) async {
     final json = await _apiClient.getJson('/api/commands/$commandId');
     return CommandApiModel.fromJson(

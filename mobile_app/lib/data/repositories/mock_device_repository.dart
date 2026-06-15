@@ -246,6 +246,13 @@ class MockDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<void> deleteDevice(String deviceId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _devices.removeWhere((device) => device.id == deviceId);
+    _events.removeWhere((event) => event.deviceId == deviceId);
+  }
+
+  @override
   Future<CommandResult> fetchCommand(String commandId) async {
     await Future<void>.delayed(const Duration(milliseconds: 220));
     final command = _commands[commandId];

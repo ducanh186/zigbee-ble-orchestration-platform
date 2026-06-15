@@ -33,6 +33,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? _lastTarget;
   bool _isRenamingDevice = false;
   bool _isMovingDevice = false;
+  bool _isDeletingDevice = false;
   bool _isMutatingRoom = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
@@ -47,6 +48,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? get lastTarget => _lastTarget;
   bool get isRenamingDevice => _isRenamingDevice;
   bool get isMovingDevice => _isMovingDevice;
+  bool get isDeletingDevice => _isDeletingDevice;
   bool get isMutatingRoom => _isMutatingRoom;
 
   /// Human-readable room name for a device's [roomId], falling back to the raw
@@ -254,6 +256,34 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       );
     } finally {
       _isMovingDevice = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteDevice(String deviceId) async {
+    if (_isDeletingDevice) {
+      return false;
+    }
+
+    _isDeletingDevice = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteDevice(deviceId);
+      _devices = _devices.where((device) => device.id != deviceId).toList();
+      _deviceEvents.remove(deviceId);
+      _deviceEventErrors.remove(deviceId);
+      _loadingEventDeviceIds.remove(deviceId);
+      return true;
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not delete device',
+      );
+      return false;
+    } finally {
+      _isDeletingDevice = false;
       notifyListeners();
     }
   }

@@ -35,5 +35,7 @@ abstract class DeviceRepository {
     required String roomId,
   });
 
+  Future<void> deleteDevice(String deviceId);
+
   Future<CommandResult> fetchCommand(String commandId);
 }

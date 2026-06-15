@@ -104,11 +104,42 @@ void main() {
     expect(repository.deletedRoomId, 'room-1');
     expect(viewModel.rooms.map((room) => room.id), ['room-2']);
   });
+
+  test(
+    'deleteDevice removes the deleted device from the dashboard list',
+    () async {
+      final repository = _CommandCaptureRepository()
+        ..devices = const [
+          SmartDevice(
+            id: 'light-01',
+            deviceType: 'light',
+            name: 'Lab Light',
+            isOnline: true,
+            power: DevicePower.on,
+          ),
+          SmartDevice(
+            id: 'pir-01',
+            deviceType: 'motion',
+            name: 'Lab Motion',
+            isOnline: true,
+            power: DevicePower.unknown,
+          ),
+        ];
+      final viewModel = DeviceDashboardViewModel(repository: repository);
+      await viewModel.load();
+
+      await viewModel.deleteDevice('light-01');
+
+      expect(repository.deletedDeviceId, 'light-01');
+      expect(viewModel.devices.map((device) => device.id), ['pir-01']);
+    },
+  );
 }
 
 class _CommandCaptureRepository implements DeviceRepository {
   String? sentDeviceId;
   DevicePower? sentTarget;
+  List<SmartDevice> devices = const [];
   List<Room> rooms = const [];
   String? movedDeviceId;
   String? movedRoomId;
@@ -116,12 +147,13 @@ class _CommandCaptureRepository implements DeviceRepository {
   String? renamedRoomId;
   String? renamedRoomName;
   String? deletedRoomId;
+  String? deletedDeviceId;
 
   @override
   Future<CloudStatus> fetchCloudStatus() async => const CloudStatus.online();
 
   @override
-  Future<List<SmartDevice>> fetchDevices() async => const <SmartDevice>[];
+  Future<List<SmartDevice>> fetchDevices() async => devices;
 
   @override
   Future<List<EventLog>> fetchEvents({String? deviceId}) async =>
@@ -198,6 +230,12 @@ class _CommandCaptureRepository implements DeviceRepository {
       power: DevicePower.on,
       roomId: roomId,
     );
+  }
+
+  @override
+  Future<void> deleteDevice(String deviceId) async {
+    deletedDeviceId = deviceId;
+    devices = devices.where((device) => device.id != deviceId).toList();
   }
 
   @override

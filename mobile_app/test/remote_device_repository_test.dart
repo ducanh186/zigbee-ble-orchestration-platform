@@ -145,6 +145,22 @@ void main() {
     },
   );
 
+  test('deleteDevice sends DELETE to the device endpoint', () async {
+    final apiClient = ApiClient(
+      baseUrl: 'http://98.83.4.87:8000',
+      httpClient: MockClient((request) async {
+        expect(request.method, 'DELETE');
+        expect(request.url.path, '/api/devices/light-01');
+        expect(request.headers['authorization'], 'Bearer token-abc');
+        return http.Response('', 204);
+      }),
+    );
+    apiClient.setAccessToken('token-abc');
+    final repository = RemoteDeviceRepository(apiClient: apiClient);
+
+    await repository.deleteDevice('light-01');
+  });
+
   test('createRoom posts the parent room name and returns the room', () async {
     final apiClient = ApiClient(
       baseUrl: 'http://98.83.4.87:8000',

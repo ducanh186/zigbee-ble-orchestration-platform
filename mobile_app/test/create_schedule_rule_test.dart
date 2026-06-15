@@ -332,6 +332,11 @@ class _FakeDeviceRepository implements DeviceRepository {
   }
 
   @override
+  Future<void> deleteDevice(String deviceId) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<CommandResult> fetchCommand(String commandId) {
     throw UnimplementedError();
   }

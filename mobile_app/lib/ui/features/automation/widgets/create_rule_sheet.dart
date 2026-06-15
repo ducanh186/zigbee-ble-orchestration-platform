@@ -81,6 +81,9 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
+    final humanizerLanguage = automationRuleLanguageForCode(
+      Localizations.localeOf(context).languageCode,
+    );
     final mediaQuery = MediaQuery.of(context);
 
     return Consumer2<AutomationViewModel, DeviceDashboardViewModel>(
@@ -97,7 +100,12 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
             .toList();
 
         final canSave = _canSave();
-        final previewText = _previewText(triggerDevice, targetDevices, lights);
+        final previewText = _previewText(
+          triggerDevice,
+          targetDevices,
+          lights,
+          humanizerLanguage,
+        );
 
         return Padding(
           padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
@@ -505,6 +513,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
     SmartDevice? triggerDevice,
     List<SmartDevice> targetDevices,
     List<SmartDevice> lights,
+    AutomationRuleLanguage language,
   ) {
     if (_ruleKind == _RuleKind.schedule) {
       final schedule = _scheduleSelection;
@@ -524,6 +533,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         trigger: ScheduleAutomationTrigger(cron: schedule.cron),
         actions: [action],
         deviceNames: {for (final light in lights) light.id: light.name},
+        language: language,
       );
     }
 
@@ -563,6 +573,7 @@ class _CreateRuleSheetState extends State<CreateRuleSheet> {
         if (triggerDevice != null) triggerDevice.id: triggerDevice.name,
         for (final target in targetDevices) target.id: target.name,
       },
+      language: language,
     );
   }
 

@@ -105,7 +105,11 @@ class _SmartBuildingShellState extends State<SmartBuildingShell> {
     final session = context.watch<AuthViewModel>().session;
     final canMutateHome = session?.canMutateHome ?? false;
     return switch (_tabIndex) {
-      0 => HomeView(onOpenLight: _openLight, onOpenDevices: _openDevices),
+      0 => HomeView(
+        onOpenLight: _openLight,
+        onOpenDevices: _openDevices,
+        onOpenProvisioning: _openProvisioning,
+      ),
       1 => AutomationRulesView(
         canMutate: session?.canManageAutomation ?? false,
       ),

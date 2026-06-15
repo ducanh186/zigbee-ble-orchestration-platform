@@ -310,10 +310,91 @@ class AppLocalizationsEn extends AppLocalizations {
   String get devicesMetricLabel => 'Devices';
 
   @override
+  String get detailsLabel => 'Details';
+
+  @override
+  String get addDeviceLabel => 'Add device';
+
+  @override
   String get onlineMetricLabel => 'Online';
 
   @override
   String get unreachableMetricLabel => 'Unreachable';
+
+  @override
+  String get allDevicesFilter => 'All';
+
+  @override
+  String get lightDevicesFilter => 'Light';
+
+  @override
+  String get sensorDevicesFilter => 'Sensors';
+
+  @override
+  String get switchDevicesFilter => 'Switch';
+
+  @override
+  String get noRoomLabel => 'No room';
+
+  @override
+  String get powerOnStatus => 'ON';
+
+  @override
+  String get powerOffStatus => 'OFF';
+
+  @override
+  String get powerUnreachableStatus => 'UNREACHABLE';
+
+  @override
+  String get powerUnknownStatus => 'UNKNOWN';
+
+  @override
+  String get onlineStatusBadge => 'ONLINE';
+
+  @override
+  String get offlineStatusBadge => 'OFFLINE';
+
+  @override
+  String get occupiedStatusBadge => 'OCCUPIED';
+
+  @override
+  String get unoccupiedStatusBadge => 'UNOCCUPIED';
+
+  @override
+  String get unknownStatusBadge => 'UNKNOWN';
+
+  @override
+  String get gatewayLogBadge => 'LOG';
+
+  @override
+  String get gatewayOffBadge => 'OFF';
+
+  @override
+  String get gatewayCheckBadge => 'CHECK';
+
+  @override
+  String get gatewayMockBadge => 'MOCK';
+
+  @override
+  String get syncPendingStatus => 'PENDING';
+
+  @override
+  String get syncSyncedStatus => 'SYNCED';
+
+  @override
+  String get syncFailedStatus => 'FAILED';
+
+  @override
+  String get runNeverStatus => 'NEVER RUN';
+
+  @override
+  String get runExecutedStatus => 'EXECUTED';
+
+  @override
+  String get runFailedStatus => 'FAILED';
+
+  @override
+  String get runTimeoutStatus => 'TIMEOUT';
 
   @override
   String get quickLightsTitle => 'Quick lights';
@@ -564,6 +645,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get renameDeviceLabel => 'Rename device';
+
+  @override
+  String get deleteDeviceTooltip => 'Delete device';
+
+  @override
+  String get deleteDeviceTitle => 'Delete device?';
+
+  @override
+  String deleteDeviceBody(String name) {
+    return 'Delete \"$name\" from Cloud. The next gateway report can add it again as a fresh device.';
+  }
 
   @override
   String get recentEventsTitle => 'Recent events';
