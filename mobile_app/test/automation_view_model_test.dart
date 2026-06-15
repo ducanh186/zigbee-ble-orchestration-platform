@@ -79,23 +79,33 @@ void main() {
     },
   );
 
-  test('createRule polls pending rule until sync status is final', () async {
-    final repository = _FakeAutomationRepository(
-      createdRule: _rule(syncStatus: AutomationSyncStatus.pending),
-      fetchedRule: _rule(syncStatus: AutomationSyncStatus.synced),
-    );
-    final viewModel = AutomationViewModel(
-      repository: repository,
-      pollDelay: Duration.zero,
-      maxPollAttempts: 2,
-    );
+  test(
+    'createRule returns immediately and reconciles sync in background',
+    () async {
+      final repository = _FakeAutomationRepository(
+        createdRule: _rule(syncStatus: AutomationSyncStatus.pending),
+        fetchedRule: _rule(syncStatus: AutomationSyncStatus.synced),
+      );
+      final viewModel = AutomationViewModel(
+        repository: repository,
+        pollDelay: Duration.zero,
+        maxPollAttempts: 2,
+      );
 
-    await viewModel.createRule(_draft());
+      await viewModel.createRule(_draft());
 
-    expect(repository.createdDrafts, hasLength(1));
-    expect(repository.fetchedRuleIds, ['automation-01']);
-    expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
-  });
+      // Save does not block on the gateway-sync reconcile: the rule is present
+      // (still pending) and saving has finished right after the POST.
+      expect(repository.createdDrafts, hasLength(1));
+      expect(viewModel.isSaving, isFalse);
+      expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.pending);
+
+      // The background reconcile then polls and updates the sync badge.
+      await viewModel.syncReconcileTask;
+      expect(repository.fetchedRuleIds, ['automation-01']);
+      expect(viewModel.rules.single.syncStatus, AutomationSyncStatus.synced);
+    },
+  );
 
   test(
     'createRule surfaces friendly error without leaking raw exception',
@@ -138,7 +148,7 @@ void main() {
   });
 
   test(
-    'deleteRule surfaces an error when cloud reload still returns deleted rule',
+    'deleteRule does not surface a false error if the backend defers removal',
     () async {
       final repository = _FakeAutomationRepository(
         initialRules: [_rule(syncStatus: AutomationSyncStatus.synced)],
@@ -151,11 +161,10 @@ void main() {
 
       expect(repository.deletedRuleIds, ['automation-01']);
       expect(repository.fetchRulesCount, 2);
-      expect(viewModel.rules.single.id, 'automation-01');
-      expect(
-        viewModel.errorMessage,
-        'Cloud chua xoa rule. Kiem tra backend release hoac API endpoint.',
-      );
+      // A successful DELETE is accepted even if the rule is still returned;
+      // no false "cloud hasn't deleted" error.
+      expect(viewModel.errorMessage, isNull);
+      expect(viewModel.rules.map((rule) => rule.id), ['automation-01']);
     },
   );
 

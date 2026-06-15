@@ -113,6 +113,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDevices => 'Devices';
 
   @override
+  String get settingsRooms => 'Rooms';
+
+  @override
   String get settingsAddNewDevice => 'Add new device';
 
   @override
@@ -334,13 +337,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ruleNameHint => 'e.g. Motion turns on lab lights';
 
   @override
-  String get quickTemplateLabel => 'Quick template';
+  String get ruleKindLabel => 'Rule type';
 
   @override
-  String get expandQuickTemplateTooltip => 'Expand quick template';
+  String get ruleKindDeviceTrigger => 'Device trigger';
 
   @override
-  String get collapseQuickTemplateTooltip => 'Collapse quick template';
+  String get ruleKindSchedule => 'Schedule';
 
   @override
   String get triggerDeviceLabel => 'Trigger device';
@@ -505,6 +508,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrJsonLabel => 'QR JSON';
 
   @override
+  String get assignDeviceRoomTitle => 'Assign device to room';
+
+  @override
+  String get assignDeviceRoomBody => 'Which room should this device use?';
+
+  @override
   String get clearLabel => 'Clear';
 
   @override
@@ -570,6 +579,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roomLabel => 'Room';
+
+  @override
+  String get roomsTitle => 'Rooms';
+
+  @override
+  String get createRoomLabel => 'Create room';
+
+  @override
+  String get renameRoomLabel => 'Rename room';
+
+  @override
+  String get roomNameLabel => 'Room name';
+
+  @override
+  String get deleteRoomTitle => 'Delete room?';
+
+  @override
+  String deleteRoomBody(String name) {
+    return 'Delete \"$name\" from this home. Rooms with devices cannot be deleted.';
+  }
+
+  @override
+  String get moveRoomLabel => 'Move room';
+
+  @override
+  String get moveRoomTitle => 'Move to room';
+
+  @override
+  String get noRoomsAvailable => 'No rooms available';
 
   @override
   String get occupancyLabel => 'Occupancy';
@@ -793,9 +831,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get humidityLabel => 'Humidity';
 
   @override
-  String get zigbeeLocalLabel => 'Zigbee local';
-
-  @override
   String get sensorConditionLabel => 'Condition';
 
   @override
@@ -827,6 +862,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduleTriggerLabel => 'Schedule';
+
+  @override
+  String get scheduleActionLabel => 'Action';
 
   @override
   String get scheduleModeHourly => 'Hourly';

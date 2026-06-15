@@ -12,8 +12,9 @@ import '../../auth/view_models/auth_view_model.dart';
 import '../../devices/views/devices_view.dart';
 import '../../logs/views/logs_view.dart';
 import '../widgets/profile_view.dart';
+import '../widgets/rooms_view.dart';
 
-enum SettingsSection { overview, profile, devices, logs }
+enum SettingsSection { overview, profile, devices, rooms, logs }
 
 class SettingsView extends StatefulWidget {
   const SettingsView({
@@ -51,6 +52,9 @@ class _SettingsViewState extends State<SettingsView> {
         onOpenDevices: () {
           setState(() => _section = SettingsSection.devices);
         },
+        onOpenRooms: () {
+          setState(() => _section = SettingsSection.rooms);
+        },
         onOpenLogs: () {
           setState(() => _section = SettingsSection.logs);
         },
@@ -66,6 +70,7 @@ class _SettingsViewState extends State<SettingsView> {
         onOpenLight: widget.onOpenLight,
         onBack: _openOverview,
       ),
+      SettingsSection.rooms => RoomsView(onBack: _openOverview),
       SettingsSection.logs => LogsView(onBack: _openOverview),
     };
   }
@@ -79,6 +84,7 @@ class _SettingsOverview extends StatelessWidget {
   const _SettingsOverview({
     required this.onOpenProfile,
     required this.onOpenDevices,
+    required this.onOpenRooms,
     required this.onOpenLogs,
     this.onOpenAutomation,
     this.onOpenProvisioning,
@@ -87,6 +93,7 @@ class _SettingsOverview extends StatelessWidget {
 
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenDevices;
+  final VoidCallback onOpenRooms;
   final VoidCallback onOpenLogs;
   final VoidCallback? onOpenAutomation;
   final VoidCallback? onOpenProvisioning;
@@ -137,6 +144,12 @@ class _SettingsOverview extends StatelessWidget {
                       onTap: onOpenDevices,
                     ),
                     if (canMutateHome) ...[
+                      Divider(color: palette.border, height: 1),
+                      _SettingsRow(
+                        icon: Icons.meeting_room_outlined,
+                        title: l10n.settingsRooms,
+                        onTap: onOpenRooms,
+                      ),
                       Divider(color: palette.border, height: 1),
                       _SettingsRow(
                         icon: Icons.add_circle_outline,
@@ -288,7 +301,7 @@ class _AdvancedSectionState extends State<_AdvancedSection> {
             _SettingsInfoRow(
               icon: Icons.timer_outlined,
               label: widget.l10n.settingsPollInterval,
-              value: '2.0 s',
+              value: '1.0 s',
               mono: true,
             ),
             Divider(color: palette.border, height: 1),

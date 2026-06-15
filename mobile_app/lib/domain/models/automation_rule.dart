@@ -8,17 +8,24 @@ enum AutomationDeviceType {
     return switch (value) {
       'light' => AutomationDeviceType.light,
       'switch' => AutomationDeviceType.switchDevice,
+      // device-model-v2: 'sensor' arrives for occupancy (device_event) triggers;
+      // sensor_threshold triggers carry their own environment typing. Legacy
+      // 'motion'/'environment' still parse for pre-migration rules.
+      'sensor' => AutomationDeviceType.motion,
       'motion' => AutomationDeviceType.motion,
       'environment' => AutomationDeviceType.environment,
       _ => AutomationDeviceType.light,
     };
   }
 
+  // Both sensor kinds wire as device_type "sensor" (v2). The cloud disambiguates
+  // by trigger type (sensor_threshold = environment/kind 2, device_event
+  // occupancy = motion/kind 1) and matches the live "sensor" device row.
   String get wireValue => switch (this) {
     AutomationDeviceType.light => 'light',
     AutomationDeviceType.switchDevice => 'switch',
-    AutomationDeviceType.motion => 'motion',
-    AutomationDeviceType.environment => 'environment',
+    AutomationDeviceType.motion => 'sensor',
+    AutomationDeviceType.environment => 'sensor',
   };
 
   String get label => switch (this) {

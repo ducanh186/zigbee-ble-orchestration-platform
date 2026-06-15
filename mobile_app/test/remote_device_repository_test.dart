@@ -57,39 +57,34 @@ void main() {
     },
   );
 
-  test('maps partial environment state into typed sensor values', () async {
+  test('maps a v2 sensor (kind 2) from inline list state', () async {
+    final requests = <Uri>[];
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
         baseUrl: 'https://dashboard.iot-building.app',
         httpClient: MockClient((request) async {
+          requests.add(request.url);
           if (request.url.path == '/api/devices/') {
             return http.Response(
               jsonEncode([
                 {
                   'id': 'environment-01',
-                  'device_type': 'environment',
+                  'device_type': 'sensor',
+                  'sensor_kind': 2,
                   'eui64': '00124b0001dht011',
                   'room_id': 'room-01',
                   'name': 'DHT11 Sensor',
                   'is_online': true,
+                  // latest state is now inlined by the list endpoint
+                  'state': {
+                    'temperature_c': 28.5,
+                    'humidity_percent': 48,
+                    'sensor': 'dht11',
+                    'reachable': true,
+                  },
+                  'reported_at': '10:11 06/13/2026',
                 },
               ]),
-              200,
-              headers: {'content-type': 'application/json'},
-            );
-          }
-          if (request.url.path == '/api/devices/environment-01/state') {
-            return http.Response(
-              jsonEncode({
-                'device_id': 'environment-01',
-                'state': {
-                  'temperature_c': 28.5,
-                  'humidity_percent': 48,
-                  'sensor': 'dht11',
-                  'reachable': true,
-                },
-                'reported_at': '10:11 06/13/2026',
-              }),
               200,
               headers: {'content-type': 'application/json'},
             );
@@ -102,9 +97,13 @@ void main() {
     final device = (await repository.fetchDevices()).single;
 
     expect(device.isEnvironment, isTrue);
+    expect(device.sensorKind, 2);
     expect(device.temperatureC, 28.5);
     expect(device.humidityPercent, 48);
-    expect(device.sensorKind, 'dht11');
+    expect(device.sensorLabel, 'dht11');
+    expect(device.reportedAt, '10:11 06/13/2026');
+    // No per-device /state fan-out — only the list endpoint is hit.
+    expect(requests.map((u) => u.path), ['/api/devices/']);
   });
 
   test(
@@ -146,6 +145,73 @@ void main() {
     },
   );
 
+  test('createRoom posts the parent room name and returns the room', () async {
+    final apiClient = ApiClient(
+      baseUrl: 'http://98.83.4.87:8000',
+      httpClient: MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/rooms/');
+        final body = jsonDecode(request.body) as Map<String, Object?>;
+        expect(body, {'name': 'Meeting Room'});
+        return http.Response(
+          jsonEncode({'id': 'room-new', 'name': 'Meeting Room'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final repository = RemoteDeviceRepository(apiClient: apiClient);
+
+    final room = await repository.createRoom('Meeting Room');
+
+    expect(room.id, 'room-new');
+    expect(room.name, 'Meeting Room');
+  });
+
+  test('renameRoom patches the room name and returns the room', () async {
+    final apiClient = ApiClient(
+      baseUrl: 'http://98.83.4.87:8000',
+      httpClient: MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.path, '/api/rooms/room-1');
+        final body = jsonDecode(request.body) as Map<String, Object?>;
+        expect(body, {'name': 'Studio'});
+        return http.Response(
+          jsonEncode({'id': 'room-1', 'name': 'Studio'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final repository = RemoteDeviceRepository(apiClient: apiClient);
+
+    final room = await repository.renameRoom(roomId: 'room-1', name: 'Studio');
+
+    expect(room.id, 'room-1');
+    expect(room.name, 'Studio');
+  });
+
+  test('deleteRoom deletes a room and returns the deleted room', () async {
+    final apiClient = ApiClient(
+      baseUrl: 'http://98.83.4.87:8000',
+      httpClient: MockClient((request) async {
+        expect(request.method, 'DELETE');
+        expect(request.url.path, '/api/rooms/room-1');
+        return http.Response(
+          jsonEncode({'id': 'room-1', 'name': 'Studio'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final repository = RemoteDeviceRepository(apiClient: apiClient);
+
+    final room = await repository.deleteRoom('room-1');
+
+    expect(room.id, 'room-1');
+    expect(room.name, 'Studio');
+  });
+
   test('fetchEvents for device reads three recent cloud event rows', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
@@ -183,10 +249,7 @@ void main() {
       apiClient: ApiClient(
         baseUrl: 'http://98.83.4.87:8000',
         httpClient: MockClient((request) async {
-          expect(
-            request.url.path,
-            '/api/gateways/gw-ubuntu-01/status',
-          );
+          expect(request.url.path, '/api/gateways/gw-ubuntu-01/status');
           expect(request.url.query, isEmpty);
           return http.Response(
             jsonEncode({
@@ -241,15 +304,15 @@ void main() {
   test('reads gateway offline status from the dedicated endpoint', () async {
     final repository = RemoteDeviceRepository(
       apiClient: ApiClient(
-          baseUrl: 'http://98.83.4.87:8000',
-          httpClient: MockClient((request) async {
-            return http.Response(
-              jsonEncode({
-                'gateway_id': 'gw-ubuntu-01',
-                'status': 'offline',
-                'event_type': 'gateway_online',
-                'occurred_at': '10:12 05/07/2026',
-              }),
+        baseUrl: 'http://98.83.4.87:8000',
+        httpClient: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'gateway_id': 'gw-ubuntu-01',
+              'status': 'offline',
+              'event_type': 'gateway_online',
+              'occurred_at': '10:12 05/07/2026',
+            }),
             200,
             headers: {'content-type': 'application/json'},
           );

@@ -6,14 +6,22 @@ final _eui64Pattern = RegExp(r'^[0-9a-fA-F]{16}$');
 enum ProvisioningDeviceType {
   light,
   switchDevice,
-  motion;
+  motion,
+  sensor,
+  environment;
 
   static ProvisioningDeviceType fromJson(Object? value) {
     return switch (value) {
       'light' => ProvisioningDeviceType.light,
       'switch' => ProvisioningDeviceType.switchDevice,
+      // device-model-v2 provisions sensors as 'sensor'; 'motion' kept for
+      // legacy QR payloads/labels printed before the migration.
+      'sensor' => ProvisioningDeviceType.sensor,
+      'environment' => ProvisioningDeviceType.environment,
       'motion' => ProvisioningDeviceType.motion,
-      _ => throw FormatException('Unsupported provisioning device_type: $value'),
+      _ => throw FormatException(
+        'Unsupported provisioning device_type: $value',
+      ),
     };
   }
 
@@ -21,12 +29,16 @@ enum ProvisioningDeviceType {
     ProvisioningDeviceType.light => 'light',
     ProvisioningDeviceType.switchDevice => 'switch',
     ProvisioningDeviceType.motion => 'motion',
+    ProvisioningDeviceType.sensor => 'sensor',
+    ProvisioningDeviceType.environment => 'environment',
   };
 
   String get label => switch (this) {
     ProvisioningDeviceType.light => 'Light',
     ProvisioningDeviceType.switchDevice => 'Switch',
     ProvisioningDeviceType.motion => 'Sensors',
+    ProvisioningDeviceType.sensor => 'Sensor',
+    ProvisioningDeviceType.environment => 'Environment Sensor',
   };
 }
 
@@ -75,23 +87,20 @@ class ProvisioningQrPayload {
     required this.eui64,
     required this.deviceType,
     this.model,
+    this.installCode,
   });
 
   factory ProvisioningQrPayload.parseJson(String value) {
     final decoded = jsonDecode(value);
     if (decoded is! Map) {
-      throw const FormatException('Provisioning QR payload must be a JSON object');
+      throw const FormatException(
+        'Provisioning QR payload must be a JSON object',
+      );
     }
     return ProvisioningQrPayload.fromJson(Map<String, Object?>.from(decoded));
   }
 
   factory ProvisioningQrPayload.fromJson(Map<String, Object?> json) {
-    if (json.containsKey('install_code')) {
-      throw const FormatException(
-        'Provisioning QR payload must not contain install_code',
-      );
-    }
-
     final version = json['version'];
     if (version is! int || version != _supportedQrVersion) {
       throw FormatException('Unsupported provisioning QR version: $version');
@@ -107,6 +116,7 @@ class ProvisioningQrPayload {
       eui64: eui64.toUpperCase(),
       deviceType: ProvisioningDeviceType.fromJson(json['device_type']),
       model: _optionalString(json, 'model'),
+      installCode: _optionalString(json, 'install_code'),
     );
   }
 
@@ -114,6 +124,7 @@ class ProvisioningQrPayload {
   final String eui64;
   final ProvisioningDeviceType deviceType;
   final String? model;
+  final String? installCode;
 }
 
 class ProvisioningSession {
@@ -121,9 +132,9 @@ class ProvisioningSession {
     required this.sessionId,
     required this.status,
     required this.gatewayId,
-    required this.roomId,
     required this.eui64,
     required this.deviceType,
+    this.roomId,
     this.model,
     this.reason,
     this.expiresAt,
@@ -134,7 +145,7 @@ class ProvisioningSession {
   final String sessionId;
   final ProvisioningStatus status;
   final String gatewayId;
-  final String roomId;
+  final String? roomId;
   final String eui64;
   final ProvisioningDeviceType deviceType;
   final String? model;

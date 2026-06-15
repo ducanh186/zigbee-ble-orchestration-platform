@@ -69,7 +69,16 @@ class HomeView extends StatelessWidget {
                   ),
                   if (environmentSensor != null) ...[
                     const SizedBox(height: 18),
-                    SectionTitle(title: l10n.environmentTitle),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SectionTitle(title: l10n.environmentTitle),
+                        ),
+                        _RoomBadge(
+                          name: viewModel.roomNameFor(environmentSensor.roomId),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,10 +89,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.temperatureC,
                             unit: '°C',
                             label: l10n.temperatureLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -93,10 +98,6 @@ class HomeView extends StatelessWidget {
                             value: environmentSensor.humidityPercent,
                             unit: '%',
                             label: l10n.humidityLabel,
-                            sensorLabel:
-                                environmentSensor.sensorKind?.toUpperCase() ??
-                                environmentSensor.name,
-                            sourceLabel: l10n.zigbeeLocalLabel,
                           ),
                         ),
                       ],
@@ -107,6 +108,7 @@ class HomeView extends StatelessWidget {
                   const SizedBox(height: 8),
                   _QuickLightGrid(
                     lights: viewModel.lights.take(4).toList(),
+                    viewModel: viewModel,
                     onOpenLight: onOpenLight,
                   ),
                   if (viewModel.isLoading)
@@ -217,9 +219,14 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _QuickLightGrid extends StatelessWidget {
-  const _QuickLightGrid({required this.lights, required this.onOpenLight});
+  const _QuickLightGrid({
+    required this.lights,
+    required this.viewModel,
+    required this.onOpenLight,
+  });
 
   final List<SmartDevice> lights;
+  final DeviceDashboardViewModel viewModel;
   final ValueChanged<SmartDevice> onOpenLight;
 
   @override
@@ -237,13 +244,18 @@ class _QuickLightGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: 1.05,
+        // Denser/compact tiles now that the EUI64 line is gone.
+        childAspectRatio: 1.45,
       ),
       itemBuilder: (context, index) {
         final light = lights[index];
         return AppCard(
+          padding: const EdgeInsets.all(12),
           onTap: () => onOpenLight(light),
-          child: _LightTile(light: light),
+          child: _LightTile(
+            light: light,
+            roomName: viewModel.roomNameFor(light.roomId),
+          ),
         );
       },
     );
@@ -251,9 +263,10 @@ class _QuickLightGrid extends StatelessWidget {
 }
 
 class _LightTile extends StatelessWidget {
-  const _LightTile({required this.light});
+  const _LightTile({required this.light, required this.roomName});
 
   final SmartDevice light;
+  final String roomName;
 
   @override
   Widget build(BuildContext context) {
@@ -265,14 +278,15 @@ class _LightTile extends StatelessWidget {
         Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: isOn ? palette.warningTint : const Color(0x1F6B7280),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: Icon(
                 isOn ? Icons.lightbulb : Icons.lightbulb_outline,
+                size: 18,
                 color: isOn ? palette.warning : palette.textSecondary,
               ),
             ),
@@ -291,20 +305,64 @@ class _LightTile extends StatelessWidget {
         const Spacer(),
         Text(
           light.name,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 2),
-        Text(
-          light.id,
-          style: TextStyle(
-            color: palette.textSecondary,
-            fontFamily: 'JetBrains Mono',
-            fontSize: 11,
-          ),
+        Row(
+          children: [
+            Icon(
+              Icons.meeting_room_outlined,
+              size: 12,
+              color: palette.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                roomName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: palette.textSecondary, fontSize: 12),
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+/// Small pill showing which room an environment sensor lives in.
+class _RoomBadge extends StatelessWidget {
+  const _RoomBadge({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.primaryTint,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.meeting_room_outlined, size: 13, color: palette.primary),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(
+              color: palette.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

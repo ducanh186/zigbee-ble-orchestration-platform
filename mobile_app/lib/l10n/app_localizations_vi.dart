@@ -112,6 +112,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsDevices => 'Thiết bị';
 
   @override
+  String get settingsRooms => 'Phòng';
+
+  @override
   String get settingsAddNewDevice => 'Thêm thiết bị mới';
 
   @override
@@ -331,13 +334,13 @@ class AppLocalizationsVi extends AppLocalizations {
   String get ruleNameHint => 'Ví dụ: Có chuyển động thì bật đèn phòng lab';
 
   @override
-  String get quickTemplateLabel => 'Mẫu nhanh';
+  String get ruleKindLabel => 'Loại rule';
 
   @override
-  String get expandQuickTemplateTooltip => 'Mở danh sách mẫu nhanh';
+  String get ruleKindDeviceTrigger => 'Thiết bị kích hoạt';
 
   @override
-  String get collapseQuickTemplateTooltip => 'Thu gọn danh sách mẫu nhanh';
+  String get ruleKindSchedule => 'Theo lịch';
 
   @override
   String get triggerDeviceLabel => 'Thiết bị kích hoạt';
@@ -497,6 +500,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get qrJsonLabel => 'QR JSON';
 
   @override
+  String get assignDeviceRoomTitle => 'Assign device to room';
+
+  @override
+  String get assignDeviceRoomBody => 'Which room should this device use?';
+
+  @override
   String get clearLabel => 'Xóa';
 
   @override
@@ -563,6 +572,35 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get roomLabel => 'Phòng';
+
+  @override
+  String get roomsTitle => 'Phòng';
+
+  @override
+  String get createRoomLabel => 'Tạo phòng';
+
+  @override
+  String get renameRoomLabel => 'Đổi tên phòng';
+
+  @override
+  String get roomNameLabel => 'Tên phòng';
+
+  @override
+  String get deleteRoomTitle => 'Xóa phòng?';
+
+  @override
+  String deleteRoomBody(String name) {
+    return 'Xóa \"$name\" khỏi home này. Phòng đang có thiết bị thì không thể xóa.';
+  }
+
+  @override
+  String get moveRoomLabel => 'Đổi phòng';
+
+  @override
+  String get moveRoomTitle => 'Chuyển sang phòng';
+
+  @override
+  String get noRoomsAvailable => 'Chưa có phòng';
 
   @override
   String get occupancyLabel => 'Trạng thái có người';
@@ -788,9 +826,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get humidityLabel => 'Độ ẩm';
 
   @override
-  String get zigbeeLocalLabel => 'Zigbee nội bộ';
-
-  @override
   String get sensorConditionLabel => 'Điều kiện';
 
   @override
@@ -822,6 +857,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get scheduleTriggerLabel => 'Lịch';
+
+  @override
+  String get scheduleActionLabel => 'Hành động';
 
   @override
   String get scheduleModeHourly => 'Hằng giờ';

@@ -6,13 +6,14 @@ import 'package:zigbee_smart_building/domain/models/provisioning_session.dart';
 
 void main() {
   group('ProvisioningQrPayload', () {
-    test('parses valid v1 QR JSON without exposing install code', () {
+    test('parses valid v1 QR JSON with install code', () {
       final payload = ProvisioningQrPayload.parseJson(
         jsonEncode({
           'version': 1,
           'eui64': 'a8d417feff570b00',
           'device_type': 'light',
           'model': 'EFR32MG12_LIGHT_KIT',
+          'install_code': '83FED3407A939723A5C639B26916D505C3B5',
         }),
       );
 
@@ -20,6 +21,22 @@ void main() {
       expect(payload.eui64, 'A8D417FEFF570B00');
       expect(payload.deviceType, ProvisioningDeviceType.light);
       expect(payload.model, 'EFR32MG12_LIGHT_KIT');
+      expect(payload.installCode, '83FED3407A939723A5C639B26916D505C3B5');
+    });
+
+    test('parses environment QR payloads as environment sensors', () {
+      final payload = ProvisioningQrPayload.parseJson(
+        jsonEncode({
+          'version': 1,
+          'eui64': '0000000000000053',
+          'device_type': 'environment',
+          'model': 'EFR32MG12_ENV_KIT',
+        }),
+      );
+
+      expect(payload.eui64, '0000000000000053');
+      expect(payload.deviceType, ProvisioningDeviceType.environment);
+      expect(payload.model, 'EFR32MG12_ENV_KIT');
     });
 
     test('rejects invalid QR JSON before posting to Cloud', () {
@@ -68,14 +85,14 @@ void main() {
       );
     });
 
-    test('rejects QR payloads that contain an install code', () {
+    test('rejects non-string install code values', () {
       expect(
         () => ProvisioningQrPayload.parseJson(
           jsonEncode({
             'version': 1,
             'eui64': 'A8D417FEFF570B00',
             'device_type': 'light',
-            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
+            'install_code': 123,
           }),
         ),
         throwsA(isA<FormatException>()),
@@ -94,6 +111,7 @@ void main() {
             'eui64': 'A8D417FEFF570B00',
             'device_type': 'switch',
             'model': 'EFR32MG12_SWITCH_KIT',
+            'install_code': '83FED3407A939723A5C639B26916D505C3B5',
           }),
         ),
       );
@@ -105,6 +123,7 @@ void main() {
           'eui64': 'A8D417FEFF570B00',
           'device_type': 'switch',
           'model': 'EFR32MG12_SWITCH_KIT',
+          'install_code': '83FED3407A939723A5C639B26916D505C3B5',
         },
       });
     });
@@ -138,14 +157,8 @@ void main() {
     });
 
     test('maps terminal provisioning statuses', () {
-      expect(
-        ProvisioningStatus.fromJson('joined'),
-        ProvisioningStatus.joined,
-      );
-      expect(
-        ProvisioningStatus.fromJson('failed'),
-        ProvisioningStatus.failed,
-      );
+      expect(ProvisioningStatus.fromJson('joined'), ProvisioningStatus.joined);
+      expect(ProvisioningStatus.fromJson('failed'), ProvisioningStatus.failed);
       expect(
         ProvisioningStatus.fromJson('expired'),
         ProvisioningStatus.expired,

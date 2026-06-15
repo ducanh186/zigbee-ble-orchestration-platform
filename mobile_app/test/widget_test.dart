@@ -255,13 +255,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATE RULE'), findsOneWidget);
-    expect(find.text('QUICK TEMPLATE'), findsOneWidget);
-    expect(find.text('Switch toggles one light'), findsNothing);
+    expect(find.text('RULE TYPE'), findsOneWidget);
+    expect(find.byKey(const ValueKey('rule-kind-schedule')), findsOneWidget);
     expect(find.text('Save rule'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('quick-template-toggle')));
+    // Switching to the schedule rule type reveals the period chips.
+    await tester.tap(find.byKey(const ValueKey('rule-kind-schedule')));
     await tester.pumpAndSettle();
-    expect(find.text('Switch toggles one light'), findsOneWidget);
+    expect(find.byKey(const ValueKey('schedule-mode-daily')), findsOneWidget);
 
     // Dismiss via Cancel to confirm Cancel works.
     await tester.tap(find.text('Cancel'));
@@ -517,7 +518,8 @@ void main() {
     );
     expect(viewModel.deviceById('light-01')?.name, 'Desk lamp');
     expect(find.text('Desk lamp', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('light-01'), findsOneWidget);
+    // Soft label only — the raw device id / EUI64 is no longer surfaced.
+    expect(find.textContaining('light-01'), findsNothing);
   });
 
   testWidgets('settings shows compact parent-facing sections', (tester) async {
@@ -542,6 +544,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('HOME MANAGEMENT'), findsOneWidget);
     expect(find.text('Devices'), findsOneWidget);
+    expect(find.text('Rooms'), findsOneWidget);
     expect(find.text('Add new device'), findsOneWidget);
     expect(find.text('Automation rules'), findsOneWidget);
     expect(find.text('Activity history'), findsOneWidget);

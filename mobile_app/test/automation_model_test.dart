@@ -53,7 +53,7 @@ void main() {
     expect(json['trigger'], {
       'type': 'device_event',
       'device_id': 'motion-1',
-      'device_type': 'motion',
+      'device_type': 'sensor',
       'event': 'occupancy_changed',
       'state': {'occupancy': 'occupied'},
     });
@@ -74,7 +74,7 @@ void main() {
     expect(trigger.toJson(), {
       'type': 'sensor_threshold',
       'device_id': 'environment-1',
-      'device_type': 'environment',
+      'device_type': 'sensor',
       'metric': 'temperature_c',
       'operator': 'gte',
       'threshold': 30.0,

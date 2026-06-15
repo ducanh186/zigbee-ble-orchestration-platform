@@ -2,11 +2,11 @@ import '../../domain/models/command_result.dart';
 import '../../domain/models/cloud_status.dart';
 import '../../domain/models/device_power.dart';
 import '../../domain/models/event_log.dart';
+import '../../domain/models/room.dart';
 import '../../domain/models/smart_device.dart';
 import '../../domain/repositories/device_repository.dart';
 import '../models/command_api_model.dart';
 import '../models/device_api_model.dart';
-import '../models/device_state_api_model.dart';
 import '../models/event_api_model.dart';
 import '../services/api_client.dart';
 
@@ -22,16 +22,10 @@ class RemoteDeviceRepository implements DeviceRepository {
   @override
   Future<CloudStatus> fetchCloudStatus() async {
     try {
-      final json = await _apiClient.getJson(
-        '/api/gateways/$gatewayId/status',
-      );
-      return _gatewayStatusFromJson(
-        Map<String, Object?>.from(json as Map),
-      );
+      final json = await _apiClient.getJson('/api/gateways/$gatewayId/status');
+      return _gatewayStatusFromJson(Map<String, Object?>.from(json as Map));
     } catch (error) {
-      return CloudStatus.unknown(
-        detail: 'Cannot read home hub status: $error',
-      );
+      return CloudStatus.unknown(detail: 'Cannot read home hub status: $error');
     }
   }
 
@@ -67,38 +61,59 @@ class RemoteDeviceRepository implements DeviceRepository {
 
   @override
   Future<List<SmartDevice>> fetchDevices() async {
+    // The list endpoint inlines each device's latest `state` + `reported_at`,
+    // so this is a single round-trip (no per-device /state fan-out).
     final json = await _apiClient.getJson('/api/devices/');
-    final devices = (json as List)
+    return (json as List).whereType<Map>().map((item) {
+      final map = Map<String, Object?>.from(item);
+      final model = DeviceApiModel.fromJson(map);
+      final reachable = model.state['reachable'] as bool? ?? true;
+      final power = DevicePower.fromJson(
+        model.state['power'],
+        reachable: reachable,
+      );
+      return model.toDomain(
+        power: power,
+        reportedAt: map['reported_at'] as String?,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<List<Room>> fetchRooms() async {
+    final json = await _apiClient.getJson('/api/rooms/');
+    return (json as List)
         .whereType<Map>()
-        .map((item) => DeviceApiModel.fromJson(Map<String, Object?>.from(item)))
+        .map((item) => _roomFromJson(Map<String, Object?>.from(item)))
         .toList();
+  }
 
-    final resolved = <SmartDevice>[];
-    for (final device in devices) {
-      try {
-        final stateJson = await _apiClient.getJson(
-          '/api/devices/${device.id}/state',
-        );
-        final state = DeviceStateApiModel.fromJson(
-          Map<String, Object?>.from(stateJson as Map),
-        );
-        resolved.add(
-          device.toDomain(
-            power: state.power,
-            reportedAt: state.reportedAt,
-            state: state.state,
-          ),
-        );
-      } on ApiException catch (error) {
-        if (error.statusCode == 404) {
-          resolved.add(device.toDomain());
-          continue;
-        }
-        rethrow;
-      }
-    }
+  @override
+  Future<Room> createRoom(String name) async {
+    final json = await _apiClient.postJson('/api/rooms/', {'name': name});
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
 
-    return resolved;
+  @override
+  Future<Room> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    final json = await _apiClient.patchJson('/api/rooms/$roomId', {
+      'name': name,
+    });
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
+
+  @override
+  Future<Room> deleteRoom(String roomId) async {
+    final json = await _apiClient.deleteJson('/api/rooms/$roomId');
+    return _roomFromJson(Map<String, Object?>.from(json as Map));
+  }
+
+  Room _roomFromJson(Map<String, Object?> json) {
+    final id = json['id'] as String;
+    return Room(id: id, name: (json['name'] as String?) ?? id);
   }
 
   @override
@@ -136,6 +151,19 @@ class RemoteDeviceRepository implements DeviceRepository {
   }) async {
     final json = await _apiClient.patchJson('/api/devices/$deviceId', {
       'name': name,
+    });
+    return DeviceApiModel.fromJson(
+      Map<String, Object?>.from(json as Map),
+    ).toDomain();
+  }
+
+  @override
+  Future<SmartDevice> moveDeviceToRoom({
+    required String deviceId,
+    required String roomId,
+  }) async {
+    final json = await _apiClient.patchJson('/api/devices/$deviceId', {
+      'room_id': roomId,
     });
     return DeviceApiModel.fromJson(
       Map<String, Object?>.from(json as Map),

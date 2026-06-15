@@ -6,6 +6,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/section_title.dart';
+import '../../devices/view_models/device_dashboard_view_model.dart';
 import '../view_models/automation_view_model.dart';
 import '../widgets/automation_visuals.dart';
 import '../widgets/create_rule_sheet.dart';
@@ -38,6 +39,12 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
     return Consumer<AutomationViewModel>(
       builder: (context, automation, _) {
         final rules = automation.rules;
+        // Resolve trigger/target device ids to their soft labels for display.
+        final deviceNames = {
+          for (final device
+              in context.watch<DeviceDashboardViewModel>().devices)
+            device.id: device.name,
+        };
 
         return CustomScrollView(
           slivers: [
@@ -88,7 +95,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                           child: SectionTitle(
                             title: l10n.rulesSectionTitle,
                             action: Text(
-                          l10n.ruleCount(rules.length),
+                              l10n.ruleCount(rules.length),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontFamily: 'JetBrains Mono',
@@ -112,6 +119,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                         child: RuleCard(
                           rule: rule,
                           template: AutomationVisuals.templateForRule(rule),
+                          deviceNames: deviceNames,
                           highlight: rule.id == _justCreatedRuleId,
                           onEnabledChanged:
                               !widget.canMutate || automation.isSaving
@@ -156,7 +164,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-                child: Text(l10n.cancelLabel),
+              child: Text(l10n.cancelLabel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -164,7 +172,7 @@ class _AutomationRulesViewState extends State<AutomationRulesView> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(context).pop(true),
-                child: Text(l10n.deleteLabel),
+              child: Text(l10n.deleteLabel),
             ),
           ],
         );

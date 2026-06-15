@@ -88,6 +88,7 @@ class Device(Base):
 
     id = Column(String, primary_key=True)  # logical device_id, e.g. "light-01"
     device_type = Column(String, nullable=False)
+    sensor_kind = Column(Integer, nullable=True)
     eui64 = Column(String, nullable=True)
     room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     name = Column(String, nullable=True)
@@ -258,7 +259,7 @@ class ProvisioningSession(Base):
 
     id = Column(String, primary_key=True)
     gateway_id = Column(String, nullable=False)
-    room_id = Column(String, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(String, ForeignKey("rooms.id"), nullable=True)
     eui64 = Column(String, nullable=False)
     install_code = Column(String, nullable=False)
     device_type = Column(String, nullable=False)

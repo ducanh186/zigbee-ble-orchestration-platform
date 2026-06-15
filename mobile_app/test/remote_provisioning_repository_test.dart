@@ -8,50 +8,83 @@ import 'package:zigbee_smart_building/data/services/api_client.dart';
 import 'package:zigbee_smart_building/domain/models/provisioning_session.dart';
 
 void main() {
-  test('createSession posts provisioning request and maps response', () async {
+  test(
+    'createSession posts provisioning request without room and maps response',
+    () async {
+      Map<String, Object?>? capturedBody;
+      final repository = RemoteProvisioningRepository(
+        apiClient: ApiClient(
+          baseUrl: 'http://98.83.4.87:8000',
+          httpClient: MockClient((request) async {
+            expect(request.method, 'POST');
+            expect(request.url.path, '/api/provisioning/sessions');
+            capturedBody = Map<String, Object?>.from(
+              jsonDecode(request.body) as Map,
+            );
+            return http.Response(
+              jsonEncode(_sessionJson(status: 'pending')),
+              201,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
+
+      final session = await repository.createSession(
+        gatewayId: 'gw-ubuntu-01',
+        payload: ProvisioningQrPayload.parseJson(
+          jsonEncode({
+            'version': 1,
+            'eui64': 'a8d417feff570b00',
+            'device_type': 'light',
+            'model': 'EFR32MG12_LIGHT_KIT',
+          }),
+        ),
+      );
+
+      expect(capturedBody, {
+        'gateway_id': 'gw-ubuntu-01',
+        'device': {
+          'eui64': 'A8D417FEFF570B00',
+          'device_type': 'light',
+          'model': 'EFR32MG12_LIGHT_KIT',
+        },
+      });
+      expect(session.sessionId, 'session-01');
+      expect(session.status, ProvisioningStatus.pending);
+    },
+  );
+
+  test('assignSessionRoom patches room after session create', () async {
     Map<String, Object?>? capturedBody;
     final repository = RemoteProvisioningRepository(
       apiClient: ApiClient(
         baseUrl: 'http://98.83.4.87:8000',
         httpClient: MockClient((request) async {
-          expect(request.method, 'POST');
-          expect(request.url.path, '/api/provisioning/sessions');
+          expect(request.method, 'PATCH');
+          expect(
+            request.url.path,
+            '/api/provisioning/sessions/session-01/room',
+          );
           capturedBody = Map<String, Object?>.from(
             jsonDecode(request.body) as Map,
           );
           return http.Response(
             jsonEncode(_sessionJson(status: 'pending')),
-            201,
+            200,
             headers: {'content-type': 'application/json'},
           );
         }),
       ),
     );
 
-    final session = await repository.createSession(
-      gatewayId: 'gw-ubuntu-01',
+    final session = await repository.assignSessionRoom(
+      sessionId: 'session-01',
       roomId: 'lab',
-      payload: ProvisioningQrPayload.parseJson(
-        jsonEncode({
-          'version': 1,
-          'eui64': 'a8d417feff570b00',
-          'device_type': 'light',
-          'model': 'EFR32MG12_LIGHT_KIT',
-        }),
-      ),
     );
 
-    expect(capturedBody, {
-      'gateway_id': 'gw-ubuntu-01',
-      'room_id': 'lab',
-      'device': {
-        'eui64': 'A8D417FEFF570B00',
-        'device_type': 'light',
-        'model': 'EFR32MG12_LIGHT_KIT',
-      },
-    });
-    expect(session.sessionId, 'session-01');
-    expect(session.status, ProvisioningStatus.pending);
+    expect(capturedBody, {'room_id': 'lab'});
+    expect(session.roomId, 'lab');
   });
 
   test('fetchSession reads current provisioning status', () async {
@@ -98,43 +131,39 @@ void main() {
     expect(session.isTerminal, isTrue);
   });
 
-  test('pollSession emits statuses until the session reaches terminal state', () async {
-    final statuses = ['pending', 'permit_open', 'joined'];
-    var requestCount = 0;
-    final repository = RemoteProvisioningRepository(
-      apiClient: ApiClient(
-        baseUrl: 'http://98.83.4.87:8000',
-        httpClient: MockClient((request) async {
-          expect(request.method, 'GET');
-          expect(request.url.path, '/api/provisioning/sessions/session-01');
-          final status = statuses[requestCount++];
-          return http.Response(
-            jsonEncode(_sessionJson(status: status)),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      ),
-    );
+  test(
+    'pollSession emits statuses until the session reaches terminal state',
+    () async {
+      final statuses = ['pending', 'permit_open', 'joined'];
+      var requestCount = 0;
+      final repository = RemoteProvisioningRepository(
+        apiClient: ApiClient(
+          baseUrl: 'http://98.83.4.87:8000',
+          httpClient: MockClient((request) async {
+            expect(request.method, 'GET');
+            expect(request.url.path, '/api/provisioning/sessions/session-01');
+            final status = statuses[requestCount++];
+            return http.Response(
+              jsonEncode(_sessionJson(status: status)),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        ),
+      );
 
-    final emitted = await repository
-        .pollSession(
-          'session-01',
-          interval: Duration.zero,
-          maxAttempts: 5,
-        )
-        .toList();
+      final emitted = await repository
+          .pollSession('session-01', interval: Duration.zero, maxAttempts: 5)
+          .toList();
 
-    expect(
-      emitted.map((session) => session.status).toList(),
-      [
+      expect(emitted.map((session) => session.status).toList(), [
         ProvisioningStatus.pending,
         ProvisioningStatus.permitOpen,
         ProvisioningStatus.joined,
-      ],
-    );
-    expect(requestCount, 3);
-  });
+      ]);
+      expect(requestCount, 3);
+    },
+  );
 }
 
 Map<String, Object?> _sessionJson({required String status}) {

@@ -82,6 +82,7 @@ class _DevicesViewState extends State<DevicesView> {
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
                         device: device,
+                        roomName: viewModel.roomNameFor(device.roomId),
                         onTap: () => widget.onOpenLight(device),
                       ),
                       const SizedBox(height: 10),
@@ -97,7 +98,13 @@ class _DevicesViewState extends State<DevicesView> {
 
   bool _matchesDevice(SmartDevice device) {
     final normalizedQuery = _query.trim().toLowerCase();
-    final matchesType = _type == 'all' || device.deviceType == _type;
+    // The "sensor" filter matches v2 'sensor'+kind devices and legacy
+    // 'motion'/'environment' rows (isMotion/isEnvironment dual-read).
+    final matchesType =
+        _type == 'all' ||
+        (_type == 'sensor'
+            ? (device.isMotion || device.isEnvironment)
+            : device.deviceType == _type);
     final matchesQuery =
         normalizedQuery.isEmpty ||
         device.name.toLowerCase().contains(normalizedQuery) ||
@@ -160,7 +167,7 @@ class _DeviceTypeFilters extends StatelessWidget {
     final filters = const [
       _DeviceFilter('all', 'All', Icons.grid_view_rounded),
       _DeviceFilter('light', 'Light', Icons.lightbulb_outline),
-      _DeviceFilter('motion', 'Sensors', Icons.sensors),
+      _DeviceFilter('sensor', 'Sensors', Icons.sensors),
       _DeviceFilter('switch', 'Switch', Icons.toggle_off),
     ];
 
@@ -192,9 +199,10 @@ class _DeviceFilter {
 }
 
 class _DeviceRow extends StatelessWidget {
-  const _DeviceRow({required this.device, this.onTap});
+  const _DeviceRow({required this.device, required this.roomName, this.onTap});
 
   final SmartDevice device;
+  final String roomName;
   final VoidCallback? onTap;
 
   @override
@@ -205,7 +213,7 @@ class _DeviceRow extends StatelessWidget {
         device.power == DevicePower.on
             ? Icons.lightbulb
             : Icons.lightbulb_outline,
-      'motion' => Icons.sensors,
+      'motion' || 'sensor' => Icons.sensors,
       'switch' => Icons.toggle_off,
       _ => Icons.help_outline,
     };
@@ -244,12 +252,8 @@ class _DeviceRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${device.id} - ${device.roomLabel}',
-                  style: TextStyle(
-                    color: palette.textSecondary,
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: 12,
-                  ),
+                  roomName,
+                  style: TextStyle(color: palette.textSecondary, fontSize: 12),
                 ),
               ],
             ),

@@ -122,9 +122,7 @@ class AutomationActionApiModel {
         command: AutomationActionCommand.fromJson(json['command']),
       ),
     };
-    return AutomationActionApiModel(
-      value: action,
-    );
+    return AutomationActionApiModel(value: action);
   }
 
   factory AutomationActionApiModel.fromDomain(AutomationAction action) {

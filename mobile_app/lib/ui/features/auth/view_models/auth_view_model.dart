@@ -77,10 +77,7 @@ class AuthViewModel extends ChangeNotifier {
     } catch (error) {
       _session = null;
       _status = AuthStatus.unauthenticated;
-      _errorMessage = friendlyErrorMessage(
-        error,
-        context: 'Login failed',
-      );
+      _errorMessage = friendlyErrorMessage(error, context: 'Login failed');
     } finally {
       notifyListeners();
     }

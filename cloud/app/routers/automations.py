@@ -19,7 +19,6 @@ from cloud.app.config import settings
 from cloud.app.database import get_db
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.models import Automation, AutomationEvent, Device, User
-from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import AutomationCreate, AutomationOut, AutomationUpdate
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
@@ -35,6 +34,8 @@ def _publish_upsert(rule: Automation) -> None:
 
     Called after commit so the published payload matches DB state.
     """
+    if not _syncs_to_gateway(rule):
+        return
     mqtt_service.publish_automation_desired(
         automation_id=rule.id,
         op="upsert",
@@ -104,7 +105,10 @@ def _normalize_trigger_event(trigger_device_type: str, event: str) -> str:
         raise HTTPException(
             status_code=422, detail="Switch trigger must be switch_toggle"
         )
-    if trigger_device_type == "motion":
+    # "sensor" is the device-model-v2 type for occupancy (kind 1); "motion" is
+    # the legacy type kept for rules created before the migration. Both fire on
+    # occupancy_changed.
+    if trigger_device_type in {"motion", "sensor"}:
         if event == "occupancy_changed":
             return event
         raise HTTPException(
@@ -139,14 +143,16 @@ async def _validate_rule_template(
         trigger_device_type = _require_string(trigger, "device_type")
 
         if trigger_type == "sensor_threshold":
-            if trigger_device_type != "environment":
+            # "sensor" (kind 2) is the v2 type; "environment" kept for legacy.
+            if trigger_device_type not in {"environment", "sensor"}:
                 raise HTTPException(
                     status_code=422,
-                    detail="Sensor threshold trigger device_type must be environment",
+                    detail="Sensor threshold trigger device_type must be environment or sensor",
                 )
         elif trigger_type == "device_event":
             event = _require_string(trigger, "event")
-            if trigger_device_type not in {"switch", "motion"}:
+            # "sensor" (kind 1 occupancy) is the v2 type; "motion" kept for legacy.
+            if trigger_device_type not in {"switch", "motion", "sensor"}:
                 raise HTTPException(
                     status_code=422,
                     detail="Unsupported trigger device_type",
@@ -154,6 +160,15 @@ async def _validate_rule_template(
         else:
             raise HTTPException(status_code=422, detail="Unsupported trigger type")
 
+        # _require_device matches the live DB row's device_type exactly. This is
+        # by design under the device-model-v2 hard cutover: once the migration
+        # has run, every sensor row is device_type="sensor", so a NEW rule must
+        # use "sensor" (a stale client still sending "motion"/"environment" is
+        # correctly rejected here). Legacy literals stay accepted upstream only
+        # to keep the deploy window safe (code ships before the migration runs).
+        # During that window the inverse can happen: a "sensor" trigger against a
+        # not-yet-migrated "environment"/"motion" row returns a transient 422
+        # here — expected until `alembic upgrade` completes, not a regression.
         await _require_device(
             db,
             trigger_device_id,
@@ -419,38 +434,38 @@ async def delete_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_parent_or_admin),
 ):
-    """Delete an automation.
+    """Delete an automation; removed immediately, never waits on the gateway.
 
-    Event rules: soft-delete — bump version, set sync_status="pending", publish
-    an op=delete tombstone, and keep the row until the gateway acks with
-    sync_status="deleted" (handled in _handle_automation_reported). Cloud stays
-    the source of truth and the gateway confirms apply.
-
-    Schedule rules: hard-delete immediately (and their child automation_events),
-    because they are never synced to the gateway so no ack will ever arrive.
+    Deleting is fully cloud-side and deterministic — the DB row (and its child
+    automation_events) is hard-deleted right away, so the app sees it gone and
+    delete never hangs on a gateway ack (the original "rule won't delete" bug).
+    Event rules — the only ones the gateway knows about — additionally get a
+    retained op=delete tombstone so the gateway drops them on its next sync,
+    using the mechanism it already has (no firmware change). Schedule rules run
+    cloud-side and are never synced, so they need no tombstone.
     """
     rule = await db.get(Automation, automation_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     await ensure_automation_visible(db, rule, current_user)
 
-    if not _syncs_to_gateway(rule):
-        # Schedule rules are never synced to the gateway, so there is no
-        # tombstone to publish and no ack will arrive. Hard-delete now,
-        # removing child audit rows first to satisfy the FK (PostgreSQL has
-        # no ON DELETE CASCADE on automation_events.automation_id).
-        # expire_on_commit=False keeps `rule` serializable for the response.
-        await db.execute(
-            delete(AutomationEvent).where(AutomationEvent.automation_id == rule.id)
-        )
-        await db.delete(rule)
-        await db.commit()
-        return rule
+    # Tell the gateway to drop it — only event rules are synced there.
+    if _syncs_to_gateway(rule):
+        rule.version = (rule.version or 0) + 1
+        rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        _publish_delete(rule)
 
-    rule.version = (rule.version or 0) + 1
-    rule.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    mark_sync_pending(rule, "automation.delete")
+    # Snapshot the response before the row is gone (expire_on_commit=False keeps
+    # the instance readable, but a snapshot is explicit and safe).
+    response = AutomationOut.model_validate(rule)
+
+    # Hard-delete now regardless of any gateway ack. Remove FK-referencing audit
+    # rows first (no ON DELETE cascade on automation_events.automation_id).
+    await db.execute(
+        delete(AutomationEvent).where(
+            AutomationEvent.automation_id == automation_id
+        )
+    )
+    await db.delete(rule)
     await db.commit()
-    await db.refresh(rule)
-    _publish_delete(rule)
-    return rule
+    return response

@@ -12,8 +12,8 @@ class RemoteProvisioningRepository implements ProvisioningRepository {
   @override
   Future<ProvisioningSession> createSession({
     required String gatewayId,
-    required String roomId,
     required ProvisioningQrPayload payload,
+    String? roomId,
   }) async {
     final json = await _apiClient.postJson(
       '/api/provisioning/sessions',
@@ -22,6 +22,18 @@ class RemoteProvisioningRepository implements ProvisioningRepository {
         roomId: roomId,
         payload: payload,
       ).toJson(),
+    );
+    return _sessionFromJson(json);
+  }
+
+  @override
+  Future<ProvisioningSession> assignSessionRoom({
+    required String sessionId,
+    required String roomId,
+  }) async {
+    final json = await _apiClient.patchJson(
+      '/api/provisioning/sessions/$sessionId/room',
+      {'room_id': roomId},
     );
     return _sessionFromJson(json);
   }

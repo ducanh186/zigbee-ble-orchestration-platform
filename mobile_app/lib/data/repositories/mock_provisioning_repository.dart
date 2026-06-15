@@ -5,8 +5,8 @@ class MockProvisioningRepository implements ProvisioningRepository {
   @override
   Future<ProvisioningSession> createSession({
     required String gatewayId,
-    required String roomId,
     required ProvisioningQrPayload payload,
+    String? roomId,
   }) async {
     return _session(
       status: ProvisioningStatus.pending,
@@ -14,6 +14,14 @@ class MockProvisioningRepository implements ProvisioningRepository {
       roomId: roomId,
       payload: payload,
     );
+  }
+
+  @override
+  Future<ProvisioningSession> assignSessionRoom({
+    required String sessionId,
+    required String roomId,
+  }) async {
+    return _session(status: ProvisioningStatus.pending, roomId: roomId);
   }
 
   @override
@@ -41,7 +49,7 @@ class MockProvisioningRepository implements ProvisioningRepository {
   ProvisioningSession _session({
     required ProvisioningStatus status,
     String gatewayId = 'gw-ubuntu-01',
-    String roomId = 'lab',
+    String? roomId = 'lab',
     ProvisioningQrPayload? payload,
   }) {
     return ProvisioningSession(

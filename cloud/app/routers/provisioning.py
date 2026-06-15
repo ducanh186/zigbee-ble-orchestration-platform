@@ -23,7 +23,7 @@ from cloud.app.access_control import (
 from cloud.app.auth import get_current_user, require_admin, require_parent_or_admin
 from cloud.app.config import settings
 from cloud.app.database import get_db
-from cloud.app.models import Command, FactoryDevice, ProvisioningSession, Room, User
+from cloud.app.models import Command, Device, FactoryDevice, ProvisioningSession, Room, User
 from cloud.app.mqtt_client import mqtt_service
 from cloud.app.schemas import (
     FactoryDeviceOut,
@@ -33,6 +33,7 @@ from cloud.app.schemas import (
     ProvisioningLabelOut,
     ProvisioningSessionCreate,
     ProvisioningSessionOut,
+    ProvisioningSessionRoomUpdate,
 )
 
 router = APIRouter(prefix="/api/provisioning/sessions", tags=["provisioning"])
@@ -179,16 +180,17 @@ async def create_provisioning_session(
             f"unknown gateway_id '{body.gateway_id}'",
         )
 
-    room = (
-        await db.execute(select(Room).where(Room.id == body.room_id))
-    ).scalar_one_or_none()
-    if room is None:
-        _raise_contract_error(
-            404,
-            ProvisioningErrorCode.ROOM_NOT_FOUND,
-            f"room_id '{body.room_id}' not found",
-        )
-    await ensure_room_visible(db, room, current_user)
+    if body.room_id is not None:
+        room = (
+            await db.execute(select(Room).where(Room.id == body.room_id))
+        ).scalar_one_or_none()
+        if room is None:
+            _raise_contract_error(
+                404,
+                ProvisioningErrorCode.ROOM_NOT_FOUND,
+                f"room_id '{body.room_id}' not found",
+            )
+        await ensure_room_visible(db, room, current_user)
 
     now = datetime.now(UTC).replace(tzinfo=None)
     active_sessions = (
@@ -221,7 +223,10 @@ async def create_provisioning_session(
             ProvisioningErrorCode.DEVICE_NOT_FACTORY_REGISTERED,
             f"device eui64 '{body.device.eui64}' is not factory registered",
         )
-    if factory_device.device_type != body.device.device_type:
+    requested_device_type = (
+        "sensor" if body.device.device_type == "environment" else body.device.device_type
+    )
+    if factory_device.device_type != requested_device_type:
         _raise_contract_error(
             422,
             ProvisioningErrorCode.INVALID_QR_PAYLOAD,
@@ -278,6 +283,36 @@ async def get_provisioning_session(
 ):
     session = await _get_session_or_404(db, session_id)
     await ensure_provisioning_session_visible(db, session, current_user)
+    return session
+
+
+@router.patch("/{session_id}/room", response_model=ProvisioningSessionOut)
+async def assign_provisioning_session_room(
+    session_id: str,
+    body: ProvisioningSessionRoomUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent_or_admin),
+):
+    session = await _get_session_or_404(db, session_id)
+    await ensure_provisioning_session_visible(db, session, current_user)
+
+    room = await db.get(Room, body.room_id)
+    if room is None:
+        _raise_contract_error(
+            404,
+            ProvisioningErrorCode.ROOM_NOT_FOUND,
+            f"room_id '{body.room_id}' not found",
+        )
+    await ensure_room_visible(db, room, current_user)
+
+    session.room_id = body.room_id
+    session.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    if session.status == "joined":
+        device = await db.get(Device, session.eui64)
+        if device is not None:
+            device.room_id = body.room_id
+    await db.commit()
+    await db.refresh(session)
     return session
 
 
