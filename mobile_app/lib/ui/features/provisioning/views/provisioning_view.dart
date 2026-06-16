@@ -5,12 +5,14 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/provisioning_session.dart';
+import '../../../../domain/models/room.dart';
 import '../../../../domain/repositories/provisioning_repository.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../l10n/localized_error_message.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
+import '../../devices/view_models/device_dashboard_view_model.dart';
 
 typedef ProvisioningQrScanLauncher =
     Future<String?> Function(BuildContext context);
@@ -25,7 +27,7 @@ class ProvisioningView extends StatefulWidget {
   const ProvisioningView({
     this.initialPayload,
     this.qrScanLauncher = _defaultProvisioningQrScanLauncher,
-    this.pollInterval = const Duration(seconds: 2),
+    this.pollInterval = const Duration(seconds: 1),
     super.key,
   });
 
@@ -37,14 +39,17 @@ class ProvisioningView extends StatefulWidget {
   State<ProvisioningView> createState() => _ProvisioningViewState();
 }
 
+enum _QrEntryMode { scan, manual }
+
 class _ProvisioningViewState extends State<ProvisioningView> {
   static const String _defaultJoinTargetId = 'gw-ubuntu-01';
 
-  final TextEditingController _roomController = TextEditingController();
   final TextEditingController _manualQrController = TextEditingController();
   StreamSubscription<ProvisioningSession>? _polling;
+  _QrEntryMode _entryMode = _QrEntryMode.scan;
   ProvisioningQrPayload? _payload;
   ProvisioningSession? _session;
+  String? _selectedRoomId;
   bool _isSubmitting = false;
   String? _error;
 
@@ -57,7 +62,6 @@ class _ProvisioningViewState extends State<ProvisioningView> {
   @override
   void dispose() {
     _polling?.cancel();
-    _roomController.dispose();
     _manualQrController.dispose();
     super.dispose();
   }
@@ -67,6 +71,8 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     final l10n = AppLocalizations.of(context)!;
     final payload = _payload;
     final session = _session;
+    final rooms = context.watch<DeviceDashboardViewModel>().rooms;
+    final selectedRoom = _selectedRoom(rooms);
 
     return CustomScrollView(
       slivers: [
@@ -76,25 +82,15 @@ class _ProvisioningViewState extends State<ProvisioningView> {
           sliver: SliverList.list(
             children: [
               SectionTitle(title: l10n.provisioningWizardTitle),
-              const SizedBox(height: 8),
-              _SessionStatusCard(
-                session: session,
-                error: _error == null
-                    ? null
-                    : localizedErrorMessage(l10n, _error!),
-              ),
-              const SizedBox(height: 12),
-              AppCard(
-                child: TextField(
-                  key: const Key('provisioning-room-field'),
-                  controller: _roomController,
-                  decoration: InputDecoration(
-                    labelText: l10n.roomIdLabel,
-                    prefixIcon: const Icon(Icons.meeting_room_outlined),
-                  ),
-                  onChanged: (_) => setState(() {}),
+              if (session != null || _error != null) ...[
+                const SizedBox(height: 8),
+                _SessionStatusCard(
+                  session: session,
+                  error: _error == null
+                      ? null
+                      : localizedErrorMessage(l10n, _error!),
                 ),
-              ),
+              ],
               const SizedBox(height: 12),
               AppCard(
                 child: Column(
@@ -105,7 +101,11 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                         Expanded(
                           child: FilledButton.icon(
                             key: const Key('provisioning-scan-button'),
-                            onPressed: _scanQr,
+                            onPressed: _entryMode == _QrEntryMode.scan
+                                ? _scanQr
+                                : () => setState(
+                                    () => _entryMode = _QrEntryMode.scan,
+                                  ),
                             icon: const Icon(Icons.qr_code_scanner),
                             label: Text(l10n.scanQrLabel),
                           ),
@@ -114,24 +114,40 @@ class _ProvisioningViewState extends State<ProvisioningView> {
                         Expanded(
                           child: OutlinedButton.icon(
                             key: const Key('provisioning-apply-manual-button'),
-                            onPressed: _applyManualQr,
+                            onPressed: () => setState(
+                              () => _entryMode = _QrEntryMode.manual,
+                            ),
                             icon: const Icon(Icons.input),
                             label: Text(l10n.useManualLabel),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('provisioning-manual-qr-field'),
-                      controller: _manualQrController,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        labelText: l10n.qrJsonLabel,
-                        prefixIcon: const Icon(Icons.data_object),
+                    if (_entryMode == _QrEntryMode.manual) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const Key('provisioning-manual-qr-field'),
+                        controller: _manualQrController,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          labelText: l10n.qrJsonLabel,
+                          prefixIcon: const Icon(Icons.data_object),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          key: const Key(
+                            'provisioning-apply-manual-payload-button',
+                          ),
+                          onPressed: _applyManualQr,
+                          icon: const Icon(Icons.check),
+                          label: Text(l10n.saveLabel),
+                        ),
+                      ),
+                    ],
                     if (payload != null) ...[
                       const SizedBox(height: 8),
                       Align(
@@ -149,6 +165,14 @@ class _ProvisioningViewState extends State<ProvisioningView> {
               ),
               const SizedBox(height: 12),
               _DeviceIdentityCard(payload: payload),
+              if (session != null) ...[
+                const SizedBox(height: 12),
+                _RoomPickerCard(
+                  rooms: rooms,
+                  selectedRoomName: selectedRoom?.name,
+                  onPick: () => _pickRoom(rooms),
+                ),
+              ],
               const SizedBox(height: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -189,8 +213,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
         !_isSubmitting &&
         (session == null ||
             (session.isTerminal &&
-                session.status != ProvisioningStatus.joined)) &&
-        _roomController.text.trim().isNotEmpty;
+                session.status != ProvisioningStatus.joined));
   }
 
   Future<void> _startProvisioning() async {
@@ -206,12 +229,15 @@ class _ProvisioningViewState extends State<ProvisioningView> {
 
     try {
       final repository = context.read<ProvisioningRepository>();
-      final session = await repository.createSession(
+      var session = await repository.createSession(
         gatewayId: _defaultJoinTargetId,
-        roomId: _roomController.text.trim(),
         payload: payload,
       );
       setState(() => _session = session);
+      session = await _assignRoomAfterSession(session, repository);
+      if (mounted) {
+        setState(() => _session = session);
+      }
       _polling?.cancel();
       _polling = repository
           .pollSession(session.sessionId, interval: widget.pollInterval)
@@ -241,8 +267,11 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     if (!mounted || rawPayload == null || rawPayload.trim().isEmpty) {
       return;
     }
-    _manualQrController.text = rawPayload;
-    _applyRawPayload(rawPayload);
+    final payloadAccepted = _applyRawPayload(rawPayload);
+    if (!payloadAccepted || !mounted) {
+      return;
+    }
+    await _startProvisioning();
   }
 
   void _applyManualQr() {
@@ -258,7 +287,7 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     _applyRawPayload(rawPayload);
   }
 
-  void _applyRawPayload(String rawPayload) {
+  bool _applyRawPayload(String rawPayload) {
     try {
       final payload = ProvisioningQrPayload.parseJson(rawPayload);
       setState(() {
@@ -266,18 +295,21 @@ class _ProvisioningViewState extends State<ProvisioningView> {
         _session = null;
         _error = null;
       });
+      return true;
     } on FormatException {
       setState(() {
         _payload = null;
         _session = null;
         _error = validationErrorMessage;
       });
+      return false;
     } catch (error) {
       setState(() {
         _payload = null;
         _session = null;
         _error = error.toString();
       });
+      return false;
     }
   }
 
@@ -286,8 +318,73 @@ class _ProvisioningViewState extends State<ProvisioningView> {
     setState(() {
       _payload = null;
       _session = null;
+      _selectedRoomId = null;
       _error = null;
     });
+  }
+
+  Room? _selectedRoom(List<Room> rooms) {
+    final selectedRoomId = _selectedRoomId;
+    if (selectedRoomId == null) {
+      return null;
+    }
+    for (final room in rooms) {
+      if (room.id == selectedRoomId) {
+        return room;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _pickRoom(List<Room> rooms) async {
+    final roomId = await _showAssignRoomDialog(context, rooms);
+    if (!mounted || roomId == null) {
+      return;
+    }
+    final session = _session;
+    if (session == null) {
+      setState(() => _selectedRoomId = roomId);
+      return;
+    }
+    setState(() => _error = null);
+    try {
+      final nextSession = await context
+          .read<ProvisioningRepository>()
+          .assignSessionRoom(sessionId: session.sessionId, roomId: roomId);
+      if (mounted) {
+        setState(() {
+          _selectedRoomId = roomId;
+          _session = nextSession;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error.toString());
+      }
+    }
+  }
+
+  Future<ProvisioningSession> _assignRoomAfterSession(
+    ProvisioningSession session,
+    ProvisioningRepository repository,
+  ) async {
+    final rooms = context.read<DeviceDashboardViewModel>().rooms;
+    final roomId = await _showAssignRoomDialog(context, rooms);
+    if (!mounted || roomId == null) {
+      return session;
+    }
+    setState(() => _selectedRoomId = roomId);
+    try {
+      return await repository.assignSessionRoom(
+        sessionId: session.sessionId,
+        roomId: roomId,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error.toString());
+      }
+      return session;
+    }
   }
 
   Future<void> _cancelProvisioning() async {
@@ -308,6 +405,105 @@ class _ProvisioningViewState extends State<ProvisioningView> {
       setState(() => _error = error.toString());
     }
   }
+}
+
+class _RoomPickerCard extends StatelessWidget {
+  const _RoomPickerCard({
+    required this.rooms,
+    required this.selectedRoomName,
+    required this.onPick,
+  });
+
+  final List<Room> rooms;
+  final String? selectedRoomName;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
+    final label = selectedRoomName ?? l10n.noRoomsAvailable;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        key: const Key('provisioning-room-picker-button'),
+        onTap: rooms.isEmpty ? null : onPick,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.meeting_room_outlined, color: palette.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.roomLabel,
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.expand_more, color: palette.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<String?> _showAssignRoomDialog(BuildContext context, List<Room> rooms) {
+  final l10n = AppLocalizations.of(context)!;
+  return showDialog<String>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text(l10n.assignDeviceRoomTitle),
+        content: rooms.isEmpty
+            ? Text(l10n.noRoomsAvailable)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(l10n.assignDeviceRoomBody),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final room in rooms)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.meeting_room_outlined),
+                      title: Text(room.name),
+                      onTap: () => Navigator.of(context).pop(room.id),
+                    ),
+                ],
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.cancelLabel),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _ProvisioningQrScannerPage extends StatefulWidget {
@@ -381,6 +577,7 @@ class _SessionStatusCard extends StatelessWidget {
     final palette = context.palette;
     final l10n = AppLocalizations.of(context)!;
     final status = session?.status;
+    final hasError = error != null;
 
     return AppCard(
       child: Row(
@@ -393,19 +590,20 @@ class _SessionStatusCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _statusLabel(status),
+                  hasError && status == null ? 'ERROR' : _statusLabel(status),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  _statusCopy(status, session?.reason, l10n),
-                  style: TextStyle(color: palette.textSecondary),
-                ),
+                if (!(hasError && status == null))
+                  Text(
+                    _statusCopy(status, session?.reason, l10n),
+                    style: TextStyle(color: palette.textSecondary),
+                  ),
                 if (error != null) ...[
-                  const SizedBox(height: 8),
+                  if (!(hasError && status == null)) const SizedBox(height: 8),
                   Text(error!, style: TextStyle(color: palette.error)),
                 ],
               ],

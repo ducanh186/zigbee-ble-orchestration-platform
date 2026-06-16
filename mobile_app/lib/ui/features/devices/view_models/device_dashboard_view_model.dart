@@ -33,6 +33,8 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? _lastTarget;
   bool _isRenamingDevice = false;
   bool _isMovingDevice = false;
+  bool _isDeletingDevice = false;
+  bool _isMutatingRoom = false;
 
   List<SmartDevice> get devices => List.unmodifiable(_devices);
   List<Room> get rooms => List.unmodifiable(_rooms);
@@ -46,6 +48,8 @@ class DeviceDashboardViewModel extends ChangeNotifier {
   DevicePower? get lastTarget => _lastTarget;
   bool get isRenamingDevice => _isRenamingDevice;
   bool get isMovingDevice => _isMovingDevice;
+  bool get isDeletingDevice => _isDeletingDevice;
+  bool get isMutatingRoom => _isMutatingRoom;
 
   /// Human-readable room name for a device's [roomId], falling back to the raw
   /// id (then "No room") when the room list hasn't loaded or has no match.
@@ -110,7 +114,7 @@ class DeviceDashboardViewModel extends ChangeNotifier {
       _cloudStatus = await statusFuture;
       _devices = await devicesFuture;
       _events = await eventsFuture;
-      _rooms = await roomsFuture;
+      _rooms = [...await roomsFuture];
       _deviceEvents.clear();
     } catch (error) {
       _cloudStatus = CloudStatus.unknown(detail: error.toString());
@@ -256,9 +260,119 @@ class DeviceDashboardViewModel extends ChangeNotifier {
     }
   }
 
-  // Short backoff so a confirmed command settles fast; the device is already
-  // showing the optimistic state, so this only reconciles / reverts.
-  static const _pollBackoffMs = [250, 400, 600, 800, 1000];
+  Future<bool> deleteDevice(String deviceId) async {
+    if (_isDeletingDevice) {
+      return false;
+    }
+
+    _isDeletingDevice = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteDevice(deviceId);
+      _devices = _devices.where((device) => device.id != deviceId).toList();
+      _deviceEvents.remove(deviceId);
+      _deviceEventErrors.remove(deviceId);
+      _loadingEventDeviceIds.remove(deviceId);
+      return true;
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not delete device',
+      );
+      return false;
+    } finally {
+      _isDeletingDevice = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> createRoom(String name) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final created = await _repository.createRoom(normalizedName);
+      _rooms = [..._rooms, created];
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not create room',
+      );
+    } finally {
+      _isMutatingRoom = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty || _isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final renamed = await _repository.renameRoom(
+        roomId: roomId,
+        name: normalizedName,
+      );
+      final index = _rooms.indexWhere((room) => room.id == roomId);
+      if (index != -1) {
+        _rooms[index] = renamed;
+      }
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not rename room',
+      );
+    } finally {
+      _isMutatingRoom = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteRoom(String roomId) async {
+    if (_isMutatingRoom) {
+      return;
+    }
+
+    _isMutatingRoom = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final deleted = await _repository.deleteRoom(roomId);
+      _rooms = _rooms.where((room) => room.id != deleted.id).toList();
+    } catch (error) {
+      _errorMessage = friendlyErrorMessage(
+        error,
+        context: 'Could not delete room',
+      );
+    } finally {
+      _isMutatingRoom = false;
+      notifyListeners();
+    }
+  }
+
+  // Short backoff so a confirmed command settles fast and the button frees up
+  // again quickly; the device already shows the optimistic state, so this only
+  // reconciles / reverts. First poll is tight (gateway often replies in
+  // ~150ms); it widens to cap total wait near 3s before declaring a timeout.
+  static const _pollBackoffMs = [150, 300, 500, 800, 1200];
 
   Future<void> _pollCommand(
     String deviceId,

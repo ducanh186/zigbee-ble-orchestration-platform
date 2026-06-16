@@ -82,7 +82,10 @@ class _DevicesViewState extends State<DevicesView> {
                     for (final device in filteredDevices) ...[
                       _DeviceRow(
                         device: device,
-                        roomName: viewModel.roomNameFor(device.roomId),
+                        roomName: _localizedRoomName(
+                          l10n,
+                          viewModel.roomNameFor(device.roomId),
+                        ),
                         onTap: () => widget.onOpenLight(device),
                       ),
                       const SizedBox(height: 10),
@@ -100,7 +103,8 @@ class _DevicesViewState extends State<DevicesView> {
     final normalizedQuery = _query.trim().toLowerCase();
     // The "sensor" filter matches v2 'sensor'+kind devices and legacy
     // 'motion'/'environment' rows (isMotion/isEnvironment dual-read).
-    final matchesType = _type == 'all' ||
+    final matchesType =
+        _type == 'all' ||
         (_type == 'sensor'
             ? (device.isMotion || device.isEnvironment)
             : device.deviceType == _type);
@@ -163,11 +167,12 @@ class _DeviceTypeFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filters = const [
-      _DeviceFilter('all', 'All', Icons.grid_view_rounded),
-      _DeviceFilter('light', 'Light', Icons.lightbulb_outline),
-      _DeviceFilter('sensor', 'Sensors', Icons.sensors),
-      _DeviceFilter('switch', 'Switch', Icons.toggle_off),
+    final l10n = AppLocalizations.of(context)!;
+    final filters = [
+      _DeviceFilter('all', l10n.allDevicesFilter, Icons.grid_view_rounded),
+      _DeviceFilter('light', l10n.lightDevicesFilter, Icons.lightbulb_outline),
+      _DeviceFilter('sensor', l10n.sensorDevicesFilter, Icons.sensors),
+      _DeviceFilter('switch', l10n.switchDevicesFilter, Icons.toggle_off),
     ];
 
     return SingleChildScrollView(
@@ -252,10 +257,7 @@ class _DeviceRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   roomName,
-                  style: TextStyle(
-                    color: palette.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: palette.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -276,12 +278,16 @@ class _DeviceStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (device.isLight) {
-      return StatusBadge.forPower(device.power);
+      return StatusBadge.forPower(
+        device.power,
+        label: _localizedPowerLabel(l10n, device.power),
+      );
     }
     if (device.isMotion) {
       return StatusBadge(
-        label: device.occupancy.label,
+        label: _localizedOccupancyLabel(l10n, device.occupancy),
         tone: switch (device.occupancy) {
           OccupancyState.occupied => BadgeTone.success,
           OccupancyState.unoccupied => BadgeTone.neutral,
@@ -290,8 +296,32 @@ class _DeviceStatusBadge extends StatelessWidget {
       );
     }
     return StatusBadge(
-      label: device.isOnline ? 'ONLINE' : 'OFFLINE',
+      label: device.isOnline ? l10n.onlineStatusBadge : l10n.offlineStatusBadge,
       tone: device.isOnline ? BadgeTone.success : BadgeTone.warning,
     );
   }
+}
+
+String _localizedRoomName(AppLocalizations l10n, String roomName) {
+  return roomName == 'No room' ? l10n.noRoomLabel : roomName;
+}
+
+String _localizedPowerLabel(AppLocalizations l10n, DevicePower power) {
+  return switch (power) {
+    DevicePower.on => l10n.powerOnStatus,
+    DevicePower.off => l10n.powerOffStatus,
+    DevicePower.unreachable => l10n.powerUnreachableStatus,
+    DevicePower.unknown => l10n.powerUnknownStatus,
+  };
+}
+
+String _localizedOccupancyLabel(
+  AppLocalizations l10n,
+  OccupancyState occupancy,
+) {
+  return switch (occupancy) {
+    OccupancyState.occupied => l10n.occupiedStatusBadge,
+    OccupancyState.unoccupied => l10n.unoccupiedStatusBadge,
+    OccupancyState.unknown => l10n.unknownStatusBadge,
+  };
 }

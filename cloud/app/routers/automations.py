@@ -34,6 +34,8 @@ def _publish_upsert(rule: Automation) -> None:
 
     Called after commit so the published payload matches DB state.
     """
+    if not _syncs_to_gateway(rule):
+        return
     mqtt_service.publish_automation_desired(
         automation_id=rule.id,
         op="upsert",

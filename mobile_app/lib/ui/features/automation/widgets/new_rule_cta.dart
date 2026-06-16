@@ -25,10 +25,7 @@ class NewRuleCta extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: palette.border,
-              style: BorderStyle.solid,
-            ),
+            border: Border.all(color: palette.border, style: BorderStyle.solid),
           ),
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -66,11 +63,7 @@ class NewRuleCta extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: palette.textSecondary,
-              ),
+              Icon(Icons.chevron_right, size: 18, color: palette.textSecondary),
             ],
           ),
         ),

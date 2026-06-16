@@ -56,8 +56,18 @@ def test_device_payload_valid():
     p = ProvisioningDevicePayload(
         eui64=VALID_EUI64,
         device_type="light",
+        install_code=VALID_INSTALL_CODE,
     )
     assert p.device_type == "light"
+    assert p.install_code == VALID_INSTALL_CODE
+
+
+def test_device_payload_accepts_environment_alias():
+    p = ProvisioningDevicePayload(
+        eui64="0000000000000053",
+        device_type="environment",
+    )
+    assert p.device_type == "environment"
 
 
 @pytest.mark.parametrize(
@@ -88,6 +98,18 @@ def test_session_create_valid():
     )
     assert body.device.eui64 == VALID_EUI64
     assert body.gateway_id == "gw-ubuntu-01"
+
+
+def test_session_create_allows_room_after_session():
+    body = ProvisioningSessionCreate(
+        gateway_id="gw-ubuntu-01",
+        device={
+            "eui64": VALID_EUI64,
+            "device_type": "light",
+        },
+    )
+    assert body.room_id is None
+    assert body.device.eui64 == VALID_EUI64
 
 
 def test_session_out_never_exposes_install_code():
@@ -178,6 +200,22 @@ async def _seed_factory_device(db_session_factory):
         await s.commit()
 
 
+async def _seed_environment_factory_device(db_session_factory):
+    from cloud.app.models import FactoryDevice
+
+    async with db_session_factory() as s:
+        s.add(
+            FactoryDevice(
+                eui64="0000000000000053",
+                install_code=VALID_INSTALL_CODE,
+                device_type="sensor",
+                model="EFR32MG12_ENV_KIT",
+                is_active=True,
+            )
+        )
+        await s.commit()
+
+
 async def _parent_headers(client, db_session_factory) -> dict[str, str]:
     await create_auth_user(
         db_session_factory,
@@ -258,6 +296,95 @@ async def test_create_provisioning_session_api_persists_and_hides_install_code(
         assert command.op == "gateway.prepare_join"
         assert command.target == published["target"]
         assert command.status == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_accepts_environment_payload(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    await _seed_environment_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+
+    r = await client.post(
+        "/api/provisioning/sessions",
+        json=_create_body(
+            device={
+                "eui64": "0000000000000053",
+                "device_type": "environment",
+                "install_code": VALID_INSTALL_CODE,
+            },
+        ),
+        headers=headers,
+    )
+
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["eui64"] == "0000000000000053"
+    assert data["device_type"] == "sensor"
+    assert data["model"] == "EFR32MG12_ENV_KIT"
+    assert "install_code" not in data
+    assert fake_mqtt.published[0]["target"]["install_code"] == VALID_INSTALL_CODE
+
+
+@pytest.mark.asyncio
+async def test_create_provisioning_session_allows_room_after_session(
+    client, db_session_factory, fake_mqtt
+):
+    from sqlalchemy import select
+
+    from cloud.app.models import ProvisioningSession
+
+    await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    body = _create_body()
+    body.pop("room_id")
+
+    r = await client.post("/api/provisioning/sessions", json=body, headers=headers)
+
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["room_id"] is None
+    assert fake_mqtt.published[0]["target"] == {
+        "eui64": VALID_EUI64,
+        "install_code": VALID_INSTALL_CODE,
+        "duration_sec": 180,
+    }
+    async with db_session_factory() as s:
+        row = (
+            await s.execute(
+                select(ProvisioningSession).where(
+                    ProvisioningSession.id == data["session_id"]
+                )
+            )
+        ).scalar_one()
+        assert row.room_id is None
+
+
+@pytest.mark.asyncio
+async def test_assign_provisioning_session_room_after_create(
+    client, db_session_factory, fake_mqtt
+):
+    await _seed_room(db_session_factory)
+    await _seed_factory_device(db_session_factory)
+    headers = await _parent_headers(client, db_session_factory)
+    body = _create_body()
+    body.pop("room_id")
+    created = (
+        await client.post("/api/provisioning/sessions", json=body, headers=headers)
+    ).json()
+
+    r = await client.patch(
+        f"/api/provisioning/sessions/{created['session_id']}/room",
+        json={"room_id": "room-1"},
+        headers=headers,
+    )
+
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["session_id"] == created["session_id"]
+    assert data["room_id"] == "room-1"
 
 
 @pytest.mark.asyncio

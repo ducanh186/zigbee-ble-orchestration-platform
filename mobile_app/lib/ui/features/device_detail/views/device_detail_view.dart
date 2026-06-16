@@ -12,6 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../auth/view_models/auth_view_model.dart';
 import '../../devices/view_models/device_dashboard_view_model.dart';
 
 class DeviceDetailView extends StatefulWidget {
@@ -62,7 +63,13 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
     return Consumer<DeviceDashboardViewModel>(
       builder: (context, viewModel, _) {
         final l10n = AppLocalizations.of(context)!;
+        final canMutateHome =
+            context.watch<AuthViewModel>().session?.canMutateHome ?? false;
         final current = viewModel.deviceById(widget.device.id) ?? widget.device;
+        final roomName = _localizedRoomName(
+          l10n,
+          viewModel.roomNameFor(current.roomId),
+        );
         final recentEvents = viewModel.eventsForDevice(current.id);
 
         return CustomScrollView(
@@ -90,6 +97,14 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
                       : () => _moveDevice(context, viewModel, current),
                   icon: const Icon(Icons.drive_file_move_outlined),
                 ),
+                if (canMutateHome)
+                  IconButton(
+                    tooltip: l10n.deleteDeviceTooltip,
+                    onPressed: viewModel.isDeletingDevice
+                        ? null
+                        : () => _deleteDevice(context, viewModel, current),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
                 IconButton(
                   tooltip: l10n.refreshTooltip,
                   onPressed: () => _refresh(viewModel, current.id),
@@ -101,16 +116,17 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               sliver: SliverList.list(
                 children: [
-                  _DeviceHeroCard(device: current, viewModel: viewModel),
+                  _DeviceHeroCard(
+                    device: current,
+                    viewModel: viewModel,
+                    roomName: roomName,
+                  ),
                   if (current.isLight) ...[
                     const SizedBox(height: 12),
                     _LastCommandCard(viewModel: viewModel),
                   ] else ...[
                     const SizedBox(height: 12),
-                    _DeviceInfoCard(
-                      device: current,
-                      roomName: viewModel.roomNameFor(current.roomId),
-                    ),
+                    _DeviceInfoCard(device: current, roomName: roomName),
                   ],
                   if (current.isMotion) ...[
                     const SizedBox(height: 18),
@@ -172,6 +188,40 @@ class _DeviceDetailViewState extends State<DeviceDetailView> {
       return;
     }
     await viewModel.moveDevice(device, roomId);
+  }
+
+  Future<void> _deleteDevice(
+    BuildContext context,
+    DeviceDashboardViewModel viewModel,
+    SmartDevice device,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext)!;
+        return AlertDialog(
+          title: Text(l10n.deleteDeviceTitle),
+          content: Text(l10n.deleteDeviceBody(device.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.cancelLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.deleteLabel),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+    final deleted = await viewModel.deleteDevice(device.id);
+    if (mounted && deleted) {
+      widget.onBack();
+    }
   }
 }
 
@@ -283,10 +333,15 @@ class _RenameDeviceDialogState extends State<_RenameDeviceDialog> {
 }
 
 class _DeviceHeroCard extends StatelessWidget {
-  const _DeviceHeroCard({required this.device, required this.viewModel});
+  const _DeviceHeroCard({
+    required this.device,
+    required this.viewModel,
+    required this.roomName,
+  });
 
   final SmartDevice device;
   final DeviceDashboardViewModel viewModel;
+  final String roomName;
 
   @override
   Widget build(BuildContext context) {
@@ -325,11 +380,8 @@ class _DeviceHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            viewModel.roomNameFor(device.roomId),
-            style: TextStyle(
-              color: palette.textSecondary,
-              fontSize: 12,
-            ),
+            roomName,
+            style: TextStyle(color: palette.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -339,7 +391,10 @@ class _DeviceHeroCard extends StatelessWidget {
             runSpacing: 6,
             children: [
               device.isLight
-                  ? StatusBadge.forPower(device.power)
+                  ? StatusBadge.forPower(
+                      device.power,
+                      label: _localizedPowerLabel(l10n, device.power),
+                    )
                   : StatusBadge(
                       label: device.isOnline
                           ? l10n.onlineLabel.toUpperCase()
@@ -785,5 +840,18 @@ String _localizedOccupancy(OccupancyState status, AppLocalizations l10n) {
     OccupancyState.occupied => l10n.occupancyOccupiedLabel,
     OccupancyState.unoccupied => l10n.occupancyUnoccupiedLabel,
     OccupancyState.unknown => l10n.occupancyUnknownLabel,
+  };
+}
+
+String _localizedRoomName(AppLocalizations l10n, String roomName) {
+  return roomName == 'No room' ? l10n.noRoomLabel : roomName;
+}
+
+String _localizedPowerLabel(AppLocalizations l10n, DevicePower power) {
+  return switch (power) {
+    DevicePower.on => l10n.powerOnStatus,
+    DevicePower.off => l10n.powerOffStatus,
+    DevicePower.unreachable => l10n.powerUnreachableStatus,
+    DevicePower.unknown => l10n.powerUnknownStatus,
   };
 }

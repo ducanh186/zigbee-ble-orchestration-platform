@@ -12,6 +12,12 @@ abstract class DeviceRepository {
 
   Future<List<Room>> fetchRooms();
 
+  Future<Room> createRoom(String name);
+
+  Future<Room> renameRoom({required String roomId, required String name});
+
+  Future<Room> deleteRoom(String roomId);
+
   Future<List<EventLog>> fetchEvents({String? deviceId});
 
   Future<CommandResult> sendLightPowerCommand({
@@ -28,6 +34,8 @@ abstract class DeviceRepository {
     required String deviceId,
     required String roomId,
   });
+
+  Future<void> deleteDevice(String deviceId);
 
   Future<CommandResult> fetchCommand(String commandId);
 }

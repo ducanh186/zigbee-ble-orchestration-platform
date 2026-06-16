@@ -112,7 +112,7 @@ class MockDeviceRepository implements DeviceRepository {
     ),
   ];
 
-  final List<Room> _rooms = const [
+  final List<Room> _rooms = [
     Room(id: 'lab01', name: 'Lab 01'),
     Room(id: 'lobby', name: 'Lobby'),
     Room(id: 'floor2', name: 'Floor 2'),
@@ -137,6 +137,42 @@ class MockDeviceRepository implements DeviceRepository {
   Future<List<Room>> fetchRooms() async {
     await Future<void>.delayed(const Duration(milliseconds: 80));
     return List.unmodifiable(_rooms);
+  }
+
+  @override
+  Future<Room> createRoom(String name) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final room = Room(
+      id: 'room-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+    );
+    _rooms.add(room);
+    return room;
+  }
+
+  @override
+  Future<Room> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final index = _rooms.indexWhere((room) => room.id == roomId);
+    final room = Room(id: roomId, name: name);
+    if (index != -1) {
+      _rooms[index] = room;
+    }
+    return room;
+  }
+
+  @override
+  Future<Room> deleteRoom(String roomId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final index = _rooms.indexWhere((room) => room.id == roomId);
+    if (index == -1) {
+      return Room(id: roomId, name: roomId);
+    }
+    final room = _rooms.removeAt(index);
+    return room;
   }
 
   @override
@@ -207,6 +243,13 @@ class MockDeviceRepository implements DeviceRepository {
     }
     _devices[index] = _devices[index].copyWith(roomId: roomId);
     return _devices[index];
+  }
+
+  @override
+  Future<void> deleteDevice(String deviceId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _devices.removeWhere((device) => device.id == deviceId);
+    _events.removeWhere((event) => event.deviceId == deviceId);
   }
 
   @override

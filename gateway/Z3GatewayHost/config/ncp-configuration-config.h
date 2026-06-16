@@ -61,7 +61,7 @@
 // <o EMBER_KEY_TABLE_SIZE> Link Key Table Size <0-127>
 // <i> Default: 0
 // <i> The maximum number of link key table entries supported by the stack.
-#define EMBER_KEY_TABLE_SIZE   4
+#define EMBER_KEY_TABLE_SIZE   8
 
 // <o EMBER_ZLL_GROUP_ADDRESSES> ZLL group addresses <0-255>
 // <i> Default: 0

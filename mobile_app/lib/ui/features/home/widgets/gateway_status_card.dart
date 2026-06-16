@@ -84,25 +84,25 @@ class _GatewayStatusPresentation {
       CloudConnectionState.online => _GatewayStatusPresentation(
         title: l10n.gatewayOnlineTitle,
         subtitle: latestReport,
-        badgeLabel: 'LOG',
+        badgeLabel: l10n.gatewayLogBadge,
         tone: BadgeTone.success,
       ),
       CloudConnectionState.offline => _GatewayStatusPresentation(
         title: l10n.gatewayOfflineTitle,
         subtitle: status.detail ?? latestReport,
-        badgeLabel: 'OFF',
+        badgeLabel: l10n.gatewayOffBadge,
         tone: BadgeTone.error,
       ),
       CloudConnectionState.unknown => _GatewayStatusPresentation(
         title: l10n.gatewayUnknownTitle,
         subtitle: status.detail ?? l10n.gatewayNoStatus,
-        badgeLabel: 'CHECK',
+        badgeLabel: l10n.gatewayCheckBadge,
         tone: BadgeTone.warning,
       ),
       CloudConnectionState.mock => _GatewayStatusPresentation(
         title: l10n.gatewayMockTitle,
         subtitle: latestReport,
-        badgeLabel: 'MOCK',
+        badgeLabel: l10n.gatewayMockBadge,
         tone: BadgeTone.neutral,
       ),
     };
@@ -149,7 +149,11 @@ Widget gatewayStatusOnlinePreview() {
   );
 }
 
-@Preview(name: 'No home hub log', group: 'Home hub status', size: Size(390, 120))
+@Preview(
+  name: 'No home hub log',
+  group: 'Home hub status',
+  size: Size(390, 120),
+)
 Widget gatewayStatusUnknownPreview() {
   return _GatewayStatusPreviewShell(
     status: const CloudStatus.unknown(

@@ -49,9 +49,7 @@ class DevicePickerRow extends StatelessWidget {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: selected
-                      ? palette.primary
-                      : palette.primaryTint,
+                  color: selected ? palette.primary : palette.primaryTint,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(

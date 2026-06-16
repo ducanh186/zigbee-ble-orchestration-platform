@@ -50,10 +50,60 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('vietnamese rule card localizes environment rule sentences', (
+    tester,
+  ) async {
+    const rule = AutomationRule(
+      id: 'rule-env',
+      name: 'test độ ẩm',
+      enabled: true,
+      trigger: SensorThresholdAutomationTrigger(
+        deviceId: 'env-1',
+        metric: EnvironmentMetric.humidity,
+        operator: ThresholdOperator.gte,
+        threshold: 80,
+      ),
+      actions: [
+        DeviceCommandAutomationAction(
+          deviceId: 'light-004f',
+          command: AutomationActionCommand.on,
+        ),
+      ],
+      syncStatus: AutomationSyncStatus.synced,
+      lastRunStatus: AutomationLastRunStatus.executed,
+    );
+
+    await tester.pumpWidget(
+      _buildCard(
+        rule,
+        locale: const Locale('vi'),
+        deviceNames: const {
+          'env-1': 'cảm biến môi trường',
+          'light-004f': 'Light (004f)',
+        },
+      ),
+    );
+
+    expect(find.text('Cảm biến môi trường'), findsOneWidget);
+    expect(
+      find.text(
+        'Khi cảm biến môi trường có độ ẩm từ 80% trở lên, bật Light (004f).',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('When'), findsNothing);
+    expect(find.textContaining('humidity is at least'), findsNothing);
+  });
 }
 
-Widget _buildCard(AutomationRule rule) {
+Widget _buildCard(
+  AutomationRule rule, {
+  Locale? locale,
+  Map<String, String> deviceNames = const {},
+}) {
   return MaterialApp(
+    locale: locale,
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
@@ -66,6 +116,7 @@ Widget _buildCard(AutomationRule rule) {
       body: RuleCard(
         rule: rule,
         template: AutomationVisuals.templateForRule(rule),
+        deviceNames: deviceNames,
       ),
     ),
   );

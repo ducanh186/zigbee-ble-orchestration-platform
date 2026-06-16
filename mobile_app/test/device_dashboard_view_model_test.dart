@@ -64,20 +64,96 @@ void main() {
     expect(repository.movedDeviceId, 'light-01');
     expect(repository.movedRoomId, 'room-2');
   });
+
+  test('createRoom adds the created room to the dashboard list', () async {
+    final repository = _CommandCaptureRepository()
+      ..rooms = const [Room(id: 'room-1', name: 'Living')];
+    final viewModel = DeviceDashboardViewModel(repository: repository);
+    await viewModel.load();
+
+    await viewModel.createRoom('Kitchen');
+
+    expect(repository.createdRoomName, 'Kitchen');
+    expect(viewModel.rooms.map((room) => room.name), ['Living', 'Kitchen']);
+  });
+
+  test('renameRoom updates the room name in the dashboard list', () async {
+    final repository = _CommandCaptureRepository()
+      ..rooms = const [Room(id: 'room-1', name: 'Living')];
+    final viewModel = DeviceDashboardViewModel(repository: repository);
+    await viewModel.load();
+
+    await viewModel.renameRoom(roomId: 'room-1', name: 'Studio');
+
+    expect(repository.renamedRoomId, 'room-1');
+    expect(repository.renamedRoomName, 'Studio');
+    expect(viewModel.roomNameFor('room-1'), 'Studio');
+  });
+
+  test('deleteRoom removes the deleted room from the dashboard list', () async {
+    final repository = _CommandCaptureRepository()
+      ..rooms = const [
+        Room(id: 'room-1', name: 'Living'),
+        Room(id: 'room-2', name: 'Kitchen'),
+      ];
+    final viewModel = DeviceDashboardViewModel(repository: repository);
+    await viewModel.load();
+
+    await viewModel.deleteRoom('room-1');
+
+    expect(repository.deletedRoomId, 'room-1');
+    expect(viewModel.rooms.map((room) => room.id), ['room-2']);
+  });
+
+  test(
+    'deleteDevice removes the deleted device from the dashboard list',
+    () async {
+      final repository = _CommandCaptureRepository()
+        ..devices = const [
+          SmartDevice(
+            id: 'light-01',
+            deviceType: 'light',
+            name: 'Lab Light',
+            isOnline: true,
+            power: DevicePower.on,
+          ),
+          SmartDevice(
+            id: 'pir-01',
+            deviceType: 'motion',
+            name: 'Lab Motion',
+            isOnline: true,
+            power: DevicePower.unknown,
+          ),
+        ];
+      final viewModel = DeviceDashboardViewModel(repository: repository);
+      await viewModel.load();
+
+      await viewModel.deleteDevice('light-01');
+
+      expect(repository.deletedDeviceId, 'light-01');
+      expect(viewModel.devices.map((device) => device.id), ['pir-01']);
+    },
+  );
 }
 
 class _CommandCaptureRepository implements DeviceRepository {
   String? sentDeviceId;
   DevicePower? sentTarget;
+  List<SmartDevice> devices = const [];
   List<Room> rooms = const [];
   String? movedDeviceId;
   String? movedRoomId;
+  String? createdRoomName;
+  String? renamedRoomId;
+  String? renamedRoomName;
+  String? deletedRoomId;
+  String? deletedDeviceId;
 
   @override
   Future<CloudStatus> fetchCloudStatus() async => const CloudStatus.online();
 
   @override
-  Future<List<SmartDevice>> fetchDevices() async => const <SmartDevice>[];
+  Future<List<SmartDevice>> fetchDevices() async => devices;
 
   @override
   Future<List<EventLog>> fetchEvents({String? deviceId}) async =>
@@ -109,6 +185,37 @@ class _CommandCaptureRepository implements DeviceRepository {
   Future<List<Room>> fetchRooms() async => rooms;
 
   @override
+  Future<Room> createRoom(String name) async {
+    createdRoomName = name;
+    final room = Room(id: 'room-new', name: name);
+    rooms = [...rooms, room];
+    return room;
+  }
+
+  @override
+  Future<Room> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    renamedRoomId = roomId;
+    renamedRoomName = name;
+    final room = Room(id: roomId, name: name);
+    rooms = [
+      for (final item in rooms)
+        if (item.id == roomId) room else item,
+    ];
+    return room;
+  }
+
+  @override
+  Future<Room> deleteRoom(String roomId) async {
+    deletedRoomId = roomId;
+    final deleted = rooms.firstWhere((room) => room.id == roomId);
+    rooms = rooms.where((room) => room.id != roomId).toList();
+    return deleted;
+  }
+
+  @override
   Future<SmartDevice> moveDeviceToRoom({
     required String deviceId,
     required String roomId,
@@ -123,6 +230,12 @@ class _CommandCaptureRepository implements DeviceRepository {
       power: DevicePower.on,
       roomId: roomId,
     );
+  }
+
+  @override
+  Future<void> deleteDevice(String deviceId) async {
+    deletedDeviceId = deviceId;
+    devices = devices.where((device) => device.id != deviceId).toList();
   }
 
   @override

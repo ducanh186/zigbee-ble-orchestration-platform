@@ -39,12 +39,7 @@ void main() {
       RegExp(r"""\blabel:\s*['"]([^'"]+)['"]"""),
       RegExp(r"""\btitle:\s*['"]([^'"]+)['"]"""),
     ];
-    const allowedTechnicalText = {
-      'EUI64',
-      '>=',
-      '<=',
-      '•',
-    };
+    const allowedTechnicalText = {'EUI64', '>=', '<=', '•'};
     final violations = <String>[];
 
     for (final file in Directory('lib/ui').listSync(recursive: true)) {

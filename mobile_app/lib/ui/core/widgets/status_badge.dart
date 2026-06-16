@@ -14,9 +14,9 @@ class StatusBadge extends StatelessWidget {
     super.key,
   });
 
-  factory StatusBadge.forPower(DevicePower power) {
+  factory StatusBadge.forPower(DevicePower power, {String? label}) {
     return StatusBadge(
-      label: power.label,
+      label: label ?? power.label,
       tone: switch (power) {
         DevicePower.on => BadgeTone.success,
         DevicePower.off => BadgeTone.neutral,

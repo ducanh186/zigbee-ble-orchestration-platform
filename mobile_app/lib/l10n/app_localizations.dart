@@ -302,6 +302,12 @@ abstract class AppLocalizations {
   /// **'Devices'**
   String get settingsDevices;
 
+  /// No description provided for @settingsRooms.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms'**
+  String get settingsRooms;
+
   /// No description provided for @settingsAddNewDevice.
   ///
   /// In en, this message translates to:
@@ -674,6 +680,18 @@ abstract class AppLocalizations {
   /// **'Devices'**
   String get devicesMetricLabel;
 
+  /// No description provided for @detailsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get detailsLabel;
+
+  /// No description provided for @addDeviceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get addDeviceLabel;
+
   /// No description provided for @onlineMetricLabel.
   ///
   /// In en, this message translates to:
@@ -685,6 +703,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unreachable'**
   String get unreachableMetricLabel;
+
+  /// No description provided for @allDevicesFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get allDevicesFilter;
+
+  /// No description provided for @lightDevicesFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get lightDevicesFilter;
+
+  /// No description provided for @sensorDevicesFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensors'**
+  String get sensorDevicesFilter;
+
+  /// No description provided for @switchDevicesFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get switchDevicesFilter;
+
+  /// No description provided for @noRoomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'No room'**
+  String get noRoomLabel;
+
+  /// No description provided for @powerOnStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'ON'**
+  String get powerOnStatus;
+
+  /// No description provided for @powerOffStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'OFF'**
+  String get powerOffStatus;
+
+  /// No description provided for @powerUnreachableStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'UNREACHABLE'**
+  String get powerUnreachableStatus;
+
+  /// No description provided for @powerUnknownStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'UNKNOWN'**
+  String get powerUnknownStatus;
+
+  /// No description provided for @onlineStatusBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'ONLINE'**
+  String get onlineStatusBadge;
+
+  /// No description provided for @offlineStatusBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'OFFLINE'**
+  String get offlineStatusBadge;
+
+  /// No description provided for @occupiedStatusBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'OCCUPIED'**
+  String get occupiedStatusBadge;
+
+  /// No description provided for @unoccupiedStatusBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'UNOCCUPIED'**
+  String get unoccupiedStatusBadge;
+
+  /// No description provided for @unknownStatusBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'UNKNOWN'**
+  String get unknownStatusBadge;
+
+  /// No description provided for @gatewayLogBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LOG'**
+  String get gatewayLogBadge;
+
+  /// No description provided for @gatewayOffBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'OFF'**
+  String get gatewayOffBadge;
+
+  /// No description provided for @gatewayCheckBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'CHECK'**
+  String get gatewayCheckBadge;
+
+  /// No description provided for @gatewayMockBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'MOCK'**
+  String get gatewayMockBadge;
+
+  /// No description provided for @syncPendingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'PENDING'**
+  String get syncPendingStatus;
+
+  /// No description provided for @syncSyncedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'SYNCED'**
+  String get syncSyncedStatus;
+
+  /// No description provided for @syncFailedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'FAILED'**
+  String get syncFailedStatus;
+
+  /// No description provided for @runNeverStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'NEVER RUN'**
+  String get runNeverStatus;
+
+  /// No description provided for @runExecutedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'EXECUTED'**
+  String get runExecutedStatus;
+
+  /// No description provided for @runFailedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'FAILED'**
+  String get runFailedStatus;
+
+  /// No description provided for @runTimeoutStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'TIMEOUT'**
+  String get runTimeoutStatus;
 
   /// No description provided for @quickLightsTitle.
   ///
@@ -1040,6 +1208,18 @@ abstract class AppLocalizations {
   /// **'QR JSON'**
   String get qrJsonLabel;
 
+  /// No description provided for @assignDeviceRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign device to room'**
+  String get assignDeviceRoomTitle;
+
+  /// No description provided for @assignDeviceRoomBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Which room should this device use?'**
+  String get assignDeviceRoomBody;
+
   /// No description provided for @clearLabel.
   ///
   /// In en, this message translates to:
@@ -1142,6 +1322,24 @@ abstract class AppLocalizations {
   /// **'Rename device'**
   String get renameDeviceLabel;
 
+  /// No description provided for @deleteDeviceTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete device'**
+  String get deleteDeviceTooltip;
+
+  /// No description provided for @deleteDeviceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete device?'**
+  String get deleteDeviceTitle;
+
+  /// No description provided for @deleteDeviceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from Cloud. The next gateway report can add it again as a fresh device.'**
+  String deleteDeviceBody(String name);
+
   /// No description provided for @recentEventsTitle.
   ///
   /// In en, this message translates to:
@@ -1171,6 +1369,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Room'**
   String get roomLabel;
+
+  /// No description provided for @roomsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rooms'**
+  String get roomsTitle;
+
+  /// No description provided for @createRoomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Create room'**
+  String get createRoomLabel;
+
+  /// No description provided for @renameRoomLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename room'**
+  String get renameRoomLabel;
+
+  /// No description provided for @roomNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Room name'**
+  String get roomNameLabel;
+
+  /// No description provided for @deleteRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete room?'**
+  String get deleteRoomTitle;
+
+  /// No description provided for @deleteRoomBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\" from this home. Rooms with devices cannot be deleted.'**
+  String deleteRoomBody(String name);
 
   /// No description provided for @moveRoomLabel.
   ///

@@ -16,6 +16,8 @@ quality: production
 source:
 - {path: main.c}
 - {path: app.c}
+- {path: app/buttons.c}
+- {path: app/net_mgr.c}
 - {path: app/display_qr.c}
 - {path: app/provisioning_qr.c}
 - {path: app/qrcodegen.c}

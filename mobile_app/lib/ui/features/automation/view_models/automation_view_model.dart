@@ -12,7 +12,7 @@ class AutomationViewModel extends ChangeNotifier {
   AutomationViewModel({
     required AutomationRepository repository,
     SceneRepository? sceneRepository,
-    this.pollDelay = const Duration(seconds: 3),
+    this.pollDelay = const Duration(milliseconds: 1500),
     this.maxPollAttempts = 5,
   }) : _repository = repository,
        _sceneRepository = sceneRepository;
@@ -28,6 +28,11 @@ class AutomationViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSaving = false;
   String? _errorMessage;
+
+  /// Background gateway-sync reconcile kicked off by [createRule] (not awaited
+  /// by the save so the sheet closes immediately). Exposed for tests.
+  @visibleForTesting
+  Future<void>? syncReconcileTask;
 
   List<AutomationRule> get rules => List.unmodifiable(_rules);
   List<LightScene> get scenes => List.unmodifiable(_scenes);
@@ -82,8 +87,12 @@ class AutomationViewModel extends ChangeNotifier {
       _upsert(created);
       notifyListeners();
 
+      // The POST already persisted the rule, so the save is done — don't block
+      // on the gateway-sync reconcile (which can wait seconds for an event
+      // rule's ack). Reconcile the sync badge in the background instead.
       if (!created.syncStatus.isFinal) {
-        await _pollRule(created.id);
+        syncReconcileTask = _pollRule(created.id);
+        unawaited(syncReconcileTask!);
       }
     } catch (error) {
       _errorMessage = friendlyErrorMessage(

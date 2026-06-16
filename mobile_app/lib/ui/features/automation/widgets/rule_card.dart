@@ -31,13 +31,13 @@ class RuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final l10n = AppLocalizations.of(context);
-    final scheduleLabel =
-        l10n?.scheduleTriggerLabel ?? 'Schedule';
+    final l10n = AppLocalizations.of(context)!;
+    final languageCode = Localizations.localeOf(context).languageCode;
     final opacity = rule.enabled ? 1.0 : 0.72;
     final showMutationControls = onDelete != null || onEnabledChanged != null;
     final isSchedule =
         rule.trigger.triggerType == AutomationTriggerType.schedule;
+    final isEnvironmentRule = rule.trigger is SensorThresholdAutomationTrigger;
 
     return Opacity(
       opacity: opacity,
@@ -74,6 +74,8 @@ class RuleCard extends StatelessWidget {
                   child: Icon(
                     isSchedule
                         ? Icons.schedule
+                        : isEnvironmentRule
+                        ? Icons.thermostat
                         : AutomationVisuals.templateIcon(template),
                     size: 18,
                     color: palette.primary,
@@ -95,7 +97,13 @@ class RuleCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isSchedule ? scheduleLabel : template.label,
+                        _templateLabel(
+                          template,
+                          l10n,
+                          languageCode,
+                          isSchedule: isSchedule,
+                          isEnvironmentRule: isEnvironmentRule,
+                        ),
                         style: TextStyle(
                           fontSize: 11,
                           color: palette.textSecondary,
@@ -110,7 +118,7 @@ class RuleCard extends StatelessWidget {
                     children: [
                       if (onDelete != null)
                         IconButton(
-                          tooltip: l10n?.deleteRuleTooltip ?? 'Delete rule',
+                          tooltip: l10n.deleteRuleTooltip,
                           icon: const Icon(Icons.delete_outline, size: 19),
                           color: palette.error,
                           onPressed: onDelete,
@@ -147,4 +155,33 @@ class RuleCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _templateLabel(
+  AutomationRuleTemplate template,
+  AppLocalizations l10n,
+  String languageCode, {
+  required bool isSchedule,
+  required bool isEnvironmentRule,
+}) {
+  if (isSchedule) {
+    return l10n.scheduleTriggerLabel;
+  }
+  final vietnamese = languageCode.toLowerCase() == 'vi';
+  if (isEnvironmentRule) {
+    return vietnamese ? 'Cảm biến môi trường' : 'Environment sensor';
+  }
+  if (!vietnamese) {
+    return template.label;
+  }
+  return switch (template) {
+    AutomationRuleTemplate.switchTogglesOneLight => 'Công tắc đổi một đèn',
+    AutomationRuleTemplate.switchTogglesLights => 'Công tắc đổi nhiều đèn',
+    AutomationRuleTemplate.motionOccupiedTurnsOnLights =>
+      'Cảm biến báo có người',
+    AutomationRuleTemplate.motionUnoccupiedTurnsOffLights =>
+      'Cảm biến báo không có người',
+    AutomationRuleTemplate.scheduleOn => l10n.scheduleTriggerLabel,
+    AutomationRuleTemplate.scheduleOff => l10n.scheduleTriggerLabel,
+  };
 }

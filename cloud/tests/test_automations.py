@@ -158,6 +158,9 @@ async def test_create_schedule_rule_persists_cron(
     assert response.status_code == 201, response.text
     assert response.json()["trigger_type"] == "schedule"
     assert response.json()["schedule_cron"] == "0 7 * * 1-5"
+    assert response.json()["sync_status"] == "synced"
+    assert response.json()["last_error"] is None
+    assert _auto_pubs(fake_mqtt) == []
 
 
 @pytest.mark.asyncio
@@ -678,6 +681,38 @@ async def test_get_unknown_automation_404(client, db_session_factory):
 
 def _auto_pubs(fake_mqtt) -> list[dict]:
     return [p for p in fake_mqtt.published if p.get("kind") == "automation_desired"]
+
+
+def test_publish_upsert_skips_schedule_rules(fake_mqtt):
+    from cloud.app.models import Automation
+    from cloud.app.routers.automations import _publish_upsert
+
+    rule = Automation(
+        id="auto_schedule",
+        name="Schedule rule",
+        enabled=True,
+        tenant_id="hust",
+        site_id="lab01",
+        gateway_id="gw-ubuntu-01",
+        version=1,
+        trigger_type="schedule",
+        schedule_cron="0 7 * * 1-5",
+        trigger={"type": "schedule"},
+        actions=[
+            {
+                "type": "device_command",
+                "device_id": "light-01",
+                "device_type": "light",
+                "command": "on",
+            }
+        ],
+        sync_status="synced",
+        last_run_status="never_run",
+    )
+
+    _publish_upsert(rule)
+
+    assert _auto_pubs(fake_mqtt) == []
 
 
 @pytest.mark.asyncio

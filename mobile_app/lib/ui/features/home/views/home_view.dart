@@ -17,11 +17,13 @@ class HomeView extends StatelessWidget {
   const HomeView({
     required this.onOpenLight,
     required this.onOpenDevices,
+    required this.onOpenProvisioning,
     super.key,
   });
 
   final ValueChanged<SmartDevice> onOpenLight;
   final VoidCallback onOpenDevices;
+  final VoidCallback onOpenProvisioning;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +68,7 @@ class HomeView extends StatelessWidget {
                   _MetricRow(
                     viewModel: viewModel,
                     onOpenDevices: onOpenDevices,
+                    onOpenProvisioning: onOpenProvisioning,
                   ),
                   if (environmentSensor != null) ...[
                     const SizedBox(height: 18),
@@ -75,8 +78,9 @@ class HomeView extends StatelessWidget {
                           child: SectionTitle(title: l10n.environmentTitle),
                         ),
                         _RoomBadge(
-                          name: viewModel.roomNameFor(
-                            environmentSensor.roomId,
+                          name: _localizedRoomName(
+                            l10n,
+                            viewModel.roomNameFor(environmentSensor.roomId),
                           ),
                         ),
                       ],
@@ -129,37 +133,68 @@ class HomeView extends StatelessWidget {
 }
 
 class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.viewModel, required this.onOpenDevices});
+  const _MetricRow({
+    required this.viewModel,
+    required this.onOpenDevices,
+    required this.onOpenProvisioning,
+  });
 
   final DeviceDashboardViewModel viewModel;
   final VoidCallback onOpenDevices;
+  final VoidCallback onOpenProvisioning;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _MetricTile(
-            label: l10n.devicesMetricLabel,
-            value: viewModel.devices.length,
-            onTap: onOpenDevices,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                label: l10n.devicesMetricLabel,
+                value: viewModel.devices.length,
+                detailText: l10n.detailsLabel,
+                onTap: onOpenDevices,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MetricTile(
+                label: l10n.onlineMetricLabel,
+                value: viewModel.onlineCount,
+                tone: BadgeTone.success,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MetricTile(
+                label: l10n.unreachableMetricLabel,
+                value: viewModel.unreachableCount,
+                tone: BadgeTone.warning,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MetricTile(
-            label: l10n.onlineMetricLabel,
-            value: viewModel.onlineCount,
-            tone: BadgeTone.success,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _MetricTile(
-            label: l10n.unreachableMetricLabel,
-            value: viewModel.unreachableCount,
-            tone: BadgeTone.warning,
+        const SizedBox(height: 8),
+        Tooltip(
+          message: l10n.addDeviceLabel,
+          child: AppCard(
+            onTap: onOpenProvisioning,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.add_circle_outline),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.addDeviceLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
           ),
         ),
       ],
@@ -173,12 +208,14 @@ class _MetricTile extends StatelessWidget {
     required this.value,
     this.tone = BadgeTone.neutral,
     this.onTap,
+    this.detailText,
   });
 
   final String label;
   final int value;
   final BadgeTone tone;
   final VoidCallback? onTap;
+  final String? detailText;
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +251,17 @@ class _MetricTile extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (detailText != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              detailText!,
+              style: TextStyle(
+                color: palette.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -256,7 +304,10 @@ class _QuickLightGrid extends StatelessWidget {
           onTap: () => onOpenLight(light),
           child: _LightTile(
             light: light,
-            roomName: viewModel.roomNameFor(light.roomId),
+            roomName: _localizedRoomName(
+              l10n,
+              viewModel.roomNameFor(light.roomId),
+            ),
           ),
         );
       },
@@ -273,6 +324,7 @@ class _LightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final l10n = AppLocalizations.of(context)!;
     final isOn = light.power == DevicePower.on;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +350,10 @@ class _LightTile extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: StatusBadge.forPower(light.power),
+                  child: StatusBadge.forPower(
+                    light.power,
+                    label: _localizedPowerLabel(l10n, light.power),
+                  ),
                 ),
               ),
             ),
@@ -367,4 +422,17 @@ class _RoomBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+String _localizedRoomName(AppLocalizations l10n, String roomName) {
+  return roomName == 'No room' ? l10n.noRoomLabel : roomName;
+}
+
+String _localizedPowerLabel(AppLocalizations l10n, DevicePower power) {
+  return switch (power) {
+    DevicePower.on => l10n.powerOnStatus,
+    DevicePower.off => l10n.powerOffStatus,
+    DevicePower.unreachable => l10n.powerUnreachableStatus,
+    DevicePower.unknown => l10n.powerUnknownStatus,
+  };
 }

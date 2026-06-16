@@ -147,6 +147,8 @@ async def ensure_provisioning_session_visible(
 ) -> None:
     if is_admin(user):
         return
+    if session.room_id is None:
+        return
     room = await db.get(Room, session.room_id)
     if room is None or user.home_id is None or room.home_id != user.home_id:
         raise HTTPException(

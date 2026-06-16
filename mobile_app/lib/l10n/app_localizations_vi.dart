@@ -112,6 +112,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsDevices => 'Thiết bị';
 
   @override
+  String get settingsRooms => 'Phòng';
+
+  @override
   String get settingsAddNewDevice => 'Thêm thiết bị mới';
 
   @override
@@ -303,10 +306,91 @@ class AppLocalizationsVi extends AppLocalizations {
   String get devicesMetricLabel => 'Thiết bị';
 
   @override
+  String get detailsLabel => 'Chi tiết';
+
+  @override
+  String get addDeviceLabel => 'Thêm thiết bị';
+
+  @override
   String get onlineMetricLabel => 'Trực tuyến';
 
   @override
   String get unreachableMetricLabel => 'Mất kết nối';
+
+  @override
+  String get allDevicesFilter => 'Tất cả';
+
+  @override
+  String get lightDevicesFilter => 'Đèn';
+
+  @override
+  String get sensorDevicesFilter => 'Cảm biến';
+
+  @override
+  String get switchDevicesFilter => 'Công tắc';
+
+  @override
+  String get noRoomLabel => 'Chưa có phòng';
+
+  @override
+  String get powerOnStatus => 'BẬT';
+
+  @override
+  String get powerOffStatus => 'TẮT';
+
+  @override
+  String get powerUnreachableStatus => 'MẤT KẾT NỐI';
+
+  @override
+  String get powerUnknownStatus => 'CHƯA RÕ';
+
+  @override
+  String get onlineStatusBadge => 'TRỰC TUYẾN';
+
+  @override
+  String get offlineStatusBadge => 'NGOẠI TUYẾN';
+
+  @override
+  String get occupiedStatusBadge => 'CÓ NGƯỜI';
+
+  @override
+  String get unoccupiedStatusBadge => 'KHÔNG CÓ NGƯỜI';
+
+  @override
+  String get unknownStatusBadge => 'CHƯA RÕ';
+
+  @override
+  String get gatewayLogBadge => 'LOG';
+
+  @override
+  String get gatewayOffBadge => 'TẮT';
+
+  @override
+  String get gatewayCheckBadge => 'KIỂM TRA';
+
+  @override
+  String get gatewayMockBadge => 'MÔ PHỎNG';
+
+  @override
+  String get syncPendingStatus => 'ĐANG CHỜ';
+
+  @override
+  String get syncSyncedStatus => 'ĐÃ ĐỒNG BỘ';
+
+  @override
+  String get syncFailedStatus => 'LỖI';
+
+  @override
+  String get runNeverStatus => 'CHƯA CHẠY';
+
+  @override
+  String get runExecutedStatus => 'ĐÃ CHẠY';
+
+  @override
+  String get runFailedStatus => 'LỖI';
+
+  @override
+  String get runTimeoutStatus => 'QUÁ HẠN';
 
   @override
   String get quickLightsTitle => 'Điều khiển đèn nhanh';
@@ -497,6 +581,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get qrJsonLabel => 'QR JSON';
 
   @override
+  String get assignDeviceRoomTitle => 'Assign device to room';
+
+  @override
+  String get assignDeviceRoomBody => 'Which room should this device use?';
+
+  @override
   String get clearLabel => 'Xóa';
 
   @override
@@ -550,6 +640,17 @@ class AppLocalizationsVi extends AppLocalizations {
   String get renameDeviceLabel => 'Đổi tên thiết bị';
 
   @override
+  String get deleteDeviceTooltip => 'Xóa thiết bị';
+
+  @override
+  String get deleteDeviceTitle => 'Xóa thiết bị?';
+
+  @override
+  String deleteDeviceBody(String name) {
+    return 'Xóa \"$name\" khỏi Cloud. Báo cáo tiếp theo từ gateway có thể thêm lại thiết bị như một thiết bị mới.';
+  }
+
+  @override
   String get recentEventsTitle => 'Sự kiện gần đây';
 
   @override
@@ -563,6 +664,26 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get roomLabel => 'Phòng';
+
+  @override
+  String get roomsTitle => 'Phòng';
+
+  @override
+  String get createRoomLabel => 'Tạo phòng';
+
+  @override
+  String get renameRoomLabel => 'Đổi tên phòng';
+
+  @override
+  String get roomNameLabel => 'Tên phòng';
+
+  @override
+  String get deleteRoomTitle => 'Xóa phòng?';
+
+  @override
+  String deleteRoomBody(String name) {
+    return 'Xóa \"$name\" khỏi home này. Phòng đang có thiết bị thì không thể xóa.';
+  }
 
   @override
   String get moveRoomLabel => 'Đổi phòng';

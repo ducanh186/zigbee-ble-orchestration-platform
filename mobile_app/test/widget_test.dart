@@ -149,6 +149,26 @@ class _ImmediateRenameRepository extends MockDeviceRepository {
   }
 }
 
+class _ImmediateDeleteRepository extends MockDeviceRepository {
+  String? deletedDeviceId;
+  final Set<String> _deletedDeviceIds = {};
+
+  @override
+  Future<List<SmartDevice>> fetchDevices() async {
+    final devices = await super.fetchDevices();
+    return [
+      for (final device in devices)
+        if (!_deletedDeviceIds.contains(device.id)) device,
+    ];
+  }
+
+  @override
+  Future<void> deleteDevice(String deviceId) async {
+    deletedDeviceId = deviceId;
+    _deletedDeviceIds.add(deviceId);
+  }
+}
+
 void main() {
   Future<void> pumpDashboard(
     WidgetTester tester, {
@@ -156,8 +176,9 @@ void main() {
     DeviceRepository? repository,
     AutomationRepository? automationRepository,
     String role = 'parent',
+    Map<String, Object> initialPreferences = const {},
   }) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues(initialPreferences);
     // SCRUM-29 wraps the app in an auth gate. Pre-authenticate the dashboard
     // tests so they continue to render the shell on first frame.
     final authViewModel = AuthViewModel(
@@ -522,6 +543,88 @@ void main() {
     expect(find.textContaining('light-01'), findsNothing);
   });
 
+  testWidgets('vietnamese home exposes details and add-device navigation', (
+    tester,
+  ) async {
+    await pumpDashboard(
+      tester,
+      useMockApi: true,
+      initialPreferences: {'locale_language_code': 'vi'},
+    );
+
+    expect(find.text('Chi tiết'), findsOneWidget);
+    expect(find.byTooltip('Thêm thiết bị'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Thêm thiết bị'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Provisioning'), findsWidgets);
+
+    await tester.tap(find.text('Trang chủ'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chi tiết'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thiết bị'), findsWidgets);
+    expect(find.text('Tất cả'), findsOneWidget);
+    expect(find.text('Đèn'), findsOneWidget);
+    expect(find.text('Cảm biến'), findsOneWidget);
+    expect(find.text('Công tắc'), findsOneWidget);
+    expect(find.text('All'), findsNothing);
+    expect(find.text('Sensors'), findsNothing);
+    expect(find.text('No room'), findsNothing);
+  });
+
+  testWidgets('parent and admin can delete a device from detail', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    for (final role in ['parent', 'admin']) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      final repository = _ImmediateDeleteRepository();
+      await pumpDashboard(
+        tester,
+        useMockApi: true,
+        repository: repository,
+        role: role,
+      );
+
+      expect(find.text('Lab Light 01'), findsOneWidget);
+      await tester.tap(find.text('Lab Light 01'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Delete device'), findsOneWidget);
+      await tester.tap(find.byTooltip('Delete device'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete device?'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(repository.deletedDeviceId, 'light-01');
+      expect(find.text('Lab Light 01'), findsNothing, reason: 'role=$role');
+    }
+  });
+
+  testWidgets('viewer cannot see the device delete action', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await pumpDashboard(tester, useMockApi: true, role: 'viewer');
+
+    expect(find.text('Lab Light 01'), findsOneWidget);
+    await tester.tap(find.text('Lab Light 01'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Delete device'), findsNothing);
+  });
+
   testWidgets('settings shows compact parent-facing sections', (tester) async {
     await pumpDashboard(tester, useMockApi: true);
 
@@ -544,6 +647,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('HOME MANAGEMENT'), findsOneWidget);
     expect(find.text('Devices'), findsOneWidget);
+    expect(find.text('Rooms'), findsOneWidget);
     expect(find.text('Add new device'), findsOneWidget);
     expect(find.text('Automation rules'), findsOneWidget);
     expect(find.text('Activity history'), findsOneWidget);

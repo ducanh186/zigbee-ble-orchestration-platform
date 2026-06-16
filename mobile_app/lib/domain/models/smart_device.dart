@@ -19,6 +19,7 @@ class SmartDevice {
   final String name;
   final String? eui64;
   final String? roomId;
+
   /// Device-model-v2 sensor slot: 1 = occupancy, 2 = environment (temp/humi).
   /// Null for non-sensor devices and legacy rows.
   final int? sensorKind;
@@ -39,6 +40,7 @@ class SmartDevice {
   double? get temperatureC => (state['temperature_c'] as num?)?.toDouble();
   double? get humidityPercent =>
       (state['humidity_percent'] as num?)?.toDouble();
+
   /// Free-form sensor model label from reported state (e.g. "dht11").
   String? get sensorLabel => state['sensor']?.toString();
   String get roomLabel =>

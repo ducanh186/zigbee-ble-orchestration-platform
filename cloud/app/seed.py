@@ -72,8 +72,8 @@ _PLACEHOLDER_FACTORY_DEVICES = [
     (
         "0000000000000053",
         "00112233445566778899AABBCCDDEEFF528F",
-        "motion",
-        "EFR32MG12_MOTION_KIT",
+        "sensor",
+        "EFR32MG12_ENV_KIT",
     ),
     (
         "0000000000000054",
