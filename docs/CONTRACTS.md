@@ -8,8 +8,8 @@ The Cloud API is mounted from `cloud/app/main.py`. `/health` is public. Other AP
 
 | Area | Routes | Notes |
 |---|---|---|
-| Auth | `/api/auth/login`, `/api/auth/me`, `/api/auth/change-password`, `/api/auth/logout` | Bearer tokens identify users. Seeded users may be forced to change passwords. |
-| Devices | `/api/devices/`, `/api/devices/{id}`, `/api/devices/{id}/state` | Device list and reads are filtered by user visibility. |
+| Auth | `/auth/login`, `/auth/me`, `/auth/change-password`, `/auth/logout` | Bearer tokens identify users. Seeded users may be forced to change passwords. The auth router is mounted at `/auth` (no `/api` prefix). |
+| Devices | `/api/devices/`, `/api/devices/{id}`, `/api/devices/{id}/state` | Device list and reads are filtered by user visibility. Each device carries `is_online` and `last_seen_at`, derived from gateway presence. |
 | Commands | `/api/devices/{id}/command`, `/api/commands/{id}` | Commands are scoped to the user's home before publishing to MQTT. |
 | Gateways | `/api/gateways/{id}/commissioning/open`, `/api/gateways/{id}/commissioning/close`, `/api/devices/{id}/rediscover` | Gateway operations publish gateway or device commands. |
 | Provisioning | `/api/provisioning/factory-devices`, `/api/provisioning/labels`, `/api/provisioning/sessions` | Factory records hold Install Codes server-side. Labels are admin-only and public. Sessions are visible to the owning home scope. |
@@ -34,6 +34,7 @@ sb/v1/{tenant_id}/{site_id}/{gateway_id}/...
 | `devices/{device_type}/{device_id}/telemetry` | Gateway to Cloud | Telemetry samples. |
 | `devices/{device_type}/{device_id}/event` | Gateway to Cloud | Device events. |
 | `devices/{device_type}/{device_id}/registry` | Gateway to Cloud | Device discovery or registry updates. |
+| `devices/{device_type}/{device_id}/presence` | Gateway to Cloud | Device liveness (reachable/online). Retained. Sets Cloud `is_online` and refreshes `last_seen_at`; the gateway re-emits it on a heartbeat so an idle-but-joined device is not aged out by the offline reaper. |
 | `devices/{device_type}/{device_id}/desired` | Cloud to Gateway | Desired device state. |
 | `commands/{command_id}/request` | Cloud to Gateway | Command request envelope. |
 | `commands/{command_id}/reply` | Gateway to Cloud | Command result envelope. |
@@ -82,9 +83,10 @@ OTA uses campaign manifests, device desired state, progress, and events. The imp
 Automation rules are stored in Cloud and synced to Gateway. Current validation is intentionally narrow:
 
 - Light actions use commands such as `on`, `off`, and `toggle`.
-- Switch triggers do not carry arbitrary state.
-- Motion triggers use an occupancy state.
-- Environment triggers use a `metric` (`temperature` or `humidity`), a `comparator` (`gte` or `lte`), and an integer centi-unit `threshold` (e.g. `2800` = 28.00 °C, `6500` = 65.00 %RH). The trigger `event` is `threshold_crossed` and fires edge-triggered (once per crossing into the matched condition).
+- Device-event triggers (`type: device_event`) carry a `device_type` (`sensor`, `switch`, or legacy `motion`), an `event` (`occupancy_changed`, `switch_toggle`, or `toggle`), and a `state` object. Switch triggers carry no arbitrary state; occupancy triggers carry `state.occupancy`.
+- Sensor-threshold triggers (`type: sensor_threshold`) carry a `device_type` (`sensor`, or legacy `environment`), a `metric` (`temperature_c` or `humidity_percent`), an `operator` (`gte` or `lte`), and a real-unit `threshold` float (temperature `-20`..`80` °C, humidity `0`..`100` %RH).
+- Schedule triggers (`type: schedule`) are Cloud-owned cron rules; see [`AUTOMATION_CONTRACT.md`](AUTOMATION_CONTRACT.md).
+- Device-model-v2: `device_type: sensor` is canonical (occupancy = sensor kind 1, environment = sensor kind 2). `motion`/`environment` are accepted as legacy aliases by both Cloud validation and the Gateway, which maps a `sensor` trigger to motion or environment by the trigger type.
 - MVP caps are enforced for maximum automations per gateway and maximum actions per automation.
 
 The Cloud-published value is canonical. Avoid compatibility aliases unless the issue or acceptance test explicitly requires one.
