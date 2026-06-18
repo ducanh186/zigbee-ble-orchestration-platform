@@ -194,6 +194,8 @@ void deviceMonitorTick(void)
 
 #define PRESENCE_PROBE_INTERVAL_MS 20000u
 #define PRESENCE_FAIL_THRESHOLD    2u   // consecutive probe failures -> offline
+#define PRESENCE_HEARTBEAT_MS      120000u  // re-emit reachable=true this often to keep
+                                            // cloud last_seen_at fresh (offline reaper = 300s)
 
 typedef struct {
   bool        used;
@@ -204,6 +206,7 @@ typedef struct {
   bool        reachable;
   bool        published;
   uint8_t     failCount;
+  uint32_t    lastHbMs;
 } presence_t;
 
 static presence_t g_pres[DEVICE_REGISTRY_MAX] = {0};
@@ -294,9 +297,14 @@ void devicePresenceTick(void)
                                   eui, sizeof(eui))) {
       continue;
     }
-    // Probe lights only (mains routers that reliably APS-ACK). Sleepy end
-    // devices would not ACK and get falsely marked offline.
-    if (strcasecmp(type, "light") != 0) continue;
+    // Every kit in this deployment is a mains-powered ROUTER (no sleepy end
+    // devices), so each reliably APS-ACKs a unicast. Probe them all — a
+    // device that stays silent between events (button switch, motion/occupancy
+    // sensor) would otherwise be aged out to "offline" while still joined.
+    // The liveness signal is APS delivery (emberAfMessageSentCallback), NOT the
+    // ZCL response, so a device without an On/Off server still reports
+    // reachable. (If a sleepy end device is ever added, gate it back out here.)
+    (void)type;
 
     presence_t *p = presenceEnsure(eui, type, nid, ep);
     if (!p) continue;
@@ -307,10 +315,19 @@ void devicePresenceTick(void)
 void devicePresenceOnSent(EmberNodeId nodeId, bool delivered)
 {
   presence_t *p = presenceFindByNode(nodeId);
-  if (!p) return;   // not a tracked (light) device
+  if (!p) return;   // not a tracked device
   if (delivered) {
     p->failCount = 0;
     presenceSet(p, true);
+    // presenceSet only emits on a state CHANGE, so an idle-but-joined device
+    // (e.g. a button switch that never reports) would have a stale last_seen_at
+    // and get reaped offline. Re-emit reachable=true on a heartbeat cadence so
+    // the cloud keeps last_seen_at fresh.
+    uint32_t now = msTick();
+    if ((now - p->lastHbMs) >= PRESENCE_HEARTBEAT_MS) {
+      p->lastHbMs = now;
+      appMqttPublishDevicePresence(p->nodeId, p->eui, p->type, true);
+    }
   } else {
     if (p->failCount < 0xFFu) p->failCount++;
     if (p->failCount >= PRESENCE_FAIL_THRESHOLD) {

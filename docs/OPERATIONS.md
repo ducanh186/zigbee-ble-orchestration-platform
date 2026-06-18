@@ -35,9 +35,30 @@ The standard run mode connects the Z3Gateway host directly to the **EC2 producti
 bash scripts/start-gateway-cloud.sh
 ```
 
-This exports the cloud MQTT + mTLS env (CA + client cert/key under `mqtt/certs`, signed by the production CA; ACL user `gateway`), stops any running gateway, frees `/dev/ttyACM0`, and launches against `98.83.4.87:8883` under the `hust/lab01/gw-ubuntu-01` topic prefix. Confirm `/tmp/z3gw.log` shows `MQTT: connected` to `98.83.4.87:8883` and `MQTT: subscribed …/commands/+/request`.
+This exports the cloud MQTT + mTLS env (CA + client cert/key under `mqtt/certs`, signed by the production CA; ACL user `gateway`), stops any running gateway, frees the NCP serial port, and launches against `98.83.4.87:8883` under the `hust/lab01/gw-ubuntu-01` topic prefix. Confirm `/tmp/z3gw.log` shows `ezsp ver …`, `MQTT: connected` to `98.83.4.87:8883`, and `MQTT: subscribed …/commands/+/request`.
 
-`scripts/start-gateway.sh` (localhost:1883) is retained only for offline local-dev when the cloud broker is unavailable; it is not the standard path. Because the dashboard and cloud also default to EC2, keeping the gateway on EC2 means all three share one broker.
+The script defaults the NCP port to `/dev/ttyACM0`. Re-plugging USB can re-enumerate the NCP onto a different `/dev/ttyACM*` (it shares the bus with the end-device kit J-Links). Find the NCP by its J-Link serial — `ls -l /dev/serial/by-id | grep D13-3` — then override the port:
+
+```bash
+UART=/dev/ttyACM1 bash scripts/start-gateway-cloud.sh
+```
+
+Use the short `/dev/ttyACM*` device path, not the long `/dev/serial/by-id/...` path — the Z3Gateway firmware truncates the serial-port-name buffer.
+
+### Offline Local-Dev Run
+
+`scripts/start-gateway.sh` (localhost:1883) is retained only for offline local-dev when the cloud broker is unavailable; it is not the standard path. Because the dashboard and cloud also default to EC2, keeping the gateway on EC2 means all three share one broker. The local-dev script pins its launch sequence so behavior does not drift:
+
+- **Stop the previous gateway first** and wait for the NCP serial port to be released before relaunching, otherwise the port grab (and any binary copy-back) fails with `Text file busy`:
+
+  ```bash
+  kill "$(cat /tmp/z3gw.pid)" 2>/dev/null
+  while fuser /dev/ttyACM0 >/dev/null 2>&1; do sleep 1; done
+  ```
+
+- **Local MQTT defaults** are `localhost:1883` with the `gateway` / `gateway123` development credentials (override via `SB_MQTT_HOST`, `SB_MQTT_PORT`, `SB_MQTT_USERNAME`, `SB_MQTT_PASSWORD`). These are dev-only and are not used in production certificate-identity mode.
+- **Automation routing** is pinned with `SB_AUTOMATION_SWITCH_HOOK=1` (cloud-pushed rules drive the switch → light path; the `AUTO` init log must show `skip_switch:false hook:true`) and `SB_RULES_SWITCH_TO_LIGHT=0` (the legacy hardcoded relay stays off; the `RULE` engine init must show `switch_to_light_relay:false`). Drift here silently breaks switch-to-light.
+- The script pipes `sleep infinity` into the binary so `sl_iostream` always sees a never-EOF stdin; without it the host exits as soon as stdin closes.
 
 ## Local Mobile Run
 
@@ -231,3 +252,17 @@ Check:
 - Cloud published retained desired automation state.
 - Gateway reported the automation as synced.
 - Device event topics are arriving at Gateway and Cloud.
+
+### Device Shows Offline Though It Is Powered And Joined
+
+A device LED is on (still joined) but Cloud shows `is_online: false`. The Gateway device registry is in-RAM and is rebuilt every boot; a router that joined earlier and then stays silent (a button switch, an idle occupancy sensor) is only re-registered when it rejoins or publishes. Check:
+
+1. Gateway log shows `BOOT rediscover_done` with a non-zero `neighbors` count — the boot/periodic sweep walks the NCP child **and** neighbor tables, so a joined router should be picked up within ~30s of gateway start.
+2. Gateway publishes `devices/{type}/{id}/presence` for that device, and the broker ACL lets Cloud read it.
+3. Cloud `last_seen_at` advances (the gateway re-emits presence on a heartbeat under the offline-reaper window).
+4. Force it immediately with `POST /api/devices/{id}/rediscover`.
+5. If the device is genuinely a sleepy end device (none ship in this deployment — all kits are routers), presence probing must be gated for it.
+
+### Gateway Crash-Loops With `ezspForceReset` / Assertion
+
+`/tmp/z3gw.log` ends with `ERROR: ezspForceReset 0x21` and `sli_zigbee_af_reset_and_init_ncp: Assertion 'false' failed`. The host is talking EZSP to the wrong serial port — usually the NCP re-enumerated off `/dev/ttyACM0` after a re-plug. Identify the NCP port by J-Link serial (`ls -l /dev/serial/by-id | grep D13-3`) and restart with `UART=/dev/ttyACMx` (see "Gateway Run").

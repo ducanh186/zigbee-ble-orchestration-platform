@@ -20,9 +20,13 @@ This platform has five runtime parts: Cloud, Mobile, MQTT, Gateway, and Zigbee d
 1. A Zigbee device changes state or emits an event.
 2. The Gateway receives it from the local Zigbee stack.
 3. The Gateway publishes an MQTT message under `sb/v1/{tenant}/{site}/{gateway}/devices/...`.
-4. Cloud subscribes to reported, telemetry, event, registry, command reply, gateway health, automation, and OTA topics.
+4. Cloud subscribes to reported, telemetry, event, registry, presence, command reply, gateway health, automation, and OTA topics.
 5. Cloud upserts device records and writes `device_states`, `events`, or command status rows.
 6. Mobile reads the latest state through the REST API.
+
+### Device Liveness
+
+The Gateway tracks each joined device and publishes `devices/{type}/{id}/presence` (retained), which Cloud maps to `is_online` and `last_seen_at`. Because the device registry on the Gateway is in-RAM (rebuilt every boot), a boot/periodic rediscovery walks the NCP child **and neighbor** tables so already-joined routers re-register without rejoining, and a presence heartbeat keeps `last_seen_at` fresh so an idle-but-joined device is not aged out by Cloud's offline reaper.
 
 ### Command Flow
 

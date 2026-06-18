@@ -40,6 +40,20 @@ bash scripts/start-gateway-cloud.sh
 
 Use `scripts/start-gateway.sh` (localhost:1883) only for offline local-dev when the cloud broker is unreachable. See [`OPERATIONS.md`](OPERATIONS.md) → "Gateway Run" for details.
 
+### Gateway And End-Device Builds (headless, no Simplicity Studio)
+
+The single canonical gateway tree is `gateway/Z3GatewayHost/` (sources plus the tracked binary at `build/debug/Z3Gateway`). The repo is the source of truth; builds happen in a separate Simplicity workspace and the fresh binary is copied back. See `CLAUDE.md` → "Z3Gateway build workflow" for the exact sync/build/copy-back steps.
+
+The four end-device kits (`Z3Light`, `Z3Switch`, `Z3_Occupancy_Sensor`, `Z3_DHT11_Sensor` under `end_devices/<kit>/`) build, flash, and verify headlessly via `scripts/kit.sh` (slc-cli + GNU ARM 12.2.1 + Commander) — no IDE:
+
+```bash
+bash scripts/setup-silabs-toolchain.sh   # one-time toolchain setup
+bash scripts/kit.sh learn <kit>          # record a board's J-Link serial (plug in one kit)
+bash scripts/kit.sh build|flash|verify|all <kit|all>
+```
+
+Only the tracked `artifact/<kit>/<kit>.s37` round-trips back into the repo; `slc generate` output and build dirs live out-of-tree. See `CLAUDE.md` → "End-device kit build/flash workflow" for details.
+
 ### Deploy Scripts
 
 PowerShell is the default shell on this machine. Use PowerShell syntax for multiline scripts and temp files. Do not paste Bash heredocs into PowerShell.

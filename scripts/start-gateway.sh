@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Persistent start path for Z3Gateway host on the dev box.
 #
-# Mirrors the documented launch sequence in docs/instruct.md §G with two
+# Mirrors the documented launch sequence in docs/OPERATIONS.md "Gateway Run" with two
 # automation env vars pinned to the values we want from now on:
 #
 #   SB_AUTOMATION_SWITCH_HOOK=1  — cloud-pushed automation rules drive the
@@ -14,7 +14,7 @@
 # Why a script (and not just docs): the env-var combo is now load-bearing
 # for switch-to-light behavior. Drift here = silent dead-toggle.
 #
-# Stop first per §G:
+# Stop first per docs/OPERATIONS.md "Gateway Run":
 #   kill "$(cat /tmp/z3gw.pid)" 2>/dev/null
 #   while fuser /dev/ttyACM0 >/dev/null 2>&1; do sleep 1; done
 #
@@ -30,7 +30,7 @@ BAUD="${BAUD:-115200}"
 LOG="${LOG:-/tmp/z3gw.log}"
 PIDFILE="${PIDFILE:-/tmp/z3gw.pid}"
 
-# MQTT — match docs/instruct.md §G dev defaults.
+# MQTT — match docs/OPERATIONS.md "Gateway Run" dev defaults.
 export SB_MQTT_HOST="${SB_MQTT_HOST:-localhost}"
 export SB_MQTT_PORT="${SB_MQTT_PORT:-1883}"
 export SB_MQTT_USERNAME="${SB_MQTT_USERNAME:-gateway}"
@@ -55,7 +55,7 @@ if fuser "$UART" >/dev/null 2>&1; then
   exit 1
 fi
 
-# sleep infinity provides a never-EOF stdin to sl_iostream — see docs/instruct.md §G.
+# sleep infinity provides a never-EOF stdin to sl_iostream — see docs/OPERATIONS.md "Gateway Run".
 cd "$(dirname "$BIN")"
 ( sleep infinity | "$BIN" -p "$UART" -b "$BAUD" >"$LOG" 2>&1 ) &
 disown

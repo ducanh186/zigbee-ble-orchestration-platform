@@ -36,16 +36,23 @@ static uint32_t g_openTick        = 0;
 // netMgrOpenForJoin() overrides this per request.
 static uint32_t g_openDurationMs  = 0;
 
-// Layer-1 boot rediscovery: 0 = inactive, otherwise msTick deadline at which
-// netMgrTick() should walk the child table and queue ZDO discovery for any
-// already-joined device the registry does not yet classify.  This solves the
-// case where a device joined before this gateway instance started: the TC-join
-// callback never fired so neither device_discovery nor the registry got
-// populated, and the device stays invisible until it happens to publish an
-// attribute report. We defer a few seconds after EMBER_NETWORK_UP so the
-// EZSP-host cache of the NCP child table has time to repopulate.
+// Boot + periodic rediscovery: 0 = inactive, otherwise msTick deadline at which
+// netMgrTick() walks the NCP child AND neighbor tables and queues ZDO discovery
+// for any already-joined device the registry does not yet classify. This solves
+// the case where a device joined before this gateway instance started: the
+// TC-join callback never fired (an already-keyed router rejoins UNSECURED, which
+// fires no join callback), so neither device_discovery nor the registry — which
+// is RAM-only and rebuilt every boot — got populated, and the device stays
+// invisible until it happens to publish a report. A silent router (button
+// switch, idle occupancy sensor) may never publish, so it would be reaped
+// offline while still joined (LED on). The first sweep defers a few seconds
+// after EMBER_NETWORK_UP; we then re-arm periodically because after an NCP reset
+// the neighbor table repopulates only as link-status messages arrive (~16 s
+// cadence), and because a later silent rejoin must also be re-registered.
 static uint32_t g_rediscoverDeadline = 0;
+static bool     g_rediscoverDidFirst = false;
 #define BOOT_REDISCOVER_DELAY_MS 3000u
+#define REDISCOVER_PERIOD_MS     30000u
 
 static bool startNetworkForm(uint16_t panId, int8_t txPwrDbm, uint8_t ch, const char *src)
 {
@@ -92,47 +99,79 @@ bool netMgrRequestForm(NetCfg_t cfg, const char *src, bool force)
   return (st == EMBER_SUCCESS);
 }
 
-// Layer-1: walk the EZSP child table and run ZDO discovery for any device
-// that is on the network but not yet classified in our registry (or is
-// classified as "unknown"). Idempotent — deviceDiscoveryStart reuses slot
-// for the same nodeId.
-static void netMgrRediscoverChildren(void)
+// Run ZDO discovery for one already-joined device the registry has not yet
+// classified. Skips devices already classified or with a discovery already in
+// flight, so a periodic re-sweep does not restart in-progress discoveries.
+static void netMgrRediscoverConsider(EmberNodeId nodeId, const EmberEUI64 euiLe,
+                                     const char *src, bool verbose,
+                                     uint8_t *kicked, uint8_t *skipped)
 {
-  uint8_t kicked = 0, skipped = 0, scanned = 0;
-#ifdef EMBER_AF_PLUGIN_CHILD_TABLE_SIZE
-  const uint8_t maxIdx = EMBER_AF_PLUGIN_CHILD_TABLE_SIZE;
-#else
-  const uint8_t maxIdx = 32;  // safe upper bound for EZSP host child table
-#endif
-  for (uint8_t i = 0; i < maxIdx; i++) {
-    EmberChildData child;
-    EmberStatus st = emberGetChildData(i, &child);
-    if (st != EMBER_SUCCESS) continue;
-    scanned++;
+  if (deviceDiscoveryInProgress(nodeId)) { (*skipped)++; return; }
 
-    char euiStr[17];
-    eui64ToStringBigEndian(euiStr, sizeof(euiStr), child.eui64);
+  char euiStr[17];
+  eui64ToStringBigEndian(euiStr, sizeof(euiStr), euiLe);
 
-    device_resolved_t resolved;
-    bool inReg = deviceRegistryResolve(euiStr, &resolved);
-    if (inReg && resolved.device_type[0]
-        && strcmp(resolved.device_type, "unknown") != 0) {
+  device_resolved_t resolved;
+  if (deviceRegistryResolve(euiStr, &resolved)
+      && resolved.device_type[0]
+      && strcmp(resolved.device_type, "unknown") != 0) {
+    if (verbose) {
       appLogLog("BOOT", "rediscover_skip",
         "\"eui64\":\"%s\",\"node_id\":\"0x%04X\",\"type\":\"%s\","
-        "\"reason\":\"already_classified\"",
-        euiStr, (unsigned)child.id, resolved.device_type);
-      skipped++;
-      continue;
+        "\"src\":\"%s\",\"reason\":\"already_classified\"",
+        euiStr, (unsigned)nodeId, resolved.device_type, src);
     }
-    appLogLog("BOOT", "rediscover_kick",
-      "\"eui64\":\"%s\",\"node_id\":\"0x%04X\"",
-      euiStr, (unsigned)child.id);
-    deviceDiscoveryStart(child.id, child.eui64);
-    kicked++;
+    (*skipped)++;
+    return;
   }
-  appLogLog("BOOT", "rediscover_done",
-    "\"scanned\":%u,\"kicked\":%u,\"skipped\":%u",
-    (unsigned)scanned, (unsigned)kicked, (unsigned)skipped);
+  appLogLog("BOOT", "rediscover_kick",
+    "\"eui64\":\"%s\",\"node_id\":\"0x%04X\",\"src\":\"%s\"",
+    euiStr, (unsigned)nodeId, src);
+  deviceDiscoveryStart(nodeId, euiLe);
+  (*kicked)++;
+}
+
+// Walk the devices the NCP already knows and run ZDO discovery for any this
+// gateway instance has not classified yet. Two sources, because a joined device
+// is either a CHILD of the coordinator (EZSP child table — sleepy/end devices)
+// or a mains-powered ROUTER (neighbor table — every kit in this deployment).
+// The original implementation walked only the child table, so after a restart
+// the router-only kit set produced scanned:0 and nothing re-registered. NOTE:
+// the neighbor table holds only 1-hop routers; a multi-hop router would need a
+// ZDO broadcast to rediscover (not implemented — every kit here is 1 hop).
+// `verbose` is true for the first boot sweep, false for periodic re-sweeps so
+// the steady state stays quiet.
+static void netMgrBootRediscover(bool verbose)
+{
+  uint8_t kicked = 0, skipped = 0, children = 0, neighbors = 0;
+
+#ifdef EMBER_AF_PLUGIN_CHILD_TABLE_SIZE
+  const uint8_t maxChild = EMBER_AF_PLUGIN_CHILD_TABLE_SIZE;
+#else
+  const uint8_t maxChild = 32;  // safe upper bound for EZSP host child table
+#endif
+  for (uint8_t i = 0; i < maxChild; i++) {
+    EmberChildData child;
+    if (emberGetChildData(i, &child) != EMBER_SUCCESS) continue;
+    children++;
+    netMgrRediscoverConsider(child.id, child.eui64, "child", verbose,
+                             &kicked, &skipped);
+  }
+
+  uint8_t nCount = emberNeighborCount();
+  for (uint8_t i = 0; i < nCount; i++) {
+    EmberNeighborTableEntry n;
+    if (emberGetNeighbor(i, &n) != EMBER_SUCCESS) continue;
+    neighbors++;
+    netMgrRediscoverConsider(n.shortId, n.longId, "neighbor", verbose,
+                             &kicked, &skipped);
+  }
+
+  if (verbose || kicked > 0) {
+    appLogLog("BOOT", "rediscover_done",
+      "\"children\":%u,\"neighbors\":%u,\"kicked\":%u,\"skipped\":%u",
+      (unsigned)children, (unsigned)neighbors, (unsigned)kicked, (unsigned)skipped);
+  }
 }
 
 // Layer-2: on-demand rediscovery by big-endian EUI64 hex (gateway.rediscover_device).
@@ -187,11 +226,14 @@ void netMgrTick(void)
   secMgrTick();
 
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_CREATOR_SECURITY_PRESENT
-  // Layer-1 boot rediscovery fires once, ~3 s after EMBER_NETWORK_UP.
+  // Boot rediscovery fires ~3 s after EMBER_NETWORK_UP, then re-arms on a period
+  // so late-populating neighbor entries (after the NCP reset) and silent rejoins
+  // still get registered. First sweep is verbose; re-sweeps are quiet.
   if (g_rediscoverDeadline != 0
       && (int32_t)(msTick() - g_rediscoverDeadline) >= 0) {
-    g_rediscoverDeadline = 0;
-    netMgrRediscoverChildren();
+    netMgrBootRediscover(!g_rediscoverDidFirst);
+    g_rediscoverDidFirst = true;
+    g_rediscoverDeadline = msTick() + REDISCOVER_PERIOD_MS;
   }
 
   uint32_t window = (g_openDurationMs > 0) ? g_openDurationMs : OPEN_JOIN_MS;
