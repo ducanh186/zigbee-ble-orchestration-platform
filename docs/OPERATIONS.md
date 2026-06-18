@@ -45,7 +45,20 @@ UART=/dev/ttyACM1 bash scripts/start-gateway-cloud.sh
 
 Use the short `/dev/ttyACM*` device path, not the long `/dev/serial/by-id/...` path — the Z3Gateway firmware truncates the serial-port-name buffer.
 
-`scripts/start-gateway.sh` (localhost:1883) is retained only for offline local-dev when the cloud broker is unavailable; it is not the standard path. Because the dashboard and cloud also default to EC2, keeping the gateway on EC2 means all three share one broker.
+### Offline Local-Dev Run
+
+`scripts/start-gateway.sh` (localhost:1883) is retained only for offline local-dev when the cloud broker is unavailable; it is not the standard path. Because the dashboard and cloud also default to EC2, keeping the gateway on EC2 means all three share one broker. The local-dev script pins its launch sequence so behavior does not drift:
+
+- **Stop the previous gateway first** and wait for the NCP serial port to be released before relaunching, otherwise the port grab (and any binary copy-back) fails with `Text file busy`:
+
+  ```bash
+  kill "$(cat /tmp/z3gw.pid)" 2>/dev/null
+  while fuser /dev/ttyACM0 >/dev/null 2>&1; do sleep 1; done
+  ```
+
+- **Local MQTT defaults** are `localhost:1883` with the `gateway` / `gateway123` development credentials (override via `SB_MQTT_HOST`, `SB_MQTT_PORT`, `SB_MQTT_USERNAME`, `SB_MQTT_PASSWORD`). These are dev-only and are not used in production certificate-identity mode.
+- **Automation routing** is pinned with `SB_AUTOMATION_SWITCH_HOOK=1` (cloud-pushed rules drive the switch → light path; the `AUTO` init log must show `skip_switch:false hook:true`) and `SB_RULES_SWITCH_TO_LIGHT=0` (the legacy hardcoded relay stays off; the `RULE` engine init must show `switch_to_light_relay:false`). Drift here silently breaks switch-to-light.
+- The script pipes `sleep infinity` into the binary so `sl_iostream` always sees a never-EOF stdin; without it the host exits as soon as stdin closes.
 
 ## Local Mobile Run
 
