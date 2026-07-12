@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from croniter import croniter
 from pydantic import (
@@ -19,12 +20,14 @@ from pydantic import (
 from cloud.app.provisioning_install_code import normalize_install_code
 
 TS_DISPLAY_FORMAT = "%H:%M %m/%d/%Y"
+DISPLAY_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def _fmt_ts(value: datetime | None) -> str | None:
     if value is None:
         return None
-    return value.strftime(TS_DISPLAY_FORMAT)
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return aware.astimezone(DISPLAY_TIMEZONE).strftime(TS_DISPLAY_FORMAT)
 
 
 _HEX_RE = re.compile(r"^[0-9a-fA-F]+$")

@@ -396,3 +396,20 @@ class TestTranslateCommandForGateway:
             translate_command_for_gateway(
                 "light", "device.set_room", {"room_id": ""}
             )
+
+
+# ---- _fmt_ts timezone conversion ----
+
+def test_fmt_ts_converts_naive_utc_to_local():
+    from datetime import datetime
+
+    from cloud.app.schemas import _fmt_ts
+
+    # 18:55 UTC on 2026-07-12 == 01:55 (+07) on 2026-07-13.
+    assert _fmt_ts(datetime(2026, 7, 12, 18, 55)) == "01:55 07/13/2026"
+
+
+def test_fmt_ts_none_passthrough():
+    from cloud.app.schemas import _fmt_ts
+
+    assert _fmt_ts(None) is None
