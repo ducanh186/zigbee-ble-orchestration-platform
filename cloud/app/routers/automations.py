@@ -187,14 +187,10 @@ async def _validate_rule_template(
     for action in actions:
         action_type = action.get("type", "device_command")
         if action_type == "scene_activate":
-            if trigger_type != "schedule":
-                raise HTTPException(
-                    status_code=422,
-                    detail="Scene actions require a schedule trigger",
-                )
-            _require_string(action, "group_id")
-            _require_string(action, "scene_id")
-            continue
+            raise HTTPException(
+                status_code=422,
+                detail="scheduled scene actions are not yet supported",
+            )
 
         action_device_id = _require_string(action, "device_id")
         action_device_type = _require_string(action, "device_type")

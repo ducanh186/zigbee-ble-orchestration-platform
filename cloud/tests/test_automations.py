@@ -180,7 +180,7 @@ async def test_create_schedule_rule_rejects_bad_cron(
 
 
 @pytest.mark.asyncio
-async def test_create_schedule_rule_accepts_scene_action(
+async def test_create_schedule_rule_rejects_scene_action(
     client, db_session_factory, fake_mqtt
 ):
     headers = await _parent_headers(client, db_session_factory)
@@ -199,8 +199,10 @@ async def test_create_schedule_rule_accepts_scene_action(
         headers=headers,
     )
 
-    assert response.status_code == 201, response.text
-    assert response.json()["actions"] == rule["actions"]
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == (
+        "scheduled scene actions are not yet supported"
+    )
 
 
 @pytest.mark.asyncio
