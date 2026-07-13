@@ -2,13 +2,31 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cloud.app.command_execution import (
     CommandExecutionError,
     execute_device_command,
 )
-from cloud.app.models import Automation, AutomationEvent
+from cloud.app.models import Automation, AutomationEvent, DeviceState
+
+
+async def _resolve_toggle(db: AsyncSession, device_id: str) -> str:
+    row = (
+        await db.execute(
+            select(DeviceState.state)
+            .where(DeviceState.device_id == device_id)
+            .order_by(DeviceState.reported_at.desc())
+            .limit(1)
+        )
+    ).first()
+    power = (row[0] or {}).get("power") if row else None
+    if power not in {"on", "off"}:
+        raise CommandExecutionError(
+            422, "toggle requires known device power state"
+        )
+    return "off" if power == "on" else "on"
 
 
 async def execute_automation_rule(
@@ -27,11 +45,13 @@ async def execute_automation_rule(
             if action.get("type", "device_command") != "device_command":
                 raise CommandExecutionError(422, "unsupported_action")
             command = action.get("command")
-            if command not in {"on", "off"}:
+            if command not in {"on", "off", "toggle"}:
                 raise CommandExecutionError(
                     422,
-                    "scheduled actions support light on/off only",
+                    "scheduled actions support light on/off/toggle only",
                 )
+            if command == "toggle":
+                command = await _resolve_toggle(db, action["device_id"])
             created = await execute_device_command(
                 db,
                 device_id=action["device_id"],

@@ -87,7 +87,7 @@ async def test_gateway_status_is_visible_to_authenticated_roles(
             "gateway_id": GW,
             "status": "offline",
             "event_type": "gateway_online",
-            "occurred_at": "08:00 06/13/2026",
+            "occurred_at": "15:00 06/13/2026",
         }
 
 

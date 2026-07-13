@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+import logging
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from croniter import croniter
@@ -9,6 +10,8 @@ from sqlalchemy import select
 
 from cloud.app.automation_execution import execute_automation_rule
 from cloud.app.models import Automation
+
+logger = logging.getLogger(__name__)
 
 SCHEDULE_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
@@ -53,26 +56,44 @@ class ScheduleWorker:
                 key = (rule.id, slot)
                 if key in self._last_slots:
                     continue
-                if rule.schedule_cron and is_schedule_due(
-                    rule.schedule_cron,
-                    slot,
+                if not (
+                    rule.schedule_cron
+                    and is_schedule_due(rule.schedule_cron, slot)
                 ):
+                    continue
+                try:
                     await self._executor(
                         db,
                         rule,
-                        scheduled_for=slot.replace(tzinfo=None),
+                        # Store naive-UTC to match the rest of the system
+                        # (device/command/event timestamps are all naive-UTC,
+                        # and _fmt_ts converts UTC->local for display). `slot`
+                        # is local (HCM) tz-aware, so convert before dropping
+                        # tzinfo — otherwise occurred_at displays +7h off.
+                        scheduled_for=slot.astimezone(UTC).replace(tzinfo=None),
                     )
                     self._last_slots.add(key)
+                except Exception:
+                    # One bad rule must not sink the batch or bubble out of
+                    # run_once. Key is NOT added, so it retries next tick.
+                    logger.exception(
+                        "schedule rule %s failed to execute", rule.id
+                    )
 
     async def run_forever(self, stop_event: asyncio.Event) -> None:
+        logger.info("Schedule worker started (tz=%s)", self.timezone)
         while not stop_event.is_set():
-            await self.run_once()
+            try:
+                await self.run_once()
+            except Exception:
+                logger.exception("schedule run_once failed")
             now = datetime.now(self.timezone)
             delay = 60 - now.second - now.microsecond / 1_000_000
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=delay)
             except asyncio.TimeoutError:
                 pass
+        logger.info("Schedule worker stopped")
 
 
 async def run_schedule_worker(session_factory, stop_event: asyncio.Event):
