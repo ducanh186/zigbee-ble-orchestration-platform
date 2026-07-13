@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from croniter import croniter
@@ -65,7 +65,12 @@ class ScheduleWorker:
                     await self._executor(
                         db,
                         rule,
-                        scheduled_for=slot.replace(tzinfo=None),
+                        # Store naive-UTC to match the rest of the system
+                        # (device/command/event timestamps are all naive-UTC,
+                        # and _fmt_ts converts UTC->local for display). `slot`
+                        # is local (HCM) tz-aware, so convert before dropping
+                        # tzinfo — otherwise occurred_at displays +7h off.
+                        scheduled_for=slot.astimezone(UTC).replace(tzinfo=None),
                     )
                     self._last_slots.add(key)
                 except Exception:
